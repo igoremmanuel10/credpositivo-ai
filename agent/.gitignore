@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Data directories
+data/
+uploads/
+monitor/
+public/
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
+
+# Backup files
+*.bak

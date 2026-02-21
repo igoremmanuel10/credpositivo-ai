@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Data and uploads
+agent/data/
+agent/uploads/
+agent/monitor/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Backup files
+*.bak
+*.backup
+
+# Docker volumes (not needed in git)
+postgres_data/
+redis_data/
+quepasa_data/
