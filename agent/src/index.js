@@ -22,6 +22,7 @@ import { getBridgeHealth } from './bridge-health.js';
 import { startBridgeWatchdog } from './bridge-watchdog.js';
 import { startReportScheduler, sendDailyReportNow, sendWeeklyRatingReportNow } from './reports/scheduler.js';
 import { getCostSummary } from './monitoring/cost-tracker.js';
+import { analyticsRouter } from './api/analytics.js';
 import { startExpenseScheduler } from './expense/tracker.js';
 
 const app = express();
@@ -96,6 +97,9 @@ app.use(couponRouter);
 app.use(voicecallRouter);
 // Vapi.ai voice call webhooks
 app.use(vapiWebhookRouter);
+
+// Analytics API (admin only)
+app.use(analyticsRouter);
 
 // API cost summary (admin only)
 app.get('/api/admin/costs', async (req, res) => {
