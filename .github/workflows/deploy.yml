@@ -7,6 +7,10 @@ on:
       - 'agent/**'
       - '.github/workflows/deploy.yml'
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -46,6 +50,9 @@ jobs:
           script: |
             set -e
             cd /opt/credpositivo-agent
+
+            echo "=== Cleaning stale containers ==="
+            docker compose rm -f agent 2>/dev/null || true
 
             echo "=== Rebuilding agent container ==="
             docker compose up -d --build agent
