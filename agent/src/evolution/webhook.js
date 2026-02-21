@@ -292,13 +292,6 @@ webhookRouter.post('/webhook/chatwoot', async (req, res) => {
   }
 });
 
-// ============================================
-// Legacy Evolution webhook (keep for compat)
-// ============================================
-webhookRouter.post(['/webhook', '/webhook/evolution'], async (req, res) => {
-  res.status(200).json({ status: 'received' });
-});
-
 export function getQrState() {
   return { qrCode: null, timestamp: null, connectionState: 'use-quepasa-ui' };
 }

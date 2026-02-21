@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CredPositivo Analytics</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-page:    #0d1117;
+      --bg-card:    #161b22;
+      --bg-input:   #1c2330;
+      --bg-hover:   #1f2937;
+      --border:     #30363d;
+      --accent:     #3b82f6;
+      --accent-dim: #1d4ed8;
+      --accent-glow:#60a5fa;
+      --success:    #22c55e;
+      --warning:    #f59e0b;
+      --danger:     #ef4444;
+      --orange:     #f97316;
+      --text-pri:   #e6edf3;
+      --text-sec:   #8b949e;
+      --text-muted: #656d76;
+      --radius:     10px;
+      --shadow:     0 1px 3px rgba(0,0,0,.4);
+    }
+
+    html, body {
+      height: 100%;
+      background-color: var(--bg-page);
+      color: var(--text-pri);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ─── SCROLLBAR ─── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-page); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ─── VIEWS ─── */
+    #view-login, #view-2fa, #view-dashboard {
+      display: none;
+    }
+    #view-login.active, #view-2fa.active, #view-dashboard.active {
+      display: flex;
+    }
+
+    /* ─── LOGIN & 2FA ─── */
+    #view-login, #view-2fa {
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .auth-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    }
+
+    .auth-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .auth-logo-icon {
+      width: 38px;
+      height: 38px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .auth-logo-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-pri);
+      line-height: 1.2;
+    }
+
+    .auth-logo-sub {
+      font-size: 11px;
+      color: var(--text-sec);
+      font-weight: 400;
+    }
+
+    .auth-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-pri);
+      margin-bottom: 6px;
+    }
+
+    .auth-subtitle {
+      color: var(--text-sec);
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-sec);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-pri);
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn-primary {
+      display: block;
+      width: 100%;
+      padding: 11px 16px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: background .2s, transform .1s;
+    }
+
+    .btn-primary:hover { background: var(--accent-dim); }
+    .btn-primary:active { transform: scale(.98); }
+
+    .btn-primary:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .auth-error {
+      background: rgba(239,68,68,.12);
+      border: 1px solid rgba(239,68,68,.35);
+      color: #fca5a5;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-top: 14px;
+      display: none;
+    }
+
+    .auth-error.visible { display: block; }
+
+    .auth-back-link {
+      display: block;
+      text-align: center;
+      margin-top: 16px;
+      color: var(--text-sec);
+      font-size: 13px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      text-decoration: underline;
+    }
+
+    .auth-back-link:hover { color: var(--accent-glow); }
+
+    .totp-hint {
+      font-size: 12px;
+      color: var(--text-sec);
+      margin-top: 8px;
+    }
+
+    /* ─── DASHBOARD ─── */
+    #view-dashboard {
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .header-logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-pri);
+    }
+
+    .header-subtitle {
+      font-size: 11px;
+      color: var(--text-sec);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .refresh-indicator {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-sec);
+      border-radius: 6px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all .2s;
+    }
+
+    .btn-icon:hover {
+      background: var(--bg-hover);
+      color: var(--text-pri);
+      border-color: var(--accent);
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-sec);
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all .2s;
+    }
+
+    .btn-logout:hover {
+      border-color: var(--danger);
+      color: #fca5a5;
+      background: rgba(239,68,68,.08);
+    }
+
+    .main {
+      flex: 1;
+      padding: 24px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ─── PERIOD SELECTOR ─── */
+    .period-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .period-label {
+      font-size: 12px;
+      color: var(--text-sec);
+      margin-right: 4px;
+    }
+
+    .period-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-sec);
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all .2s;
+    }
+
+    .period-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-pri);
+    }
+
+    .period-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .last-update {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ─── METRIC CARDS ─── */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+
+    .metric-card:hover { border-color: var(--accent); }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    .metric-card.blue::before   { background: var(--accent); }
+    .metric-card.green::before  { background: var(--success); }
+    .metric-card.orange::before { background: var(--orange); }
+    .metric-card.red::before    { background: var(--danger); }
+
+    .metric-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-sec);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 10px;
+    }
+
+    .metric-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--text-pri);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .metric-value.loading-placeholder {
+      background: var(--bg-input);
+      border-radius: 4px;
+      height: 36px;
+      width: 60%;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .metric-sub {
+      font-size: 12px;
+      color: var(--text-sec);
+    }
+
+    .metric-sub strong {
+      color: var(--text-pri);
+    }
+
+    /* ─── CHARTS GRID ─── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+    }
+
+    .chart-card.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 12px;
+    }
+
+    .chart-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-pri);
+      margin-bottom: 3px;
+    }
+
+    .chart-desc {
+      font-size: 12px;
+      color: var(--text-sec);
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 260px;
+    }
+
+    .chart-wrap canvas {
+      display: block;
+    }
+
+    /* ─── PRODUCT TABLE ─── */
+    .table-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-top: 14px;
+    }
+
+    .table-header {
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-pri);
+      margin-bottom: 3px;
+    }
+
+    .table-desc {
+      font-size: 12px;
+      color: var(--text-sec);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .data-table th {
+      padding: 10px 22px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      text-align: left;
+      background: rgba(255,255,255,.02);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 12px 22px;
+      font-size: 13px;
+      color: var(--text-pri);
+      border-bottom: 1px solid rgba(48,54,61,.5);
+      vertical-align: middle;
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table tbody tr:hover td {
+      background: rgba(255,255,255,.02);
+    }
+
+    .product-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .3px;
+    }
+
+    .badge-diagnostico  { background: rgba(59,130,246,.15); color: #93c5fd; }
+    .badge-limpa        { background: rgba(34,197,94,.15);  color: #86efac; }
+    .badge-rating       { background: rgba(249,115,22,.15); color: #fdba74; }
+    .badge-none         { background: rgba(139,148,158,.12); color: var(--text-sec); }
+
+    .progress-bar-wrap {
+      background: var(--bg-input);
+      border-radius: 3px;
+      height: 5px;
+      width: 100%;
+      min-width: 80px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--accent);
+      transition: width .5s ease;
+    }
+
+    /* ─── LOADING / ERROR STATES ─── */
+    .state-loading,
+    .state-error {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+      gap: 12px;
+      color: var(--text-sec);
+      font-size: 13px;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    .error-msg {
+      color: #fca5a5;
+      font-size: 13px;
+      text-align: center;
+      max-width: 280px;
+    }
+
+    .btn-retry {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-sec);
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all .2s;
+    }
+
+    .btn-retry:hover {
+      background: var(--bg-hover);
+      color: var(--text-pri);
+    }
+
+    /* ─── TOAST ─── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-pri);
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .25s, transform .25s;
+      pointer-events: none;
+    }
+
+    #toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #toast.toast-error { border-color: var(--danger); }
+    #toast.toast-success { border-color: var(--success); }
+
+    /* ─── ANIMATIONS ─── */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: .4; }
+      50% { opacity: .7; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-in {
+      animation: fadeIn .3s ease forwards;
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 900px) {
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+      .charts-row  { grid-template-columns: 1fr; }
+      .main { padding: 16px; }
+    }
+
+    @media (max-width: 560px) {
+      .metric-grid { grid-template-columns: 1fr 1fr; }
+      .metric-value { font-size: 1.7rem; }
+      .header { padding: 0 14px; }
+      .main { padding: 12px; }
+      .auth-card { padding: 28px 20px; }
+      .data-table th,
+      .data-table td { padding: 10px 14px; }
+    }
+
+    @media (max-width: 400px) {
+      .metric-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===================== LOGIN VIEW ===================== -->
+<div id="view-login">
+  <div class="auth-card fade-in">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">CP</div>
+      <div>
+        <div class="auth-logo-text">CredPositivo</div>
+        <div class="auth-logo-sub">Painel Administrativo</div>
+      </div>
+    </div>
+
+    <h1 class="auth-title">Entrar</h1>
+    <p class="auth-subtitle">Acesse o painel de analytics do agente.</p>
+
+    <form id="form-login" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="input-email">E-mail</label>
+        <input
+          id="input-email"
+          class="form-input"
+          type="email"
+          placeholder="admin@credpositivo.com.br"
+          autocomplete="username"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="input-senha">Senha</label>
+        <input
+          id="input-senha"
+          class="form-input"
+          type="password"
+          placeholder="Sua senha"
+          autocomplete="current-password"
+          required
+        />
+      </div>
+      <button type="submit" class="btn-primary" id="btn-login">Entrar</button>
+      <div class="auth-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== 2FA VIEW ===================== -->
+<div id="view-2fa">
+  <div class="auth-card fade-in">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">CP</div>
+      <div>
+        <div class="auth-logo-text">CredPositivo</div>
+        <div class="auth-logo-sub">Painel Administrativo</div>
+      </div>
+    </div>
+
+    <h1 class="auth-title" id="twofa-title">Verificacao em 2 etapas</h1>
+    <p class="auth-subtitle" id="twofa-subtitle">
+      Digite o codigo de 6 digitos gerado pelo seu autenticador.
+    </p>
+
+    <!-- Setup QR code container (hidden until needed) -->
+    <div id="setup-container" style="display:none; margin-bottom:20px;">
+      <div style="font-size:12px; color:var(--text-sec); margin-bottom:10px;">
+        Escaneie o QR code no seu app autenticador (Google Authenticator, Authy, etc.):
+      </div>
+      <div id="setup-qr" style="background:#fff; padding:10px; border-radius:6px; display:inline-block; margin-bottom:10px;"></div>
+      <div style="font-size:11px; color:var(--text-muted); word-break:break-all;" id="setup-secret-text"></div>
+    </div>
+
+    <form id="form-2fa" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="input-totp">Codigo TOTP</label>
+        <input
+          id="input-totp"
+          class="form-input"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          maxlength="6"
+          placeholder="000000"
+          autocomplete="one-time-code"
+          required
+        />
+        <div class="totp-hint">O codigo muda a cada 30 segundos.</div>
+      </div>
+      <button type="submit" class="btn-primary" id="btn-2fa">Verificar</button>
+      <div class="auth-error" id="twofa-error"></div>
+    </form>
+    <button class="auth-back-link" id="btn-back-login">Voltar para o login</button>
+  </div>
+</div>
+
+<!-- ===================== DASHBOARD VIEW ===================== -->
+<div id="view-dashboard">
+
+  <header class="header">
+    <div class="header-logo">
+      <div class="header-logo-icon">CP</div>
+      <div>
+        <div class="header-title">CredPositivo Analytics</div>
+        <div class="header-subtitle">Painel do Agente Augusto</div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <span class="refresh-indicator" id="refresh-timer">Auto-refresh em 5:00</span>
+      <button class="btn-icon" id="btn-refresh" title="Atualizar dados agora">Atualizar</button>
+      <button class="btn-logout" id="btn-logout">Sair</button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- PERIOD SELECTOR -->
+    <div class="period-bar">
+      <span class="period-label">Periodo:</span>
+      <button class="period-btn" data-days="7">7 dias</button>
+      <button class="period-btn active" data-days="30">30 dias</button>
+      <button class="period-btn" data-days="14">14 dias</button>
+      <button class="period-btn" data-days="90">90 dias</button>
+      <span class="last-update" id="last-update-time"></span>
+    </div>
+
+    <!-- METRIC CARDS -->
+    <div class="metric-grid" id="metric-grid">
+      <div class="metric-card blue">
+        <div class="metric-label">Conversas</div>
+        <div class="metric-value loading-placeholder" id="metric-conversations"></div>
+        <div class="metric-sub" id="metric-conversations-sub">Carregando...</div>
+      </div>
+      <div class="metric-card green">
+        <div class="metric-label">Mensagens</div>
+        <div class="metric-value loading-placeholder" id="metric-messages"></div>
+        <div class="metric-sub" id="metric-messages-sub">Carregando...</div>
+      </div>
+      <div class="metric-card orange">
+        <div class="metric-label">Custo API (USD)</div>
+        <div class="metric-value loading-placeholder" id="metric-cost"></div>
+        <div class="metric-sub" id="metric-cost-sub">Carregando...</div>
+      </div>
+      <div class="metric-card red">
+        <div class="metric-label">Taxa de Opt-out</div>
+        <div class="metric-value loading-placeholder" id="metric-optout"></div>
+        <div class="metric-sub" id="metric-optout-sub">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW 1 -->
+    <div class="charts-row">
+      <!-- Funnel Chart -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Funil de Conversao</div>
+            <div class="chart-desc">Conversas por fase do atendimento</div>
+          </div>
+        </div>
+        <div class="chart-wrap" id="chart-funnel-wrap">
+          <div class="state-loading" id="funnel-loading">
+            <div class="spinner"></div>
+            <span>Carregando...</span>
+          </div>
+          <canvas id="chart-funnel" style="display:none;"></canvas>
+        </div>
+      </div>
+
+      <!-- Daily Activity Chart -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Atividade Diaria</div>
+            <div class="chart-desc">Conversas e mensagens por dia</div>
+          </div>
+        </div>
+        <div class="chart-wrap" id="chart-daily-wrap">
+          <div class="state-loading" id="daily-loading">
+            <div class="spinner"></div>
+            <span>Carregando...</span>
+          </div>
+          <canvas id="chart-daily" style="display:none;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW 2: Daily Costs -->
+    <div class="charts-row">
+      <div class="chart-card full-width">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title">Custos Diarios (USD)</div>
+            <div class="chart-desc">Custo de API por dia no periodo selecionado</div>
+          </div>
+        </div>
+        <div class="chart-wrap" id="chart-costs-wrap">
+          <div class="state-loading" id="costs-loading">
+            <div class="spinner"></div>
+            <span>Carregando...</span>
+          </div>
+          <canvas id="chart-costs" style="display:none;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCT TABLE -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Distribuicao de Produtos</div>
+        <div class="table-desc">Recomendacoes do agente por produto</div>
+      </div>
+      <div id="products-state">
+        <div class="state-loading" id="products-loading">
+          <div class="spinner"></div>
+          <span>Carregando...</span>
+        </div>
+      </div>
+      <table class="data-table" id="products-table" style="display:none;">
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th>Conversas</th>
+            <th>Chegaram ao Site</th>
+            <th>Dropouts</th>
+            <th>Conversao</th>
+          </tr>
+        </thead>
+        <tbody id="products-tbody"></tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ─────────────────────────────────────────────
+  //  CONFIG
+  // ─────────────────────────────────────────────
+  const BASE_URL = '';          // same-origin; prefix if API differs
+  const TOKEN_KEY = 'admin_token';
+  const AUTO_REFRESH_SEC = 300; // 5 minutes
+
+  const PHASE_LABELS = {
+    0: 'Fase 0 — Antiban',
+    1: 'Fase 1 — Abordagem',
+    2: 'Fase 2 — Investigacao',
+    3: 'Fase 3 — Educacao',
+    4: 'Fase 4 — Direcao ao Site',
+    5: 'Fase 5 — Follow-up',
+  };
+
+  const PRODUCT_LABELS = {
+    diagnostico: 'Diagnostico',
+    limpa_nome: 'Limpa Nome',
+    rating: 'Rating',
+    none: 'Sem produto',
+  };
+
+  // ─────────────────────────────────────────────
+  //  STATE
+  // ─────────────────────────────────────────────
+  let currentDays = 30;
+  let tempToken = null;
+  let flowType = null; // 'verify' | 'setup'
+  let refreshInterval = null;
+  let refreshCountdown = AUTO_REFRESH_SEC;
+  let refreshTimerInterval = null;
+  let charts = {};
+
+  // ─────────────────────────────────────────────
+  //  DOM HELPERS
+  // ─────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+
+  function showView(name) {
+    ['view-login', 'view-2fa', 'view-dashboard'].forEach(v => {
+      $(v).classList.remove('active');
+    });
+    $(name).classList.add('active');
+  }
+
+  function showError(elId, msg) {
+    const el = $(elId);
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+
+  function clearError(elId) {
+    const el = $(elId);
+    el.textContent = '';
+    el.classList.remove('visible');
+  }
+
+  function setLoading(btnId, loading) {
+    const btn = $(btnId);
+    btn.disabled = loading;
+    btn.textContent = loading ? 'Aguarde...' : btn.dataset.defaultText || btn.textContent;
+  }
+
+  function toast(msg, type = 'info') {
+    const el = $('toast');
+    el.textContent = msg;
+    el.className = 'visible toast-' + type;
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.className = ''; }, 3500);
+  }
+
+  function fmtNumber(n) {
+    const num = parseInt(n, 10);
+    if (isNaN(num)) return '—';
+    return num.toLocaleString('pt-BR');
+  }
+
+  function fmtCost(n) {
+    const num = parseFloat(n);
+    if (isNaN(num)) return '—';
+    return '$' + num.toFixed(2);
+  }
+
+  function fmtDate(str) {
+    if (!str) return '';
+    const d = new Date(str + 'T00:00:00');
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
+
+  function getToken() {
+    return localStorage.getItem(TOKEN_KEY);
+  }
+
+  function saveToken(t) {
+    localStorage.setItem(TOKEN_KEY, t);
+  }
+
+  function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+
+  // ─────────────────────────────────────────────
+  //  API FETCH HELPER
+  // ─────────────────────────────────────────────
+  async function apiFetch(path, opts = {}) {
+    const token = getToken();
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+
+    const res = await fetch(BASE_URL + path, {
+      ...opts,
+      headers,
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 401) {
+      clearToken();
+      showView('view-login');
+      throw new Error('Sessao expirada. Faca login novamente.');
+    }
+
+    if (!res.ok) {
+      throw new Error(data.error || data.message || 'Erro desconhecido (' + res.status + ')');
+    }
+
+    return data;
+  }
+
+  // ─────────────────────────────────────────────
+  //  LOGIN
+  // ─────────────────────────────────────────────
+  $('btn-login').dataset.defaultText = 'Entrar';
+  $('btn-2fa').dataset.defaultText = 'Verificar';
+
+  $('form-login').addEventListener('submit', async e => {
+    e.preventDefault();
+    clearError('login-error');
+
+    const email = $('input-email').value.trim();
+    const senha = $('input-senha').value;
+
+    if (!email || !senha) {
+      showError('login-error', 'Preencha e-mail e senha.');
+      return;
+    }
+
+    setLoading('btn-login', true);
+
+    try {
+      const data = await fetch(BASE_URL + '/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, senha }),
+      }).then(r => r.json());
+
+      if (data.token) {
+        // Direct login — no 2FA
+        saveToken(data.token);
+        initDashboard();
+        return;
+      }
+
+      if (data.requires2FA && data.tempToken) {
+        tempToken = data.tempToken;
+        flowType = 'verify';
+        show2FAVerify();
+        return;
+      }
+
+      if (data.requiresSetup && data.tempToken) {
+        tempToken = data.tempToken;
+        flowType = 'setup';
+        show2FASetup(data);
+        return;
+      }
+
+      showError('login-error', data.error || 'Resposta inesperada do servidor.');
+    } catch (err) {
+      showError('login-error', 'Erro de conexao: ' + err.message);
+    } finally {
+      setLoading('btn-login', false);
+    }
+  });
+
+  function show2FAVerify() {
+    $('twofa-title').textContent = 'Verificacao em 2 etapas';
+    $('twofa-subtitle').textContent = 'Digite o codigo de 6 digitos gerado pelo seu autenticador.';
+    $('setup-container').style.display = 'none';
+    $('input-totp').value = '';
+    clearError('twofa-error');
+    showView('view-2fa');
+    $('input-totp').focus();
+  }
+
+  function show2FASetup(data) {
+    $('twofa-title').textContent = 'Configurar autenticador';
+    $('twofa-subtitle').textContent = 'Configure o autenticador e depois confirme com o codigo.';
+    const container = $('setup-container');
+    container.style.display = 'block';
+
+    if (data.qrCode) {
+      $('setup-qr').innerHTML = '<img src="' + data.qrCode + '" alt="QR Code 2FA" style="width:160px;height:160px;" />';
+    }
+    if (data.secret) {
+      $('setup-secret-text').textContent = 'Chave manual: ' + data.secret;
+    }
+
+    $('input-totp').value = '';
+    clearError('twofa-error');
+    showView('view-2fa');
+    $('input-totp').focus();
+  }
+
+  $('form-2fa').addEventListener('submit', async e => {
+    e.preventDefault();
+    clearError('twofa-error');
+
+    const code = $('input-totp').value.trim();
+    if (code.length !== 6 || !/^\d+$/.test(code)) {
+      showError('twofa-error', 'O codigo deve ter exatamente 6 digitos numericos.');
+      return;
+    }
+
+    setLoading('btn-2fa', true);
+
+    try {
+      const res = await fetch(BASE_URL + '/api/admin/2fa/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + tempToken,
+        },
+        body: JSON.stringify({ code }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (data.token) {
+        saveToken(data.token);
+        tempToken = null;
+        flowType = null;
+        initDashboard();
+        return;
+      }
+
+      showError('twofa-error', data.error || 'Codigo invalido. Tente novamente.');
+    } catch (err) {
+      showError('twofa-error', 'Erro de conexao: ' + err.message);
+    } finally {
+      setLoading('btn-2fa', false);
+    }
+  });
+
+  // Auto-format TOTP input: digits only
+  $('input-totp').addEventListener('input', e => {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+  });
+
+  $('btn-back-login').addEventListener('click', () => {
+    tempToken = null;
+    flowType = null;
+    clearError('twofa-error');
+    showView('view-login');
+  });
+
+  // ─────────────────────────────────────────────
+  //  LOGOUT
+  // ─────────────────────────────────────────────
+  $('btn-logout').addEventListener('click', () => {
+    clearToken();
+    tempToken = null;
+    stopAutoRefresh();
+    destroyCharts();
+    showView('view-login');
+    toast('Sessao encerrada.', 'info');
+  });
+
+  // ─────────────────────────────────────────────
+  //  PERIOD SELECTOR
+  // ─────────────────────────────────────────────
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const days = parseInt(btn.dataset.days, 10);
+      if (days === currentDays) return;
+
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentDays = days;
+      loadAllData();
+    });
+  });
+
+  // ─────────────────────────────────────────────
+  //  MANUAL REFRESH
+  // ─────────────────────────────────────────────
+  $('btn-refresh').addEventListener('click', () => {
+    loadAllData();
+    resetCountdown();
+  });
+
+  // ─────────────────────────────────────────────
+  //  AUTO REFRESH
+  // ─────────────────────────────────────────────
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    refreshCountdown = AUTO_REFRESH_SEC;
+    updateCountdownUI();
+
+    refreshTimerInterval = setInterval(() => {
+      refreshCountdown--;
+      updateCountdownUI();
+      if (refreshCountdown <= 0) {
+        loadAllData();
+        refreshCountdown = AUTO_REFRESH_SEC;
+      }
+    }, 1000);
+  }
+
+  function stopAutoRefresh() {
+    clearInterval(refreshTimerInterval);
+    clearInterval(refreshInterval);
+    refreshTimerInterval = null;
+  }
+
+  function resetCountdown() {
+    refreshCountdown = AUTO_REFRESH_SEC;
+    updateCountdownUI();
+  }
+
+  function updateCountdownUI() {
+    const m = Math.floor(refreshCountdown / 60);
+    const s = refreshCountdown % 60;
+    const pad = n => String(n).padStart(2, '0');
+    $('refresh-timer').textContent = 'Auto-refresh em ' + pad(m) + ':' + pad(s);
+  }
+
+  // ─────────────────────────────────────────────
+  //  CHART UTILS
+  // ─────────────────────────────────────────────
+  const CHART_DEFAULTS = {
+    color: '#e6edf3',
+    plugins: {
+      legend: {
+        labels: {
+          color: '#8b949e',
+          font: { size: 11 },
+          boxWidth: 12,
+          padding: 16,
+        },
+      },
+      tooltip: {
+        backgroundColor: '#1c2330',
+        borderColor: '#30363d',
+        borderWidth: 1,
+        titleColor: '#e6edf3',
+        bodyColor: '#8b949e',
+        padding: 10,
+      },
+    },
+    scales: {
+      x: {
+        ticks: { color: '#656d76', font: { size: 11 } },
+        grid: { color: 'rgba(48,54,61,.5)' },
+        border: { color: '#30363d' },
+      },
+      y: {
+        ticks: { color: '#656d76', font: { size: 11 } },
+        grid: { color: 'rgba(48,54,61,.5)' },
+        border: { color: '#30363d' },
+      },
+    },
+  };
+
+  function destroyChart(key) {
+    if (charts[key]) {
+      charts[key].destroy();
+      delete charts[key];
+    }
+  }
+
+  function destroyCharts() {
+    Object.keys(charts).forEach(k => destroyChart(k));
+  }
+
+  function showChartLoading(loadingId, canvasId) {
+    $(loadingId).style.display = 'flex';
+    $(canvasId).style.display = 'none';
+    $(loadingId).innerHTML = '<div class="spinner"></div><span>Carregando...</span>';
+  }
+
+  function showChartError(loadingId, canvasId, msg, retryFn) {
+    $(canvasId).style.display = 'none';
+    $(loadingId).style.display = 'flex';
+    $(loadingId).innerHTML =
+      '<div class="error-msg">' + msg + '</div>' +
+      '<button class="btn-retry" id="retry-' + loadingId + '">Tentar novamente</button>';
+    document.getElementById('retry-' + loadingId).addEventListener('click', retryFn);
+  }
+
+  function showChart(loadingId, canvasId) {
+    $(loadingId).style.display = 'none';
+    $(canvasId).style.display = 'block';
+  }
+
+  // ─────────────────────────────────────────────
+  //  LOAD: OVERVIEW
+  // ─────────────────────────────────────────────
+  async function loadOverview() {
+    setMetricLoading(true);
+    try {
+      const data = await apiFetch('/api/admin/analytics/overview?days=' + currentDays);
+      renderOverview(data);
+    } catch (err) {
+      setMetricError(err.message);
+    }
+  }
+
+  function setMetricLoading(on) {
+    ['metric-conversations', 'metric-messages', 'metric-cost', 'metric-optout'].forEach(id => {
+      const el = $(id);
+      if (on) {
+        el.classList.add('loading-placeholder');
+        el.textContent = '';
+      } else {
+        el.classList.remove('loading-placeholder');
+      }
+    });
+  }
+
+  function setMetricError(msg) {
+    setMetricLoading(false);
+    ['metric-conversations', 'metric-messages', 'metric-cost', 'metric-optout'].forEach(id => {
+      $(id).textContent = '—';
+    });
+    toast('Erro ao carregar metricas: ' + msg, 'error');
+  }
+
+  function renderOverview(data) {
+    setMetricLoading(false);
+
+    const c = data.conversations || {};
+    const m = data.messages || {};
+    const costs = data.costs || {};
+
+    // Conversations
+    $('metric-conversations').textContent = fmtNumber(c.total);
+    $('metric-conversations-sub').innerHTML =
+      '<strong>' + fmtNumber(c.recent) + '</strong> nos ultimos ' + currentDays + ' dias' +
+      ' &nbsp;|&nbsp; Augusto: ' + fmtNumber(c.augusto);
+
+    // Messages
+    $('metric-messages').textContent = fmtNumber(m.total);
+    $('metric-messages-sub').innerHTML =
+      'Usuarios: <strong>' + fmtNumber(m.from_users) + '</strong>' +
+      ' &nbsp;|&nbsp; Agente: <strong>' + fmtNumber(m.from_agent) + '</strong>';
+
+    // Cost
+    $('metric-cost').textContent = fmtCost(costs.total_cost);
+    const totalTokens = (parseInt(costs.total_input_tokens, 10) || 0) +
+                        (parseInt(costs.total_output_tokens, 10), 0);
+    $('metric-cost-sub').innerHTML =
+      '<strong>' + fmtNumber(costs.total_calls) + '</strong> chamadas &nbsp;|&nbsp; ' +
+      fmtNumber(costs.total_input_tokens) + ' tokens entrada';
+
+    // Opt-out rate
+    const totalConvs = parseInt(c.total, 10) || 1;
+    const optedOut = parseInt(c.opted_out, 10) || 0;
+    const rate = ((optedOut / totalConvs) * 100).toFixed(1);
+    $('metric-optout').textContent = rate + '%';
+    $('metric-optout-sub').innerHTML =
+      '<strong>' + fmtNumber(optedOut) + '</strong> contatos optaram por sair';
+  }
+
+  // ─────────────────────────────────────────────
+  //  LOAD: FUNNEL CHART
+  // ─────────────────────────────────────────────
+  async function loadFunnel() {
+    showChartLoading('funnel-loading', 'chart-funnel');
+    try {
+      const data = await apiFetch('/api/admin/analytics/funnel?days=' + currentDays);
+      renderFunnel(data);
+    } catch (err) {
+      showChartError('funnel-loading', 'chart-funnel', 'Erro: ' + err.message, loadFunnel);
+    }
+  }
+
+  function renderFunnel(data) {
+    destroyChart('funnel');
+
+    const phases = data.phases || [];
+    const labels = phases.map(p => PHASE_LABELS[p.phase] || 'Fase ' + p.phase);
+    const counts = phases.map(p => parseInt(p.count, 10) || 0);
+    const pcts   = phases.map(p => p.pct || 0);
+
+    const colors = [
+      'rgba(59,130,246,.8)',
+      'rgba(34,197,94,.8)',
+      'rgba(249,115,22,.8)',
+      'rgba(168,85,247,.8)',
+      'rgba(236,72,153,.8)',
+      'rgba(20,184,166,.8)',
+    ];
+
+    showChart('funnel-loading', 'chart-funnel');
+    const ctx = $('chart-funnel').getContext('2d');
+
+    charts['funnel'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Conversas',
+          data: counts,
+          backgroundColor: colors,
+          borderRadius: 4,
+          borderSkipped: false,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...CHART_DEFAULTS.plugins.tooltip,
+            callbacks: {
+              label: ctx => {
+                const pct = pcts[ctx.dataIndex];
+                return ' ' + fmtNumber(ctx.raw) + ' conversas (' + pct + '%)';
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#656d76', font: { size: 11 } },
+            grid: { color: 'rgba(48,54,61,.5)' },
+            border: { color: '#30363d' },
+          },
+          y: {
+            ticks: { color: '#8b949e', font: { size: 11 } },
+            grid: { display: false },
+            border: { color: '#30363d' },
+          },
+        },
+      },
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  //  LOAD: DAILY ACTIVITY CHART
+  // ─────────────────────────────────────────────
+  async function loadDaily() {
+    showChartLoading('daily-loading', 'chart-daily');
+    try {
+      const data = await apiFetch('/api/admin/analytics/daily?days=' + currentDays);
+      renderDaily(data);
+    } catch (err) {
+      showChartError('daily-loading', 'chart-daily', 'Erro: ' + err.message, loadDaily);
+    }
+  }
+
+  function renderDaily(data) {
+    destroyChart('daily');
+
+    const rows = (data.daily || []).slice().reverse();
+    const labels = rows.map(r => fmtDate(r.date));
+    const convs  = rows.map(r => parseInt(r.active_conversations, 10) || 0);
+    const umsgs  = rows.map(r => parseInt(r.user_messages, 10) || 0);
+    const amsgs  = rows.map(r => parseInt(r.agent_messages, 10) || 0);
+
+    showChart('daily-loading', 'chart-daily');
+    const ctx = $('chart-daily').getContext('2d');
+
+    charts['daily'] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Conversas ativas',
+            data: convs,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,.12)',
+            tension: .3,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+          },
+          {
+            label: 'Msgs usuarios',
+            data: umsgs,
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34,197,94,.08)',
+            tension: .3,
+            fill: false,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+          },
+          {
+            label: 'Msgs agente',
+            data: amsgs,
+            borderColor: '#f97316',
+            backgroundColor: 'rgba(249,115,22,.08)',
+            tension: .3,
+            fill: false,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: CHART_DEFAULTS.plugins.legend,
+          tooltip: CHART_DEFAULTS.plugins.tooltip,
+        },
+        scales: CHART_DEFAULTS.scales,
+      },
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  //  LOAD: DAILY COSTS CHART
+  // ─────────────────────────────────────────────
+  async function loadCostsDaily() {
+    showChartLoading('costs-loading', 'chart-costs');
+    try {
+      const data = await apiFetch('/api/admin/analytics/costs-daily?days=' + currentDays);
+      renderCostsDaily(data);
+    } catch (err) {
+      showChartError('costs-loading', 'chart-costs', 'Erro: ' + err.message, loadCostsDaily);
+    }
+  }
+
+  function renderCostsDaily(data) {
+    destroyChart('costs');
+
+    const rows = data.daily_costs || [];
+
+    // Group by date, sum costs
+    const byDate = {};
+    rows.forEach(r => {
+      const d = r.date;
+      if (!byDate[d]) byDate[d] = 0;
+      byDate[d] += parseFloat(r.cost_usd) || 0;
+    });
+
+    const sortedDates = Object.keys(byDate).sort();
+    const labels = sortedDates.map(fmtDate);
+    const values = sortedDates.map(d => parseFloat(byDate[d].toFixed(4)));
+
+    showChart('costs-loading', 'chart-costs');
+    const ctx = $('chart-costs').getContext('2d');
+
+    charts['costs'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Custo USD',
+          data: values,
+          backgroundColor: 'rgba(59,130,246,.7)',
+          borderColor: '#3b82f6',
+          borderWidth: 1,
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...CHART_DEFAULTS.plugins.tooltip,
+            callbacks: {
+              label: ctx => ' $' + ctx.raw.toFixed(4) + ' USD',
+            },
+          },
+        },
+        scales: {
+          x: CHART_DEFAULTS.scales.x,
+          y: {
+            ...CHART_DEFAULTS.scales.y,
+            ticks: {
+              color: '#656d76',
+              font: { size: 11 },
+              callback: v => '$' + v.toFixed(3),
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  //  LOAD: PRODUCTS TABLE
+  // ─────────────────────────────────────────────
+  async function loadProducts() {
+    $('products-loading').style.display = 'flex';
+    $('products-loading').innerHTML = '<div class="spinner"></div><span>Carregando...</span>';
+    $('products-table').style.display = 'none';
+
+    try {
+      const data = await apiFetch('/api/admin/analytics/products');
+      renderProducts(data);
+    } catch (err) {
+      $('products-loading').innerHTML =
+        '<div class="error-msg">Erro: ' + err.message + '</div>' +
+        '<button class="btn-retry" id="retry-products">Tentar novamente</button>';
+      $('retry-products').addEventListener('click', loadProducts);
+    }
+  }
+
+  function renderProducts(data) {
+    const products = data.products || [];
+
+    $('products-loading').style.display = 'none';
+    $('products-table').style.display = 'table';
+
+    const total = products.reduce((s, p) => s + (parseInt(p.count, 10) || 0), 0);
+    const tbody = $('products-tbody');
+    tbody.innerHTML = '';
+
+    if (!products.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Sem dados disponiveis.</td></tr>';
+      return;
+    }
+
+    products.forEach(p => {
+      const count     = parseInt(p.count, 10) || 0;
+      const reached   = parseInt(p.reached_site, 10) || 0;
+      const dropped   = parseInt(p.dropped, 10) || 0;
+      const pct       = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+      const convPct   = count > 0 ? ((reached / count) * 100).toFixed(1) : 0;
+
+      const key     = (p.product || 'none').toLowerCase();
+      const label   = PRODUCT_LABELS[key] || p.product || 'Outro';
+      const badgeClass = key.includes('diagnostico') ? 'badge-diagnostico'
+                       : key.includes('limpa')       ? 'badge-limpa'
+                       : key.includes('rating')      ? 'badge-rating'
+                       : 'badge-none';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <span class="product-badge ${badgeClass}">${label}</span>
+        </td>
+        <td>
+          ${fmtNumber(count)}
+          <span style="color:var(--text-muted); font-size:11px; margin-left:4px;">(${pct}%)</span>
+        </td>
+        <td>${fmtNumber(reached)}</td>
+        <td style="color: ${dropped > 0 ? '#fca5a5' : 'var(--text-sec)'};">${fmtNumber(dropped)}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill" style="width:${Math.min(parseFloat(convPct), 100)}%;"></div>
+            </div>
+            <span style="font-size:12px; color:var(--text-sec); min-width:36px;">${convPct}%</span>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  //  ORCHESTRATE ALL DATA
+  // ─────────────────────────────────────────────
+  function loadAllData() {
+    // Fire all in parallel — each manages its own loading/error state
+    loadOverview();
+    loadFunnel();
+    loadDaily();
+    loadCostsDaily();
+    loadProducts();
+    updateLastUpdateTime();
+  }
+
+  function updateLastUpdateTime() {
+    const now = new Date();
+    const fmt = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    $('last-update-time').textContent = 'Atualizado as ' + fmt;
+  }
+
+  // ─────────────────────────────────────────────
+  //  INIT DASHBOARD
+  // ─────────────────────────────────────────────
+  function initDashboard() {
+    showView('view-dashboard');
+    loadAllData();
+    startAutoRefresh();
+    toast('Dashboard carregado.', 'success');
+  }
+
+  // ─────────────────────────────────────────────
+  //  BOOT
+  // ─────────────────────────────────────────────
+  function boot() {
+    const token = getToken();
+    if (token) {
+      // Try to load the dashboard right away;
+      // if the token is expired, apiFetch will redirect to login
+      initDashboard();
+    } else {
+      showView('view-login');
+      $('input-email').focus();
+    }
+  }
+
+  // Wait for Chart.js to be ready (CDN load)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+
+})();
+</script>
+</body>
+</html>

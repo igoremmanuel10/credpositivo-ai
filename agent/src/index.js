@@ -3,6 +3,8 @@ initSentry();
 
 import express from 'express';
 import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { config } from './config.js';
 import { webhookRouter } from './evolution/webhook.js';
 import { paymentRouter } from './payment/routes.js';
@@ -24,6 +26,9 @@ import { startReportScheduler, sendDailyReportNow, sendWeeklyRatingReportNow } f
 import { getCostSummary } from './monitoring/cost-tracker.js';
 import { analyticsRouter } from './api/analytics.js';
 import { startExpenseScheduler } from './expense/tracker.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 
@@ -100,6 +105,11 @@ app.use(vapiWebhookRouter);
 
 // Analytics API (admin only)
 app.use(analyticsRouter);
+
+// Admin Dashboard (self-contained HTML)
+app.get('/admin/dashboard', (req, res) => {
+  res.sendFile(join(__dirname, 'admin', 'dashboard.html'));
+});
 
 // API cost summary (admin only)
 app.get('/api/admin/costs', async (req, res) => {

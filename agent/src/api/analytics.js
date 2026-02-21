@@ -144,6 +144,56 @@ analyticsRouter.get('/api/admin/analytics/products', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/analytics/conversations
+ * Recent conversations with details.
+ */
+analyticsRouter.get('/api/admin/analytics/conversations', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '50'), 100);
+    const offset = parseInt(req.query.offset || '0');
+    const phase = req.query.phase;
+
+    let where = '';
+    const params = [];
+    let idx = 1;
+
+    if (phase !== undefined && phase !== '') {
+      where = `WHERE c.phase = $${idx}`;
+      params.push(parseInt(phase));
+      idx++;
+    }
+
+    params.push(limit, offset);
+
+    const { rows } = await db.query(`
+      SELECT
+        c.id, c.phone, c.name, c.phase, c.persona,
+        c.recommended_product, c.opted_out,
+        c.created_at, c.updated_at, c.last_message_at,
+        (SELECT COUNT(*)::int FROM messages m WHERE m.conversation_id = c.id) as message_count
+      FROM conversations c
+      ${where}
+      ORDER BY c.last_message_at DESC NULLS LAST
+      LIMIT $${idx} OFFSET $${idx + 1}
+    `, params);
+
+    const { rows: countRows } = await db.query(
+      `SELECT COUNT(*)::int as total FROM conversations c ${where}`,
+      phase !== undefined && phase !== '' ? [parseInt(phase)] : []
+    );
+
+    res.json({
+      total: countRows[0]?.total || 0,
+      limit,
+      offset,
+      conversations: rows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/admin/analytics/costs-daily
  * Daily API cost breakdown.
  */
