@@ -56,7 +56,7 @@ const SUMMARY_TRIGGER_WORDS = ['resumo', 'quanto gastamos', 'total', 'gastos'];
 
 // ─── OpenAI client ─────────────────────────────────────────────────────────────
 
-const openai = new OpenAI({ apiKey: config.openai.apiKey });
+const openai = new OpenAI({ apiKey: config.openai.apiKey, dangerouslyAllowBrowser: true });
 
 // ─── Partner resolution ────────────────────────────────────────────────────────
 
