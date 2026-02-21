@@ -119,8 +119,9 @@ export async function generateWeeklyRatingReport() {
     '',
     'FINANCEIRO (MOISES)',
     '- Custo unitario: ' + formatBRL(CUSTO_FORNECEDOR),
-    '- Total a pagar: ' + formatBRL(weeklySupplierCost),
+    '- Total: ' + formatBRL(weeklySupplierCost),
     '- Forma: PIX (Pix: 79991320624)',
+    '- Status: ' + (weeklySupplierCost > 0 ? 'PAGO' : 'Sem custo nesta semana'),
   ].join('\n');
 
   console.log('[WeeklyRating] Report generated (' + report.length + ' chars)');
