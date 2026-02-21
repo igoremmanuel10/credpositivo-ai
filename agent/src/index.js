@@ -18,6 +18,7 @@ import { startVapiScheduler } from "./voice/scheduler.js";
 import { getBridgeHealth } from './bridge-health.js';
 import { startBridgeWatchdog } from './bridge-watchdog.js';
 import { startReportScheduler, sendDailyReportNow } from './reports/scheduler.js';
+import { getCostSummary } from './monitoring/cost-tracker.js';
 
 const app = express();
 
@@ -91,6 +92,17 @@ app.use(couponRouter);
 app.use(voicecallRouter);
 // Vapi.ai voice call webhooks
 app.use(vapiWebhookRouter);
+
+// API cost summary (admin only)
+app.get('/api/admin/costs', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days || '7');
+    const summary = await getCostSummary(days);
+    res.json({ days, summary });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Daily report manual trigger
 app.post('/api/admin/daily-report', async (req, res) => {

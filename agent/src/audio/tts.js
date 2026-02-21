@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { config } from '../config.js';
 import { sendMediaBase64 } from '../quepasa/client.js';
+import { trackApiCost } from '../monitoring/cost-tracker.js';
 
 let openaiClient = null;
 
@@ -41,6 +42,15 @@ export async function generateAudio(text, voice = null) {
   const base64 = buffer.toString('base64');
 
   console.log(`[TTS] Generated ${buffer.length} bytes (${(buffer.length / 1024).toFixed(1)} KB)`);
+
+  trackApiCost({
+    provider: 'openai',
+    model,
+    inputTokens: text.length,  // char count for TTS pricing
+    outputTokens: 0,
+    endpoint: 'tts',
+  }).catch(() => {});
+
   return base64;
 }
 

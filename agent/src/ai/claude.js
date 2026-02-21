@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { config } from '../config.js';
 import { buildSystemPrompt } from './system-prompt.js';
 import { filterOutput, buildCorrectionInstruction } from './output-filter.js';
+import { trackApiCost } from '../monitoring/cost-tracker.js';
 
 // Anthropic client for chat (Haiku 4.5)
 const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
@@ -70,9 +71,17 @@ async function callClaude(systemPrompt, messages, attempt = 1) {
     const text = response.content[0]?.text || '';
     const metadata = extractMetadata(text);
 
-    console.log('[AI] Model:', config.anthropic.model);
-    console.log('[AI] Raw response (first 500 chars):', text.substring(0, 500));
-    console.log('[AI] Extracted metadata:', JSON.stringify(metadata.data));
+    const inputTokens = response.usage?.input_tokens || 0;
+    const outputTokens = response.usage?.output_tokens || 0;
+    console.log(`[AI] Model: ${config.anthropic.model} | Tokens: ${inputTokens}in/${outputTokens}out`);
+
+    trackApiCost({
+      provider: 'anthropic',
+      model: config.anthropic.model,
+      inputTokens,
+      outputTokens,
+      endpoint: 'chat',
+    }).catch(() => {});
 
     return {
       text: metadata.cleanText,
@@ -127,6 +136,15 @@ export async function analyzeImage(base64Image, mimeType = 'image/jpeg') {
 
       const description = response.choices[0]?.message?.content?.trim() || '';
       console.log(`[Vision] Image analysis: ${description.substring(0, 200)}`);
+
+      trackApiCost({
+        provider: 'openai',
+        model: config.openai.visionModel,
+        inputTokens: response.usage?.prompt_tokens || 0,
+        outputTokens: response.usage?.completion_tokens || 0,
+        endpoint: 'vision',
+      }).catch(() => {});
+
       return description;
     } catch (err) {
       if (err.status === 429 && attempt <= MAX_RETRIES) {

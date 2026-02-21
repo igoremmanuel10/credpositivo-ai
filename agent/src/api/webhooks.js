@@ -9,6 +9,30 @@ import { config } from '../config.js';
 
 export const webhooksRouter = Router();
 
+// Webhook authentication middleware for /api/events/* endpoints
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
+
+function authenticateWebhook(req, res, next) {
+  // Skip auth if no secret is configured (backwards compatible)
+  if (!WEBHOOK_SECRET) return next();
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
+
+  const token = authHeader.slice(7);
+  if (token !== WEBHOOK_SECRET) {
+    console.warn(`[Webhook] Unauthorized request to ${req.path} from ${req.ip}`);
+    return res.status(403).json({ error: 'Invalid webhook token' });
+  }
+
+  next();
+}
+
+// Apply auth to all /api/events/* routes
+webhooksRouter.use('/api/events', authenticateWebhook);
+
 // NOTE: POST /api/register is in api/users.js — SDR trigger is hooked there.
 
 /**

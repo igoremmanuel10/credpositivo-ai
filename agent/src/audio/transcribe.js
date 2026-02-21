@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { config } from '../config.js';
 import { downloadMedia, getTokenForWid } from '../quepasa/client.js';
+import { trackApiCost } from '../monitoring/cost-tracker.js';
 
 let openaiClient = null;
 
@@ -39,5 +40,15 @@ export async function transcribeAudio(messageId, botToken = null) {
 
   const text = transcription.text?.trim() || '';
   console.log(`[Transcribe] Result: ${text.substring(0, 200)}`);
+
+  trackApiCost({
+    provider: 'openai',
+    model: 'whisper-1',
+    inputTokens: 0,
+    outputTokens: 0,
+    endpoint: 'transcribe',
+    durationMs: transcription.duration ? transcription.duration * 1000 : audioBuffer.length / 16,  // rough estimate
+  }).catch(() => {});
+
   return text;
 }
