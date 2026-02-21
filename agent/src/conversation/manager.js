@@ -144,8 +144,18 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // 2. Save incoming message (combined)
     await db.addMessage(conversation.id, 'user', combinedText, conversation.phase);
 
-    // 3. Load message history
-    const messages = await db.getMessages(conversation.id);
+    // 3. Load message history (last 20 messages)
+    const messages = await db.getMessages(conversation.id, 20);
+    const totalMessages = await db.getMessageCount(conversation.id);
+
+    // If history was trimmed, prepend context note
+    if (totalMessages > messages.length && messages.length > 0) {
+      const trimmed = totalMessages - messages.length;
+      messages.unshift({
+        role: 'user',
+        content: `[SISTEMA: Esta conversa tem ${totalMessages} mensagens. Mostrando as últimas ${messages.length}. ${trimmed} mensagens anteriores foram omitidas. Continue naturalmente a partir do contexto visível.]`,
+      });
+    }
 
     // 4. Build state for Claude
     const state = {

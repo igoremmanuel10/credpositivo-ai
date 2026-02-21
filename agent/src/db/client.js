@@ -57,7 +57,7 @@ export const db = {
     );
   },
 
-  async getMessages(conversationId, limit = 50) {
+  async getMessages(conversationId, limit = 20) {
     const { rows } = await pool.query(
       `SELECT role, content, phase, created_at
        FROM messages
@@ -67,6 +67,14 @@ export const db = {
       [conversationId, limit]
     );
     return rows;
+  },
+
+  async getMessageCount(conversationId) {
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int as count FROM messages WHERE conversation_id = $1',
+      [conversationId]
+    );
+    return rows[0]?.count || 0;
   },
 
   async upsertMessageAck(evolutionMsgId, remoteJid, ack) {
