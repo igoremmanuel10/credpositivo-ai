@@ -37,7 +37,6 @@ function getWeekRange() {
     start,
     end,
     label: fmt(start) + ' a ' + fmtFull(end),
-    // ISO strings for SQL queries (UTC)
     startISO: start.toISOString(),
     endISO: end.toISOString(),
   };
@@ -69,9 +68,11 @@ async function getWeeklyFormStats(startISO, endISO) {
       [startISO, endISO]
     );
     const completedRes = await db.query(
-      `SELECT COUNT(*)::int as count FROM rating_forms
-       WHERE completed = true
-         AND updated_at >= $1 AND updated_at <= $2`,
+      `SELECT COUNT(*)::int as count FROM rating_forms rf
+       JOIN orders o ON rf.order_id = o.id
+       WHERE rf.completed = true
+         AND o.status = 'paid'
+         AND rf.updated_at >= $1 AND rf.updated_at <= $2`,
       [startISO, endISO]
     );
     const inProgressRes = await db.query(
@@ -84,12 +85,11 @@ async function getWeeklyFormStats(startISO, endISO) {
     const initiated = initiatedRes.rows[0].count;
     const completed = completedRes.rows[0].count;
     const inProgress = inProgressRes.rows[0].count;
-    const rate = initiated > 0 ? Math.round((completed / initiated) * 100) : 0;
 
-    return { initiated, completed, inProgress, rate };
+    return { initiated, completed, inProgress };
   } catch (err) {
     console.error('[WeeklyRating] Error getWeeklyFormStats:', err.message);
-    return { initiated: 0, completed: 0, inProgress: 0, rate: 0 };
+    return { initiated: 0, completed: 0, inProgress: 0 };
   }
 }
 

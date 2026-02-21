@@ -2,11 +2,15 @@ import cron from 'node-cron';
 import { generateDailyReport } from './daily-report.js';
 import { generateWeeklyRatingReport } from './weekly-rating-report.js';
 import { sendText } from '../quepasa/client.js';
+import { config } from '../config.js';
 
 const REPORT_PHONES = ['5511932145806', '557191234115', '557187700120'];
 
 // WhatsApp group ID for "Fornecedor Rating (Moises/Cred Positivo)"
 const RATING_GROUP_ID = process.env.RATING_GROUP_CHAT_ID || '';
+
+// Paulo SDR token — rating report goes out from Paulo's number
+const PAULO_TOKEN = config.sdr.botToken;
 
 /**
  * Send the daily report to all configured phone numbers.
@@ -110,7 +114,7 @@ export async function sendWeeklyRatingReportNow() {
     const results = [];
     for (const target of targets) {
       try {
-        await sendText(target, report);
+        await sendText(target, report, PAULO_TOKEN);
         console.log('[ReportScheduler] Weekly rating report sent to ' + target);
         results.push({ target, status: 'sent' });
       } catch (err) {
