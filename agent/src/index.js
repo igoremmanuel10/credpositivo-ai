@@ -1,3 +1,6 @@
+import { initSentry, Sentry } from './monitoring/sentry.js';
+initSentry();
+
 import express from 'express';
 import { readFileSync } from 'fs';
 import { config } from './config.js';
@@ -117,6 +120,13 @@ app.post('/api/admin/daily-report', async (req, res) => {
     console.error('[Admin] Daily report error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('[Express] Unhandled error:', err);
+  if (Sentry) Sentry.captureException(err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // Start server with async initialization

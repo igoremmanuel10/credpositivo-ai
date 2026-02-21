@@ -9,6 +9,7 @@ import { sendMediaBase64 } from '../quepasa/client.js';
 import { fixSiteLinks } from '../ai/output-filter.js';
 import { config } from '../config.js';
 import { resolvePersona } from '../sdr/persona.js';
+import { captureError } from '../monitoring/sentry.js';
 
 // In-memory map: phone → botTokenForReply (for follow-ups and debounced messages)
 const phoneTokenMap = new Map();
@@ -64,6 +65,7 @@ export async function handleIncomingMessage(phone, remoteJid, text, pushName, bo
       await processBufferedMessages(phone, remoteJid, pushName);
     } catch (err) {
       console.error(`[Manager] Error processing buffered messages for ${phone}:`, err);
+      captureError(err, { phone, module: 'manager', action: 'processBufferedMessages' });
     }
   }, debounceSeconds * 1000);
 }
