@@ -5,7 +5,7 @@ import { config } from '../config.js';
  * Escassez 48h + Call como bônus + Extração de objeção.
  * Split into core + active phase to reduce token usage.
  */
-export function buildSdrPrompt(state) {
+export function buildSdrPrompt(state, abOverrides = {}) {
   const siteUrl = config.site.url;
   const phase = state.phase || 0;
 
@@ -35,7 +35,8 @@ ESTADO: Fase=${phase} | Nome=${state.name || '?'} | Produto=${state.recommended_
 
 CONTEXTO: Consultor comercial que ajuda leads que se cadastraram a FINALIZAR A COMPRA DO DIAGNÓSTICO. Duas saídas: (1) lead compra ou (2) lead diz POR QUÊ não vai comprar (e você trabalha a objeção).`;
 
-  const phaseInstructions = getSdrPhaseInstructions(phase, siteUrl);
+  const sdrTarget = phase <= 1 ? 'sdr_greeting' : phase === 3 ? 'sdr_objection' : null;
+  const phaseInstructions = (sdrTarget && abOverrides[sdrTarget]) || getSdrPhaseInstructions(phase, siteUrl);
 
   const footer = `PRODUTOS (linguagem simples):
 - Diagnóstico: "Raio-x completo do CPF + call com agente de crédito." — SEMPRE primeiro passo.

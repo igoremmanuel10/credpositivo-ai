@@ -10,6 +10,7 @@ import { fixSiteLinks } from '../ai/output-filter.js';
 import { config } from '../config.js';
 import { resolvePersona } from '../sdr/persona.js';
 import { captureError } from '../monitoring/sentry.js';
+import { assignVariants, getPromptOverride } from '../ab/manager.js';
 
 // In-memory map: phone → botTokenForReply (for follow-ups and debounced messages)
 const phoneTokenMap = new Map();
@@ -168,9 +169,23 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       recommended_product: conversation.recommended_product,
     };
 
-    // 5. Get AI response (use persona from conversation or detected from bot token)
+    // 4.5. A/B test variant assignment
     const activePersona = conversation.persona || persona;
-    const { text: responseText, metadata } = await getAgentResponse(state, messages, combinedText, activePersona);
+    let abOverrides = {};
+    try {
+      const assignments = await assignVariants(conversation.id, activePersona);
+      // Resolve prompt overrides for assigned variants
+      for (const target of Object.keys(assignments)) {
+        const override = await getPromptOverride(assignments, target);
+        if (override) abOverrides[target] = override;
+      }
+    } catch (err) {
+      // A/B tests are non-critical — don't block conversation
+      console.warn('[Manager] A/B test assignment failed (non-critical):', err.message);
+    }
+
+    // 5. Get AI response (use persona from conversation or detected from bot token)
+    const { text: responseText, metadata } = await getAgentResponse(state, messages, combinedText, activePersona, abOverrides);
 
     if (!responseText) {
       console.error(`[Manager] Empty response from Claude for ${phone}`);

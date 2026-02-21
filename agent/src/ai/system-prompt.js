@@ -5,12 +5,13 @@ import { buildSdrPrompt } from './sdr-prompt.js';
  * Build system prompt based on persona.
  * @param {Object} state - Conversation state
  * @param {string} persona - 'augusto' (default) or 'paulo'
+ * @param {Object} abOverrides - A/B test overrides { target: promptText }
  */
-export function buildSystemPrompt(state, persona = 'augusto') {
+export function buildSystemPrompt(state, persona = 'augusto', abOverrides = {}) {
   if (persona === 'paulo') {
-    return buildSdrPrompt(state);
+    return buildSdrPrompt(state, abOverrides);
   }
-  return buildAugustoPrompt(state);
+  return buildAugustoPrompt(state, abOverrides);
 }
 
 /**
@@ -18,7 +19,7 @@ export function buildSystemPrompt(state, persona = 'augusto') {
  * 3 perguntas matadoras + diagnóstico como gate + call como bônus.
  * Split into core + active phase to reduce token usage by ~50%.
  */
-function buildAugustoPrompt(state) {
+function buildAugustoPrompt(state, abOverrides = {}) {
   const siteUrl = config.site.url;
   const phase = state.phase || 0;
 
@@ -46,7 +47,9 @@ BÔNUS DO DIAGNÓSTICO: Quem compra o diagnóstico ganha uma CALL EXCLUSIVA com 
 ESTADO: Fase=${phase} | Links=${state.link_counter}/3 | Nome=${state.name || '?'} | Produto=${state.recommended_product || '?'} | Perfil=${JSON.stringify(state.user_profile || {})}`;
 
   // Phase-specific instructions (only active phase sent)
-  const phaseInstructions = getPhaseInstructions(phase, siteUrl);
+  // Check A/B test overrides for the current phase target
+  const phaseTarget = phase <= 1 ? 'greeting' : phase === 2 ? 'investigation' : phase === 3 ? 'education' : 'closing';
+  const phaseInstructions = abOverrides[phaseTarget] || getPhaseInstructions(phase, siteUrl);
 
   // Compact objection handling (always included but shorter)
   const objections = getRelevantObjections(phase, siteUrl);

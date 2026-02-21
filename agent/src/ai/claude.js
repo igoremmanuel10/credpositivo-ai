@@ -16,8 +16,8 @@ const openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
  * Get AI response for a conversation turn.
  * Uses Claude Haiku 4.5 for chat responses.
  */
-export async function getAgentResponse(conversationState, messageHistory, userMessage, persona = 'augusto') {
-  const systemPrompt = buildSystemPrompt(conversationState, persona);
+export async function getAgentResponse(conversationState, messageHistory, userMessage, persona = 'augusto', abOverrides = {}) {
+  const systemPrompt = buildSystemPrompt(conversationState, persona, abOverrides);
 
   const messages = [];
 
