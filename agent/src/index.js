@@ -20,8 +20,9 @@ import { vapiWebhookRouter } from "./voice/vapi-webhook.js";
 import { startVapiScheduler } from "./voice/scheduler.js";
 import { getBridgeHealth } from './bridge-health.js';
 import { startBridgeWatchdog } from './bridge-watchdog.js';
-import { startReportScheduler, sendDailyReportNow } from './reports/scheduler.js';
+import { startReportScheduler, sendDailyReportNow, sendWeeklyRatingReportNow } from './reports/scheduler.js';
 import { getCostSummary } from './monitoring/cost-tracker.js';
+import { startExpenseScheduler } from './expense/tracker.js';
 
 const app = express();
 
@@ -122,6 +123,21 @@ app.post('/api/admin/daily-report', async (req, res) => {
   }
 });
 
+// Weekly rating report manual trigger
+app.post('/api/admin/weekly-rating-report', async (req, res) => {
+  try {
+    const result = await sendWeeklyRatingReportNow();
+    res.json({
+      success: result.success,
+      message: 'Relatorio rating enviado para ' + result.sentCount + '/' + result.totalTargets + ' destinos',
+      results: result.results,
+    });
+  } catch (err) {
+    console.error('[Admin] Weekly rating report error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('[Express] Unhandled error:', err);
@@ -156,5 +172,6 @@ app.use((err, req, res, next) => {
     startVapiScheduler();
     startBridgeWatchdog();
     startReportScheduler();
+    startExpenseScheduler();
   });
 })();
