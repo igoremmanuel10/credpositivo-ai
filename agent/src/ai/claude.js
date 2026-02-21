@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { buildSystemPrompt } from './system-prompt.js';
 import { filterOutput, buildCorrectionInstruction } from './output-filter.js';
 import { trackApiCost } from '../monitoring/cost-tracker.js';
+import { captureError } from '../monitoring/sentry.js';
 
 // Anthropic client for chat (Haiku 4.5)
 const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
@@ -63,7 +64,8 @@ async function callClaude(systemPrompt, messages, attempt = 1) {
   try {
     const response = await anthropic.messages.create({
       model: config.anthropic.model,
-      max_tokens: 500,
+      max_tokens: 300,
+      temperature: 0.7,
       system: systemPrompt,
       messages: messages,
     });
@@ -99,6 +101,7 @@ async function callClaude(systemPrompt, messages, attempt = 1) {
       return callClaude(systemPrompt, messages, attempt + 1);
     }
 
+    captureError(err, { module: 'claude', action: 'callClaude', extra: { status: err.status, attempt } });
     throw err;
   }
 }

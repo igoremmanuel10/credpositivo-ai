@@ -2,7 +2,7 @@ import { config } from '../config.js';
 
 const { apiUrl, botToken } = config.quepasa;
 
-const MESSAGE_DELAY_MS = 10000; // 10 seconds between bubbles
+const MESSAGE_DELAY_MS = 4000; // 4 seconds between bubbles
 
 // Cache: maps wid prefix (phone number) to bot token
 const widTokenMap = new Map();
@@ -251,7 +251,7 @@ export async function sendMessages(chatId, fullText, token = null) {
     results.push(result);
   }
 
-  console.log(`[Quepasa] Sent ${bubbles.length} bubbles to ${chatId} (10s intervals)`);
+  console.log(`[Quepasa] Sent ${bubbles.length} bubbles to ${chatId} (4s intervals)`);
   return results;
 }
 
