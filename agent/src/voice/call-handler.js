@@ -191,7 +191,7 @@ function buildWhatsAppMessage(eventType, leadName, produto, webCallUrl) {
     case 'purchase_abandoned': {
       const produtoNome = formatProductName(produto);
       return [
-        `Oi${nome ? ' ' + nome : ''}! Aqui e o inteligencia artificial do Grupo CredPositivo.`,
+        `Oi${nome ? ' ' + nome : ''}! Aqui e o Paulo, a inteligencia artificial do Grupo CredPositivo.`,
         '',
         `Vi que voce estava dando uma olhada no nosso servico${produtoNome ? ' de ' + produtoNome : ''} e queria te ajudar com qualquer duvida.`,
         '',
@@ -205,7 +205,7 @@ function buildWhatsAppMessage(eventType, leadName, produto, webCallUrl) {
 
     case 'diagnosis_completed': {
       return [
-        `Oi${nome ? ' ' + nome : ''}! Aqui e o inteligencia artificial do Grupo CredPositivo.`,
+        `Oi${nome ? ' ' + nome : ''}! Aqui e o Paulo, a inteligencia artificial do Grupo CredPositivo.`,
         '',
         `Seu diagnostico de credito ficou pronto e tem algumas coisas importantes que quero te explicar pessoalmente.`,
         '',
@@ -219,7 +219,7 @@ function buildWhatsAppMessage(eventType, leadName, produto, webCallUrl) {
 
     default: {
       return [
-        `Oi${nome ? ' ' + nome : ''}! Aqui e o inteligencia artificial do Grupo CredPositivo.`,
+        `Oi${nome ? ' ' + nome : ''}! Aqui e o Paulo, a inteligencia artificial do Grupo CredPositivo.`,
         '',
         `Quero conversar com voce sobre sua situacao de credito. E so clicar no link abaixo e falar comigo pelo navegador:`,
         '',
@@ -252,7 +252,7 @@ function buildCallOverrides(eventType, leadName, produto, eventData) {
 
   switch (eventType) {
     case 'purchase_abandoned': {
-      overrides.firstMessage = `Oi${leadName !== 'amigo' ? ', ' + leadName : ''}! Aqui e o inteligencia artificial do Grupo CredPositivo. Que bom que voce entrou na chamada! Vi que voce estava dando uma olhada no nosso servico${produto ? ' de ' + formatProductName(produto) : ''}. Posso te ajudar com alguma duvida?`;
+      overrides.firstMessage = `Oi${leadName !== 'amigo' ? ', ' + leadName : ''}! Aqui e o Paulo, a inteligencia artificial do Grupo CredPositivo. Que bom que voce entrou na chamada! Vi que voce estava dando uma olhada no nosso servico${produto ? ' de ' + formatProductName(produto) : ''}. Posso te ajudar com alguma duvida?`;
 
       overrides.model = {
         messages: [
@@ -266,7 +266,7 @@ function buildCallOverrides(eventType, leadName, produto, eventData) {
     }
 
     case 'diagnosis_completed': {
-      overrides.firstMessage = `Oi${leadName !== 'amigo' ? ', ' + leadName : ''}! Aqui e o inteligencia artificial do Grupo CredPositivo. Que bom que voce entrou na chamada! Seu diagnostico de credito ficou pronto e tem algumas coisas importantes que quero te explicar. Pode falar agora?`;
+      overrides.firstMessage = `Oi${leadName !== 'amigo' ? ', ' + leadName : ''}! Aqui e o Paulo, a inteligencia artificial do Grupo CredPositivo. Que bom que voce entrou na chamada! Seu diagnostico de credito ficou pronto e tem algumas coisas importantes que quero te explicar. Pode falar agora?`;
 
       overrides.model = {
         messages: [
