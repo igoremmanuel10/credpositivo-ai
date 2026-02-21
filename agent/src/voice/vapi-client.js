@@ -226,7 +226,7 @@ export async function listCalls(params = {}) {
 export async function createAssistant(overrides = {}) {
   const body = {
     name: 'Augusto - CredPositivo',
-    firstMessage: 'Oi! Aqui e o Augusto da CredPositivo. Tudo bem? Estou te ligando porque vi que voce tem interesse em resolver sua situacao de credito. Posso falar com voce agora?',
+    firstMessage: 'Oi! Aqui e a inteligencia artificial do Grupo CredPositivo. Tudo bem? Estou te ligando porque vi que voce tem interesse em resolver sua situacao de credito. Posso falar com voce agora?',
     model: {
       provider: 'openai',
       model: 'gpt-4o-mini',
@@ -282,7 +282,7 @@ export async function createAssistant(overrides = {}) {
  * Adapted from the text-based Augusto prompt for voice interactions.
  */
 function buildVoiceSystemPrompt() {
-  return `Voce e o Augusto, especialista em credito da CredPositivo. Voce esta em uma chamada de voz.
+  return `Voce e a inteligencia artificial do Grupo CredPositivo. Voce esta em uma chamada de voz.
 
 REGRAS DE VOZ:
 - Fale de forma natural e conversacional, como uma pessoa real

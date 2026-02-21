@@ -13,6 +13,7 @@ import {
   sendOutgoingMessage as chatwootSendOutgoing,
 } from '../chatwoot/client.js';
 import { trackBridgeActivity, trackBridgeError } from '../bridge-health.js';
+import { handleGroupMessage, FINANCEIRO_GROUP_JID } from '../expense/tracker.js';
 
 export const webhookRouter = Router();
 
@@ -57,6 +58,24 @@ webhookRouter.post('/webhook/quepasa', async (req, res) => {
       }
       console.log('[Quepasa] Audio with fromme:true but no agent trackId — treating as incoming user audio');
     }
+
+    // ── GROUP MESSAGE ROUTING ──────────────────────────────────────────────
+    // Detect WhatsApp group messages (@g.us suffix on chat ID).
+    // Route Financeiro group to expense tracker; drop all other group messages
+    // so they never reach the AI conversation manager or Chatwoot bridge.
+    const incomingChatId = msg.chat?.id || msg.chatId || msg.source || '';
+    if (incomingChatId.endsWith('@g.us')) {
+      if (incomingChatId === FINANCEIRO_GROUP_JID) {
+        handleGroupMessage(msg).catch(err => {
+          console.error('[ExpenseTracker] Unhandled error in handleGroupMessage:', err);
+        });
+      } else {
+        console.log(`[Quepasa Webhook] Group message from ${incomingChatId} ignored (not Financeiro group)`);
+      }
+      // Either way, do NOT continue to individual-chat processing
+      return;
+    }
+    // ── END GROUP ROUTING ──────────────────────────────────────────────────
 
     // Extract message text or transcribe audio
     let text = msg.text || msg.body || msg.message?.text || msg.message?.conversation || '';
