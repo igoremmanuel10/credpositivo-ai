@@ -27,6 +27,7 @@ import { getCostSummary } from './monitoring/cost-tracker.js';
 import { analyticsRouter } from './api/analytics.js';
 import { abTestsRouter } from './api/ab-tests.js';
 import { startExpenseScheduler } from './expense/tracker.js';
+import { runMigrations, db } from './db/client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,13 +55,21 @@ app.use('/api/admin', (req, res, next) => {
 });
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  let dbOk = false;
+  try {
+    await db.query('SELECT 1');
+    dbOk = true;
+  } catch {}
+
   res.json({
-    status: 'ok',
+    status: dbOk ? 'ok' : 'degraded',
     agent: 'CredPositivo Agents v2 (Augusto + Paulo SDR)',
+    uptime: Math.round(process.uptime()),
     services: {
       quepasa: config.quepasa.apiUrl,
       chatwoot: config.chatwoot.apiUrl,
+      postgres: dbOk ? 'ok' : 'unreachable',
     },
     timestamp: new Date().toISOString(),
   });
@@ -165,6 +174,9 @@ app.use((err, req, res, next) => {
 
 // Start server with async initialization
 (async () => {
+  // Run database migrations (idempotent)
+  await runMigrations();
+
   // Initialize token mapping for multi-number support
   await initTokenMapping();
 

@@ -1,6 +1,10 @@
 import pg from 'pg';
+import { readFileSync, readdirSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { config } from '../config.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const pool = new pg.Pool({ connectionString: config.database.url });
 
 export const db = {
@@ -152,3 +156,32 @@ export const db = {
     return rows;
   },
 };
+
+/**
+ * Run all SQL migrations in order.
+ * Migrations use IF NOT EXISTS, so re-running is safe.
+ */
+export async function runMigrations() {
+  const migrationsDir = resolve(__dirname, 'migrations');
+  let files;
+  try {
+    files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+  } catch {
+    console.log('[Migrations] No migrations directory found, skipping');
+    return;
+  }
+
+  if (files.length === 0) return;
+
+  console.log(`[Migrations] Running ${files.length} migration files...`);
+  for (const file of files) {
+    try {
+      const sql = readFileSync(resolve(migrationsDir, file), 'utf-8');
+      await pool.query(sql);
+    } catch (err) {
+      console.error(`[Migrations] Failed on ${file}:`, err.message);
+      // Don't crash — table might already exist with slightly different schema
+    }
+  }
+  console.log('[Migrations] Done');
+}
