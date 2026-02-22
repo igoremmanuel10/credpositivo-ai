@@ -36,11 +36,13 @@ usersRouter.post('/api/register', async (req, res) => {
       return res.status(409).json({ success: false, error: 'CPF ou E-mail ja cadastrados!' });
     }
 
+    const hashedPassword = await bcrypt.hash(senha, 10);
+
     const { rows } = await db.query(
       `INSERT INTO users (nome, cpf, email, telefone, senha)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, nome, cpf, email, telefone, tipo, status, created_at`,
-      [nome, cpf, email, telefone || null, senha]
+      [nome, cpf, email, telefone || null, hashedPassword]
     );
 
     res.json({ success: true, user: rows[0] });
@@ -73,17 +75,24 @@ usersRouter.post('/api/login', async (req, res) => {
 
     // Allow login by email or CPF
     const { rows } = await db.query(
-      `SELECT id, nome, cpf, email, telefone, tipo, status, created_at
+      `SELECT id, nome, cpf, email, telefone, tipo, status, senha, created_at
        FROM users
-       WHERE (email = $1 OR cpf = $1) AND senha = $2 AND ativo = true`,
-      [email, senha]
+       WHERE (email = $1 OR cpf = $1) AND ativo = true`,
+      [email]
     );
 
     if (rows.length === 0) {
       return res.status(401).json({ success: false, error: 'CPF/Email ou senha invalidos' });
     }
 
-    res.json({ success: true, user: rows[0] });
+    const user = rows[0];
+    const passwordMatch = await bcrypt.compare(senha, user.senha);
+    if (!passwordMatch) {
+      return res.status(401).json({ success: false, error: 'CPF/Email ou senha invalidos' });
+    }
+
+    const { senha: _, ...safeUser } = user;
+    res.json({ success: true, user: safeUser });
 
   } catch (err) {
     console.error('[API] Login error:', err.message);

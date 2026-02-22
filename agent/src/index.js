@@ -28,6 +28,7 @@ import { analyticsRouter } from './api/analytics.js';
 import { abTestsRouter } from './api/ab-tests.js';
 import { startExpenseScheduler } from './expense/tracker.js';
 import { runMigrations, db } from './db/client.js';
+import { processUnembeddedConversations, refreshStaleEmbeddings } from './ai/embed-job.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -203,5 +204,21 @@ app.use((err, req, res, next) => {
     startBridgeWatchdog();
     startReportScheduler();
     startExpenseScheduler();
+
+    // Embedding job: process new conversations every 30 minutes, refresh stale daily
+    setInterval(() => {
+      processUnembeddedConversations().catch(err =>
+        console.error('[EmbedJob] Scheduler error:', err.message)
+      );
+    }, 30 * 60 * 1000);
+    setInterval(() => {
+      refreshStaleEmbeddings().catch(err =>
+        console.error('[EmbedJob] Refresh error:', err.message)
+      );
+    }, 24 * 60 * 60 * 1000);
+    // Run initial embedding pass after 2 min startup delay
+    setTimeout(() => {
+      processUnembeddedConversations().catch(() => {});
+    }, 2 * 60 * 1000);
   });
 })();

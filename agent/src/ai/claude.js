@@ -5,6 +5,7 @@ import { buildSystemPrompt } from './system-prompt.js';
 import { filterOutput, buildCorrectionInstruction } from './output-filter.js';
 import { trackApiCost } from '../monitoring/cost-tracker.js';
 import { captureError } from '../monitoring/sentry.js';
+import { buildContextFromSimilar } from './embeddings.js';
 
 // Anthropic client for chat (Haiku 4.5)
 const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
@@ -17,7 +18,17 @@ const openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
  * Uses Claude Haiku 4.5 for chat responses.
  */
 export async function getAgentResponse(conversationState, messageHistory, userMessage, persona = 'augusto', abOverrides = {}) {
-  const systemPrompt = buildSystemPrompt(conversationState, persona, abOverrides);
+  let systemPrompt = buildSystemPrompt(conversationState, persona, abOverrides);
+
+  // Inject similar conversation patterns via pgvector (RAG)
+  try {
+    const embeddingsContext = await buildContextFromSimilar(userMessage, conversationState.phase);
+    if (embeddingsContext) {
+      systemPrompt += embeddingsContext;
+    }
+  } catch (err) {
+    // Embeddings are optional — don't block the response
+  }
 
   const messages = [];
 

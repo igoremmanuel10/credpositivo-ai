@@ -111,6 +111,7 @@ export const config = {
     debounceSeconds: 3,
     cooldownSeconds: 10,
     maxBubblesPerResponse: 1,
+    maxConversationMessages: 200,
     maxAgentMessagesPerHour: 20,
     maxFollowupsPerDay: 1,
     maxAutoTouchpointsPerWeek: 3,
