@@ -124,6 +124,9 @@ app.use(abTestsRouter);
 app.get('/admin/dashboard', (req, res) => {
   res.sendFile(join(__dirname, 'admin', 'dashboard.html'));
 });
+app.get('/admin/analytics', (req, res) => {
+  res.sendFile(join(__dirname, 'admin', 'analytics.html'));
+});
 
 // API cost summary (admin only)
 app.get('/api/admin/costs', async (req, res) => {
