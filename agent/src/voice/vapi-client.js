@@ -347,3 +347,16 @@ export function isVapiEnabled() {
     config.vapi.assistantId
   );
 }
+
+/**
+ * Check if Vapi is configured for outbound PSTN calls.
+ * Outbound calls require privateKey + assistantId + phoneNumberId.
+ */
+export function isVapiOutboundEnabled() {
+  return !!(
+    config.vapi.enabled &&
+    config.vapi.privateKey &&
+    config.vapi.assistantId &&
+    config.vapi.phoneNumberId
+  );
+}

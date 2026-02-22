@@ -1,13 +1,15 @@
 /**
- * Voice Call Handler (Web Call Mode)
+ * Voice Call Handler (Dual Mode: Web Call + Outbound PSTN)
  *
- * Decides WHEN to initiate voice calls via Vapi.ai Web Calls.
- * Instead of phone calls, generates a browser link and sends it to the lead via WhatsApp.
- * The lead clicks the link and talks to Augusto through the browser.
+ * Decides WHEN and HOW to initiate voice calls via Vapi.ai.
+ * Supports two modes:
+ * - "web": Generates a browser link and sends it to the lead via WhatsApp
+ * - "outbound": Makes a real PSTN phone call (phone rings directly)
  *
  * Supported triggers:
  * 1. purchase_abandoned (Rating R$997) -- high-value lead abandoned checkout
  * 2. diagnosis_completed (complex result) -- result too complex for text
+ * 3. manual_test -- admin test call (skips business hours)
  *
  * Fernando Dev - CredPositivo
  */
@@ -15,19 +17,19 @@
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { cache } from '../db/redis.js';
-import { createWebCall, isVapiEnabled } from './vapi-client.js';
+import { createWebCall, createOutboundCall, isVapiEnabled, isVapiOutboundEnabled } from './vapi-client.js';
 import { sendText } from '../quepasa/client.js';
 
 /**
  * Attempt to initiate a voice call for a specific event.
- * Creates a web call link and sends it to the lead via WhatsApp.
  *
  * @param {string} phone - Lead phone number (Brazilian format, e.g. 5571999999999)
- * @param {string} eventType - Event that triggered the call (purchase_abandoned, diagnosis_completed)
+ * @param {string} eventType - Event that triggered the call (purchase_abandoned, diagnosis_completed, manual_test)
  * @param {Object} eventData - Additional event data (produto, valor, etc.)
+ * @param {string|null} mode - Call mode: null=auto, "outbound"=PSTN, "web"=browser link
  * @returns {Object|null} Call result or null if skipped
  */
-export async function handleVoiceCallTrigger(phone, eventType, eventData = {}) {
+export async function handleVoiceCallTrigger(phone, eventType, eventData = {}, mode = null) {
   // 1. Check if Vapi is enabled
   if (!isVapiEnabled()) {
     console.log(`[VoiceCall] Vapi not enabled, skipping call for ${phone} (${eventType})`);
@@ -40,38 +42,70 @@ export async function handleVoiceCallTrigger(phone, eventType, eventData = {}) {
     return null;
   }
 
-  // 3. Check rate limit (max calls per lead per day)
-  const rateLimitOk = await checkCallRateLimit(phone);
-  if (!rateLimitOk) {
-    console.log(`[VoiceCall] Rate limit reached for ${phone}, skipping call`);
-    return null;
+  // 3. Check rate limit (max calls per lead per day) — skip for manual_test
+  if (eventType !== 'manual_test') {
+    const rateLimitOk = await checkCallRateLimit(phone);
+    if (!rateLimitOk) {
+      console.log(`[VoiceCall] Rate limit reached for ${phone}, skipping call`);
+      return null;
+    }
   }
 
-  // 4. Check business hours (8h-20h BRT = 11h-23h UTC)
-  if (!isBusinessHours()) {
+  // 4. Check business hours — skip for manual_test
+  if (eventType !== 'manual_test' && !isBusinessHours()) {
     console.log(`[VoiceCall] Outside business hours, scheduling delayed call for ${phone}`);
-    // Schedule for next business hours window
     await scheduleDelayedCall(phone, eventType, eventData);
     return { scheduled: true, phone, eventType };
   }
 
-  // 5. Check if lead opted out
-  const conversation = await db.getConversation(phone);
-  if (conversation?.opted_out) {
-    console.log(`[VoiceCall] Lead ${phone} opted out, skipping call`);
-    return null;
+  // 5. Check if lead opted out — skip for manual_test
+  if (eventType !== 'manual_test') {
+    const conversation = await db.getConversation(phone);
+    if (conversation?.opted_out) {
+      console.log(`[VoiceCall] Lead ${phone} opted out, skipping call`);
+      return null;
+    }
   }
 
-  // 6. Create web call and send link via WhatsApp
+  // 6. Resolve call mode
+  const resolvedMode = resolveCallMode(mode);
+  console.log(`[VoiceCall] Resolved mode: ${resolvedMode} (requested: ${mode || 'auto'})`);
+
+  // 7. Initiate call based on mode
   try {
-    const callResult = await initiateWebCall(phone, eventType, eventData, conversation);
-    return callResult;
+    const conversation = await db.getConversation(phone);
+
+    if (resolvedMode === 'outbound') {
+      const callResult = await initiateOutboundCall(phone, eventType, eventData, conversation);
+      return callResult;
+    } else {
+      const callResult = await initiateWebCall(phone, eventType, eventData, conversation);
+      return callResult;
+    }
   } catch (err) {
-    console.error(`[VoiceCall] Failed to initiate web call for ${phone}:`, err.message);
-    // Log failure to DB
-    await logCallAttempt(phone, eventType, 'failed', null, err.message);
+    const callMode = resolvedMode === 'outbound' ? 'outbound' : 'web';
+    console.error(`[VoiceCall] Failed to initiate ${callMode} call for ${phone}:`, err.message);
+    await logCallAttempt(phone, eventType, 'failed', null, err.message, null, 'vapi', callMode);
     return null;
   }
+}
+
+/**
+ * Resolve the effective call mode.
+ * null/auto = outbound if configured, otherwise web.
+ */
+function resolveCallMode(mode) {
+  if (mode === 'outbound') {
+    if (!isVapiOutboundEnabled()) {
+      console.warn('[VoiceCall] Outbound requested but not configured, falling back to web');
+      return 'web';
+    }
+    return 'outbound';
+  }
+  if (mode === 'web') return 'web';
+
+  // Auto: prefer outbound if fully configured
+  return isVapiOutboundEnabled() ? 'outbound' : 'web';
 }
 
 /**
@@ -88,6 +122,10 @@ function shouldCallForEvent(eventType, eventData = {}) {
     case 'diagnosis_completed':
       // Call when result is complex (multiple issues found)
       return eventData.complex === true || eventData.issues_count > 3;
+
+    case 'manual_test':
+      // Always allow manual test calls
+      return true;
 
     default:
       return false;
@@ -136,6 +174,38 @@ async function scheduleDelayedCall(phone, eventType, eventData) {
 }
 
 /**
+ * Initiate an outbound PSTN call via Vapi.
+ * The phone rings directly — no WhatsApp message needed.
+ */
+async function initiateOutboundCall(phone, eventType, eventData, conversation) {
+  const leadName = conversation?.name || 'amigo';
+  const produto = eventData.produto || conversation?.recommended_product || '';
+
+  const overrides = buildCallOverrides(eventType, leadName, produto, eventData);
+
+  console.log(`[VoiceCall] Creating outbound PSTN call for ${phone} (${eventType}, lead: ${leadName})`);
+
+  const call = await createOutboundCall(phone, {
+    assistantOverrides: overrides,
+    metadata: {
+      eventType,
+      phone,
+      leadName,
+      produto,
+      conversationId: conversation?.id?.toString() || '',
+    },
+  });
+
+  // Increment rate limit counter
+  await incrementCallCounter(phone);
+
+  // Log to database
+  await logCallAttempt(phone, eventType, 'initiated', call.id, null, null, 'vapi', 'outbound');
+
+  return { callId: call.id, phone, eventType, status: 'initiated', mode: 'outbound' };
+}
+
+/**
  * Create a Vapi web call and send the link to the lead via WhatsApp.
  */
 async function initiateWebCall(phone, eventType, eventData, conversation) {
@@ -176,9 +246,9 @@ async function initiateWebCall(phone, eventType, eventData, conversation) {
   await incrementCallCounter(phone);
 
   // Log to database
-  await logCallAttempt(phone, eventType, 'link_sent', call.id, null, webCallUrl);
+  await logCallAttempt(phone, eventType, 'link_sent', call.id, null, webCallUrl, 'vapi', 'web');
 
-  return { callId: call.id, phone, eventType, webCallUrl, status: 'link_sent' };
+  return { callId: call.id, phone, eventType, webCallUrl, status: 'link_sent', mode: 'web' };
 }
 
 /**
@@ -278,6 +348,11 @@ function buildCallOverrides(eventType, leadName, produto, eventData) {
       };
       break;
     }
+
+    case 'manual_test': {
+      overrides.firstMessage = `Oi! Aqui e o Paulo, a inteligencia artificial do Grupo CredPositivo. Essa e uma chamada de teste. Como posso te ajudar?`;
+      break;
+    }
   }
 
   return overrides;
@@ -298,17 +373,26 @@ function formatProductName(produto) {
 
 /**
  * Log a call attempt to the database.
+ *
+ * @param {string} phone
+ * @param {string} eventType
+ * @param {string} status
+ * @param {string|null} vapiCallId
+ * @param {string|null} errorMessage
+ * @param {string|null} webCallUrl
+ * @param {string} provider - 'vapi' or 'wavoip'
+ * @param {string} callMode - 'web', 'outbound', or 'whatsapp'
  */
-async function logCallAttempt(phone, eventType, status, vapiCallId = null, errorMessage = null, webCallUrl = null) {
+export async function logCallAttempt(phone, eventType, status, vapiCallId = null, errorMessage = null, webCallUrl = null, provider = 'vapi', callMode = 'web') {
   try {
     await db.query(
-      `INSERT INTO voice_calls (phone, event_type, status, vapi_call_id, error_message, web_call_url, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-      [phone, eventType, status, vapiCallId, errorMessage, webCallUrl]
+      `INSERT INTO voice_calls (phone, event_type, status, vapi_call_id, error_message, web_call_url, provider, call_mode, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+      [phone, eventType, status, vapiCallId, errorMessage, webCallUrl, provider, callMode]
     );
   } catch (err) {
-    // If web_call_url column doesn't exist yet, fallback without it
-    if (err.message.includes('web_call_url')) {
+    // Fallback: if new columns don't exist yet (migration not run), try without them
+    if (err.message.includes('provider') || err.message.includes('call_mode') || err.message.includes('web_call_url')) {
       try {
         await db.query(
           `INSERT INTO voice_calls (phone, event_type, status, vapi_call_id, error_message, created_at)

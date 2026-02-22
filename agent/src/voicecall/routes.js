@@ -21,9 +21,9 @@ voicecallRouter.post("/api/voicecall/call", async (req, res) => {
     const result = await makeCall(phone, { reason: reason || "api" });
 
     if (result.success) {
-      res.json(result);
+      res.json({ ...result, provider: 'wavoip' });
     } else {
-      res.status(400).json(result);
+      res.status(400).json({ ...result, provider: 'wavoip' });
     }
   } catch (err) {
     console.error("[VOICECALL] API error:", err);

@@ -12,6 +12,7 @@ import { createRequire } from "module";
 import Redis from "ioredis";
 import { config } from "../config.js";
 import { normalizePhone } from "../utils/phone.js";
+import { db } from "../db/client.js";
 
 // Setup JSDOM environment for wavoip-api
 const dom = new JSDOM("", {
@@ -249,6 +250,20 @@ export async function makeCall(phone, options = {}) {
     });
     await redis.lpush("wavoip:call_log", callLog);
     await redis.ltrim("wavoip:call_log", 0, 999);
+
+    // Log to database (non-fatal if migration hasn't run yet)
+    try {
+      await db.query(
+        `INSERT INTO voice_calls (phone, event_type, status, provider, call_mode, created_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())`,
+        [normalizedPhone, reason, 'initiated', 'wavoip', 'whatsapp']
+      );
+    } catch (dbErr) {
+      // Silently ignore if provider/call_mode columns don't exist yet
+      if (!dbErr.message.includes('provider') && !dbErr.message.includes('call_mode')) {
+        console.warn("[WAVOIP] DB log failed:", dbErr.message);
+      }
+    }
 
     console.log("[WAVOIP] Call initiated to " + normalizedPhone);
     return { success: true, message: "Call initiated to " + normalizedPhone };

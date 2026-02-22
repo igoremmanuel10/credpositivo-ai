@@ -1,15 +1,22 @@
 /**
- * Vapi.ai Webhook Receiver
+ * Vapi.ai Webhook Receiver + Admin Voice Endpoints
  *
  * Receives call status events from Vapi.ai and updates our database.
  * Events: status-update, end-of-call-report, hang
+ *
+ * Admin endpoints:
+ * - POST /api/admin/voice/test-call — unified test call (Vapi + Wavoip)
+ * - GET /api/admin/voice/status — combined status of all voice providers
  *
  * Fernando Dev - CredPositivo
  */
 
 import { Router } from 'express';
 import { config } from '../config.js';
-import { updateCallStatus } from './call-handler.js';
+import { updateCallStatus, handleVoiceCallTrigger, logCallAttempt } from './call-handler.js';
+import { isVapiEnabled, isVapiOutboundEnabled } from './vapi-client.js';
+import { makeCall, getWavoipStatus } from '../voicecall/wavoip.js';
+import { requireAdmin } from '../api/auth.js';
 
 export const vapiWebhookRouter = Router();
 
@@ -117,7 +124,7 @@ async function handleEndOfCallReport(message) {
   if (artifact?.messages) {
     transcript = artifact.messages
       .filter(m => m.role && m.message)
-      .map(m => `${m.role === 'assistant' ? 'Augusto' : 'Lead'}: ${m.message}`)
+      .map(m => `${m.role === 'assistant' ? 'Paulo' : 'Lead'}: ${m.message}`)
       .join('\n');
   } else if (artifact?.transcript) {
     transcript = artifact.transcript;
@@ -183,4 +190,93 @@ vapiWebhookRouter.get('/api/vapi/status', (req, res) => {
     hasAssistantId: !!config.vapi?.assistantId,
     serverUrl: config.vapi?.serverUrl || 'not configured',
   });
+});
+
+// ============================================================
+// Admin Voice Endpoints (JWT required)
+// ============================================================
+
+/**
+ * POST /api/admin/voice/test-call -- Unified test call endpoint.
+ *
+ * Body: { phone: string, provider?: "vapi"|"wavoip", mode?: "outbound"|"web" }
+ *
+ * provider defaults to "vapi".
+ * mode defaults to auto (outbound if configured, else web). Only applies to Vapi.
+ */
+vapiWebhookRouter.post('/api/admin/voice/test-call', requireAdmin, async (req, res) => {
+  try {
+    const { phone, provider = 'vapi', mode = null } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ success: false, error: 'Phone number is required' });
+    }
+
+    console.log(`[Admin Voice] Test call requested: phone=${phone}, provider=${provider}, mode=${mode || 'auto'}`);
+
+    if (provider === 'wavoip') {
+      // Wavoip call (WhatsApp voice)
+      const result = await makeCall(phone, { reason: 'manual_test', skipLimitCheck: true });
+      return res.json({
+        success: result.success,
+        provider: 'wavoip',
+        mode: 'whatsapp',
+        message: result.message,
+      });
+    }
+
+    // Vapi call (default)
+    const result = await handleVoiceCallTrigger(phone, 'manual_test', {}, mode);
+
+    if (!result) {
+      return res.status(400).json({
+        success: false,
+        provider: 'vapi',
+        error: 'Call could not be initiated. Check Vapi configuration.',
+      });
+    }
+
+    return res.json({
+      success: true,
+      provider: 'vapi',
+      mode: result.mode || (result.webCallUrl ? 'web' : 'outbound'),
+      callId: result.callId,
+      webCallUrl: result.webCallUrl || null,
+      status: result.status,
+    });
+  } catch (err) {
+    console.error('[Admin Voice] Test call error:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/voice/status -- Combined status of all voice providers.
+ */
+vapiWebhookRouter.get('/api/admin/voice/status', requireAdmin, async (req, res) => {
+  try {
+    const wavoipStatus = getWavoipStatus();
+
+    res.json({
+      vapi: {
+        enabled: config.vapi?.enabled || false,
+        webCallReady: isVapiEnabled(),
+        outboundReady: isVapiOutboundEnabled(),
+        hasPrivateKey: !!config.vapi?.privateKey,
+        hasPublicKey: !!config.vapi?.publicKey,
+        hasPhoneNumberId: !!config.vapi?.phoneNumberId,
+        hasAssistantId: !!config.vapi?.assistantId,
+        serverUrl: config.vapi?.serverUrl || 'not configured',
+      },
+      wavoip: {
+        enabled: wavoipStatus.enabled,
+        connected: wavoipStatus.connected,
+        tokenConfigured: wavoipStatus.tokenConfigured,
+        maxDailyCalls: wavoipStatus.maxDailyCalls,
+      },
+    });
+  } catch (err) {
+    console.error('[Admin Voice] Status error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
