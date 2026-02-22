@@ -80,9 +80,16 @@ const redis = new Redis(config.redis.url);
 let wavoipInstance = null;
 let whatsappInstance = null;
 let connected = false;
+let reconnectAttempts = 0;
+let lastConnectTime = 0;
+let gaveUp = false;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_MS = 5000;
+const STABLE_CONNECTION_MS = 30000; // Connection must last 30s to be considered stable
 
 /**
  * Initialize Wavoip connection.
+ * Uses exponential backoff with max retry limit to prevent log spam.
  */
 export function initWavoip() {
   if (config.wavoip.enabled === false) {
@@ -100,18 +107,53 @@ export function initWavoip() {
     wavoipInstance = new WavoipClass();
     whatsappInstance = wavoipInstance.connect(config.wavoip.token);
 
+    // Disable automatic reconnection — we handle it manually with backoff
+    if (whatsappInstance.socket && whatsappInstance.socket.io) {
+      whatsappInstance.socket.io.opts.reconnection = false;
+    }
+
     whatsappInstance.socket.on("connect", () => {
       connected = true;
-      console.log("[WAVOIP] Connected successfully");
+      lastConnectTime = Date.now();
+      if (!gaveUp) {
+        console.log("[WAVOIP] Connected successfully");
+      }
     });
 
     whatsappInstance.socket.on("disconnect", (reason) => {
       connected = false;
-      console.log("[WAVOIP] Disconnected:", reason);
+      const connectionDuration = Date.now() - lastConnectTime;
+
+      // If connection lasted long enough, reset the counter
+      if (connectionDuration > STABLE_CONNECTION_MS) {
+        reconnectAttempts = 0;
+      }
+
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        if (!gaveUp) {
+          console.warn("[WAVOIP] Connection unstable — giving up after " + MAX_RECONNECT_ATTEMPTS + " attempts. Will retry on next makeCall.");
+          gaveUp = true;
+          // Force close the socket to stop internal auto-reconnects
+          try { whatsappInstance.socket.disconnect(); } catch (e) {}
+        }
+        return;
+      }
+      reconnectAttempts++;
+      const backoff = Math.min(RECONNECT_BASE_MS * Math.pow(2, reconnectAttempts - 1), 60000);
+      console.log("[WAVOIP] Disconnected (" + reason + ", lasted " + Math.round(connectionDuration / 1000) + "s). Reconnecting in " + Math.round(backoff / 1000) + "s (attempt " + reconnectAttempts + "/" + MAX_RECONNECT_ATTEMPTS + ")");
+      setTimeout(() => {
+        try {
+          whatsappInstance.socket.connect();
+        } catch (err) {
+          console.error("[WAVOIP] Reconnect failed:", err.message);
+        }
+      }, backoff);
     });
 
     whatsappInstance.socket.on("connect_error", (err) => {
-      console.error("[WAVOIP] Connection error:", err.message);
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        console.error("[WAVOIP] Connection error:", err.message);
+      }
     });
 
     whatsappInstance.socket.on("error", (err) => {
@@ -159,8 +201,24 @@ export async function makeCall(phone, options = {}) {
     return { success: false, message: "Wavoip is disabled" };
   }
 
-  if (connected === false || whatsappInstance == null) {
-    return { success: false, message: "Wavoip not connected" };
+  if (whatsappInstance == null) {
+    return { success: false, message: "Wavoip not initialized" };
+  }
+
+  // Lazy reconnect: if disconnected but instance exists, try to reconnect
+  if (connected === false) {
+    console.log("[WAVOIP] Not connected, attempting lazy reconnect for call...");
+    reconnectAttempts = 0;
+    gaveUp = false;
+    try {
+      whatsappInstance.socket.connect();
+      await new Promise(r => setTimeout(r, 3000));
+    } catch (err) {
+      console.error("[WAVOIP] Lazy reconnect failed:", err.message);
+    }
+    if (connected === false) {
+      return { success: false, message: "Wavoip not connected (reconnect failed)" };
+    }
   }
 
   const normalizedPhone = normalizePhone(phone);

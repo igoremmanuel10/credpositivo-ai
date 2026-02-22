@@ -59,11 +59,13 @@ export const db = {
 
   async getMessages(conversationId, limit = 20) {
     const { rows } = await pool.query(
-      `SELECT role, content, phase, created_at
-       FROM messages
-       WHERE conversation_id = $1
-       ORDER BY created_at ASC
-       LIMIT $2`,
+      `SELECT role, content, phase, created_at FROM (
+         SELECT role, content, phase, created_at
+         FROM messages
+         WHERE conversation_id = $1
+         ORDER BY created_at DESC
+         LIMIT $2
+       ) sub ORDER BY created_at ASC`,
       [conversationId, limit]
     );
     return rows;
