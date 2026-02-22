@@ -155,8 +155,8 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // 2. Save incoming message (combined)
     await db.addMessage(conversation.id, 'user', combinedText, conversation.phase);
 
-    // 3. Load message history (last 20 messages)
-    const messages = await db.getMessages(conversation.id, 20);
+    // 3. Load message history (last 12 messages — saves ~40% tokens vs 20)
+    const messages = await db.getMessages(conversation.id, 12);
     const totalMessages = await db.getMessageCount(conversation.id);
 
     // BOT-LOOP PROTECTION: Max messages per conversation

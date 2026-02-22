@@ -21,13 +21,17 @@ export async function getAgentResponse(conversationState, messageHistory, userMe
   let systemPrompt = buildSystemPrompt(conversationState, persona, abOverrides);
 
   // Inject similar conversation patterns via pgvector (RAG)
-  try {
-    const embeddingsContext = await buildContextFromSimilar(userMessage, conversationState.phase);
-    if (embeddingsContext) {
-      systemPrompt += embeddingsContext;
+  // Only for phases 2+ (investigation onwards) where context matters most.
+  // Phases 0-1 are simple greetings — no need for extra tokens.
+  if (conversationState.phase >= 2) {
+    try {
+      const embeddingsContext = await buildContextFromSimilar(userMessage, conversationState.phase);
+      if (embeddingsContext) {
+        systemPrompt += embeddingsContext;
+      }
+    } catch (err) {
+      // Embeddings are optional — don't block the response
     }
-  } catch (err) {
-    // Embeddings are optional — don't block the response
   }
 
   const messages = [];

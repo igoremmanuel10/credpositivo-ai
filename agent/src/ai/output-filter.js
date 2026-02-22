@@ -69,6 +69,8 @@ const BANNED_PATTERNS = [
   /s[oó] hoje/i,
   /oferta.*tempo limitado/i,
   /promo[cç][aã]o.*acaba/i,
+  /desconto.*expira/i,
+  /vagas? limitadas?/i,
 
   // Technical terms that shouldn't leak
   /\bthin file\b/i,
@@ -77,6 +79,28 @@ const BANNED_PATTERNS = [
   /\bBacen\b/i,
   /\bwebhook\b/i,
   /\bAPI\b(?=\s|$)/,
+  /\bpgvector\b/i,
+  /\bembedding\b/i,
+  /\bprompt\b/i,
+  /\bpipeline\b/i,
+
+  // Evasion patterns (price in disguised forms)
+  /investimento\s*(de|é|e)\s*apenas/i,
+  /por\s+apenas\s+\d/i,
+  /somente\s+\d+\s*x/i,
+  /s[oó]\s+\d+\s*reais/i,
+  /\d+\s*x\s*de\s*R?\$?\s*\d/i,
+  /taxa\s*(de|é|e)\s*R?\$?\s*\d/i,
+
+  // CPF/data solicitation
+  /me\s+(passa|envia|manda)\s+(seu|o)\s+CPF/i,
+  /preciso\s+do\s+seu\s+CPF/i,
+  /dados\s+banc[aá]rios/i,
+  /n[uú]mero\s+do\s+(cart[aã]o|cart[aã]o)/i,
+
+  // False authority claims
+  /somos\s+(regulados|certificados|autorizados)/i,
+  /parceria\s+(oficial|exclusiva)\s+com\s+(serasa|spc|boa\s+vista)/i,
 ];
 
 // Normalized patterns (checked against accent-stripped text)
@@ -89,6 +113,18 @@ const NORMALIZED_BANNED = [
   'nos garantimos',
   'sistema prompt',
   'inteligencia artificial',
+  'aumento de score',
+  'aumentar seu score',
+  'subir o score',
+  'score vai aumentar',
+  'limpar seu nome em',
+  'aprovacao de credito',
+  'cartao garantido',
+  'credito garantido',
+  'serasa vai',
+  'spc vai',
+  'rating bancario',
+  'perfil bancario',
 ];
 
 /**
