@@ -11,6 +11,7 @@ import { config } from '../config.js';
 import { resolvePersona } from '../sdr/persona.js';
 import { captureError } from '../monitoring/sentry.js';
 import { assignVariants, getPromptOverride } from '../ab/manager.js';
+import crypto from 'crypto';
 
 // In-memory map: phone → botTokenForReply (for follow-ups and debounced messages)
 const phoneTokenMap = new Map();
@@ -103,6 +104,15 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
   const combinedText = bufferedTexts.join('\n');
   console.log(`[Manager] Debounce: processing ${bufferedTexts.length} message(s) from ${phone}`);
 
+  // BOT-LOOP PROTECTION: Duplicate message detection
+  const normalizedMsg = combinedText.toLowerCase().trim().replace(/\s+/g, ' ');
+  const msgHash = crypto.createHash('md5').update(normalizedMsg).digest('hex');
+  const duplicateCount = await cache.trackMessageHash(phone, msgHash);
+  if (duplicateCount >= 3) {
+    console.warn(`[Manager] BOT-LOOP DETECTED for ${phone}: same message received ${duplicateCount}x in a row. Ignoring. Hash: ${msgHash}, msg: "${combinedText.substring(0, 80)}"`);
+    return;
+  }
+
   // Acquire processing lock
   const locked = await cache.setProcessingLock(phone);
   if (!locked) {
@@ -149,6 +159,13 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     const messages = await db.getMessages(conversation.id, 20);
     const totalMessages = await db.getMessageCount(conversation.id);
 
+    // BOT-LOOP PROTECTION: Max messages per conversation
+    const maxConversationMessages = config.limits.maxConversationMessages || 200;
+    if (totalMessages > maxConversationMessages) {
+      console.warn(`[Manager] CONVERSATION LIMIT reached for ${phone}: ${totalMessages}/${maxConversationMessages} messages. Auto-pausing (not responding).`);
+      return;
+    }
+
     // If history was trimmed, prepend context note
     if (totalMessages > messages.length && messages.length > 0) {
       const trimmed = totalMessages - messages.length;
@@ -186,6 +203,9 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
 
     // 5. Get AI response (use persona from conversation or detected from bot token)
     const { text: responseText, metadata } = await getAgentResponse(state, messages, combinedText, activePersona, abOverrides);
+
+    // DEBUG: Phase transition and metadata tracking
+    console.log(`[Manager] Phase transition: ${conversation.phase} → ${metadata.phase ?? 'no change'} | metadata keys: ${Object.keys(metadata).join(',')}`);
 
     if (!responseText) {
       console.error(`[Manager] Empty response from Claude for ${phone}`);

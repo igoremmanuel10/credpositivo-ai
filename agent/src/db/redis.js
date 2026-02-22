@@ -158,4 +158,32 @@ export const cache = {
   async getScheduledVapiCallKeys() {
     return redis.keys("vapi_scheduled:*");
   },
+
+  // --- Bot-to-bot loop detection ---
+
+  /**
+   * Track last N message hashes for a phone to detect duplicate spam.
+   * Stores a list of normalized message hashes. Returns the count of
+   * consecutive identical hashes at the tail (i.e., how many times
+   * the same message was received in a row).
+   */
+  async trackMessageHash(phone, hash) {
+    const key = `msg_hashes:${phone}`;
+    await redis.rpush(key, hash);
+    // Keep only the last 10 hashes
+    await redis.ltrim(key, -10, -1);
+    await redis.expire(key, 3600); // 1 hour TTL
+
+    // Count consecutive identical hashes from the tail
+    const hashes = await redis.lrange(key, 0, -1);
+    let consecutiveCount = 0;
+    for (let i = hashes.length - 1; i >= 0; i--) {
+      if (hashes[i] === hash) {
+        consecutiveCount++;
+      } else {
+        break;
+      }
+    }
+    return consecutiveCount;
+  },
 };

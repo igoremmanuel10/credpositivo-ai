@@ -64,7 +64,7 @@ async function callClaude(systemPrompt, messages, attempt = 1) {
   try {
     const response = await anthropic.messages.create({
       model: config.anthropic.model,
-      max_tokens: 300,
+      max_tokens: 500,
       temperature: 0.7,
       system: systemPrompt,
       messages: messages,
@@ -72,6 +72,7 @@ async function callClaude(systemPrompt, messages, attempt = 1) {
 
     const text = response.content[0]?.text || '';
     const metadata = extractMetadata(text);
+    console.log(`[AI] Metadata extracted: ${JSON.stringify(metadata.data)}`);
 
     const inputTokens = response.usage?.input_tokens || 0;
     const outputTokens = response.usage?.output_tokens || 0;
