@@ -57,7 +57,7 @@ services:
       DBUSER: ${POSTGRES_USER:-credpositivo}
       DBPASSWORD: ${POSTGRES_PASSWORD}
       DBSSLMODE: "disable"
-      GROUPS: "false"
+      GROUPS: "true"
       BROADCASTS: "false"
       READRECEIPTS: "false"
       CALLS: "false"
