@@ -93,6 +93,11 @@ export const config = {
     token: process.env.WAVOIP_TOKEN || '',
     maxDailyCalls: parseInt(process.env.WAVOIP_MAX_DAILY_CALLS || '5'),
   },
+  agenda: {
+    enabled: process.env.AGENDA_ENABLED !== 'false',
+    admGroupJid: process.env.ADM_GROUP_JID || '',
+  },
+
   followupEnabled: process.env.FOLLOWUP_ENABLED !== 'false',
 
   // Business hours (BRT = UTC-3)

@@ -27,6 +27,8 @@ import { getCostSummary } from './monitoring/cost-tracker.js';
 import { analyticsRouter } from './api/analytics.js';
 import { abTestsRouter } from './api/ab-tests.js';
 import { startExpenseScheduler } from './expense/tracker.js';
+import { startCoachingScheduler } from './coaching/protocol.js';
+import { startAgendaScheduler } from './agenda/manager.js';
 import { runMigrations, db } from './db/client.js';
 import { processUnembeddedConversations, refreshStaleEmbeddings } from './ai/embed-job.js';
 
@@ -212,6 +214,8 @@ app.use((err, req, res, next) => {
     startBridgeWatchdog();
     startReportScheduler();
     startExpenseScheduler();
+    startCoachingScheduler();
+    startAgendaScheduler();
 
     // Embedding job: process new conversations every 30 minutes, refresh stale daily
     setInterval(() => {

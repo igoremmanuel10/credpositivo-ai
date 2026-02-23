@@ -14,6 +14,8 @@ import {
 } from '../chatwoot/client.js';
 import { trackBridgeActivity, trackBridgeError } from '../bridge-health.js';
 import { handleGroupMessage, FINANCEIRO_GROUP_JID } from '../expense/tracker.js';
+import { handleCoachingMessage, COACHING_GROUP_JID } from '../coaching/protocol.js';
+import { handleAdmGroupMessage, ADM_GROUP_JID } from '../agenda/manager.js';
 
 export const webhookRouter = Router();
 
@@ -69,8 +71,16 @@ webhookRouter.post('/webhook/quepasa', async (req, res) => {
         handleGroupMessage(msg).catch(err => {
           console.error('[ExpenseTracker] Unhandled error in handleGroupMessage:', err);
         });
+      } else if (COACHING_GROUP_JID && incomingChatId === COACHING_GROUP_JID) {
+        handleCoachingMessage(msg).catch(err => {
+          console.error('[Coaching] Unhandled error in handleCoachingMessage:', err);
+        });
+      } else if (ADM_GROUP_JID && incomingChatId === ADM_GROUP_JID) {
+        handleAdmGroupMessage(msg).catch(err => {
+          console.error('[Agenda] Unhandled error in handleAdmGroupMessage:', err);
+        });
       } else {
-        console.log(`[Quepasa Webhook] Group message from ${incomingChatId} ignored (not Financeiro group)`);
+        console.log(`[Quepasa Webhook] Group message from ${incomingChatId} ignored`);
       }
       // Either way, do NOT continue to individual-chat processing
       return;
