@@ -88,24 +88,40 @@ function isBotSender(rawId) {
   return BOT_PHONES.has(stripped) || BOT_PHONES.has('55' + stripped);
 }
 
-/** Format Date as "DD/MM/YYYY". */
-function formatDate(date) {
-  const d = String(date.getDate()).padStart(2, '0');
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  return `${d}/${m}/${date.getFullYear()}`;
+/** Convert a Date to BRT components (server runs in UTC). */
+function toBRT(date) {
+  const brt = new Date(date.getTime() - 3 * 60 * 60 * 1000);
+  return {
+    year: brt.getUTCFullYear(),
+    month: brt.getUTCMonth(),
+    day: brt.getUTCDate(),
+    hours: brt.getUTCHours(),
+    minutes: brt.getUTCMinutes(),
+    dayOfWeek: brt.getUTCDay(),
+  };
 }
 
-/** Format Date as "DD/MM". */
+/** Format Date as "DD/MM/YYYY" in BRT. */
+function formatDate(date) {
+  const b = toBRT(date);
+  const d = String(b.day).padStart(2, '0');
+  const m = String(b.month + 1).padStart(2, '0');
+  return `${d}/${m}/${b.year}`;
+}
+
+/** Format Date as "DD/MM" in BRT. */
 function formatDateShort(date) {
-  const d = String(date.getDate()).padStart(2, '0');
-  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const b = toBRT(date);
+  const d = String(b.day).padStart(2, '0');
+  const m = String(b.month + 1).padStart(2, '0');
   return `${d}/${m}`;
 }
 
-/** Format time as "HH:MM". */
+/** Format time as "HH:MM" in BRT. */
 function formatTime(date) {
-  const h = String(date.getHours()).padStart(2, '0');
-  const min = String(date.getMinutes()).padStart(2, '0');
+  const b = toBRT(date);
+  const h = String(b.hours).padStart(2, '0');
+  const min = String(b.minutes).padStart(2, '0');
   return `${h}:${min}`;
 }
 
@@ -280,7 +296,7 @@ async function markReminderSent(eventId) {
 
 function formatEventConfirmation(event) {
   const dt = new Date(event.scheduled_at);
-  const dia = DIAS[dt.getDay()];
+  const dia = DIAS[toBRT(dt).dayOfWeek];
   const lines = [
     'Agendado!',
     '',
@@ -329,7 +345,7 @@ function formatWeekAgenda(events) {
     const dateKey = dt.toISOString().slice(0, 10);
     if (dateKey !== currentDate) {
       if (currentDate) lines.push('');
-      const dia = DIAS[dt.getDay()];
+      const dia = DIAS[toBRT(dt).dayOfWeek];
       lines.push(`*${formatDateShort(dt)} (${dia})*`);
       currentDate = dateKey;
     }
@@ -473,9 +489,9 @@ export async function handleAdmGroupMessage(msg) {
   const chatId = msg.chat?.id || msg.chatId || msg.source || '';
   if (chatId !== ADM_GROUP_JID) return;
 
-  // Determine sender
-  const senderLid = msg.chat?.lid || msg.lid || '';
-  const senderPhone = msg.chat?.phone?.replace(/^\+/, '') || msg.from || '';
+  // Determine sender (in group messages, sender is in msg.participant, not msg.chat)
+  const senderLid = msg.participant?.id || msg.chat?.lid || msg.lid || '';
+  const senderPhone = msg.participant?.phone?.replace(/^\+/, '') || msg.chat?.phone?.replace(/^\+/, '') || msg.from || '';
   const senderId = senderLid || senderPhone;
 
   // Ignore bot's own messages
@@ -484,7 +500,7 @@ export async function handleAdmGroupMessage(msg) {
   const text = msg.text || msg.body || msg.message?.text || msg.message?.conversation || '';
   if (!text) return;
 
-  const pushName = msg.chat?.title || msg.senderName || msg.pushName || '';
+  const pushName = msg.participant?.title || msg.senderName || msg.pushName || '';
   const memberName = resolveTeamMember(senderLid) || resolveTeamMember(senderPhone) || pushName || 'Desconhecido';
   const msgId = msg.id || null;
 
