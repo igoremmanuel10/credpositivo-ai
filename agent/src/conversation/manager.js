@@ -1,7 +1,7 @@
 import { db } from '../db/client.js';
 import { cache } from '../db/redis.js';
 import { sendMessages, sendMedia } from '../quepasa/client.js';
-import { findOrCreateContact, findOrCreateConversation, getInboxForPhone, sendOutgoingMessage } from '../chatwoot/client.js';
+import { findOrCreateContact, findOrCreateConversation, getInboxForPhone, sendOutgoingMessage, updateContactAttributes, setConversationLabels, buildLeadAttributes, buildPhaseLabels } from '../chatwoot/client.js';
 import { getAgentResponse } from '../ai/claude.js';
 import { applyMetadataUpdates } from './state.js';
 import { getMediaForPhase, getProductAudios } from '../media/assets.js';
@@ -329,6 +329,20 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
         if (cwConv.id) {
           await sendOutgoingMessage(cwConv.id, fixedResponseText);
           console.log(`[Bridge] Agent response forwarded to Chatwoot conversation ${cwConv.id} (inbox ${cwInboxId})`);
+
+          // Sync lead qualification to Chatwoot
+          const effectivePhase = metadata.phase ?? conversation.phase;
+          const effectiveProfile = metadata.user_profile_update
+            ? { ...conversation.user_profile, ...metadata.user_profile_update }
+            : conversation.user_profile;
+          const attrs = buildLeadAttributes({
+            ...conversation,
+            phase: effectivePhase,
+            user_profile: effectiveProfile,
+            recommended_product: metadata.recommended_product || conversation.recommended_product,
+          });
+          await updateContactAttributes(cwContactId, attrs);
+          await setConversationLabels(cwConv.id, buildPhaseLabels(effectivePhase, conversation.persona || 'augusto'));
         }
       }
     } catch (err) {

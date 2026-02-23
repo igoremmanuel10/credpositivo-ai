@@ -1,7 +1,7 @@
 import { db } from '../db/client.js';
 import { cache } from '../db/redis.js';
 import { sendMessages, resolveWhatsAppId } from '../quepasa/client.js';
-import { findOrCreateContact, findOrCreateConversation, getInboxForPhone, sendOutgoingMessage } from '../chatwoot/client.js';
+import { findOrCreateContact, findOrCreateConversation, getInboxForPhone, sendOutgoingMessage, updateContactAttributes, setConversationLabels, buildLeadAttributes, buildPhaseLabels } from '../chatwoot/client.js';
 import { getAgentResponse } from '../ai/claude.js';
 import { config } from '../config.js';
 import { normalizePhone } from '../utils/phone.js';
@@ -118,6 +118,17 @@ export async function triggerSdrOutreach(phone, name, email) {
         if (cwConv.id) {
           await sendOutgoingMessage(cwConv.id, responseText);
           console.log(`[SDR] Outreach forwarded to Chatwoot conversation ${cwConv.id} (inbox ${cwInboxId})`);
+
+          // Sync lead qualification to Chatwoot
+          const attrs = buildLeadAttributes({
+            phase: newPhase,
+            persona: 'paulo',
+            name,
+            user_profile: state.user_profile,
+            recommended_product: null,
+          });
+          await updateContactAttributes(cwContactId, attrs);
+          await setConversationLabels(cwConv.id, buildPhaseLabels(newPhase, 'paulo'));
         }
       }
     } catch (err) {

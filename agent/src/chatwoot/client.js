@@ -127,3 +127,70 @@ export async function sendMessage(conversationId, content, messageType = 'incomi
 export async function sendOutgoingMessage(conversationId, content) {
   return sendMessage(conversationId, content, 'outgoing');
 }
+
+/**
+ * Update custom attributes on a Chatwoot contact.
+ */
+export async function updateContactAttributes(contactId, customAttributes) {
+  const res = await fetch(`${baseUrl}/contacts/${contactId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'api_access_token': apiToken,
+    },
+    body: JSON.stringify({ custom_attributes: customAttributes }),
+  });
+  if (!res.ok) {
+    console.error(`[Chatwoot] Failed to update contact ${contactId} attributes: ${res.status}`);
+  }
+}
+
+/**
+ * Set labels on a Chatwoot conversation (replaces existing labels).
+ */
+export async function setConversationLabels(conversationId, labels) {
+  const res = await fetch(`${baseUrl}/conversations/${conversationId}/labels`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api_access_token': apiToken,
+    },
+    body: JSON.stringify({ labels }),
+  });
+  if (!res.ok) {
+    console.error(`[Chatwoot] Failed to set labels on conversation ${conversationId}: ${res.status}`);
+  }
+}
+
+const PHASE_NAMES = {
+  0: 'novo-lead',
+  1: 'apresentacao',
+  2: 'investigacao',
+  3: 'diagnostico',
+  4: 'fechamento',
+  5: 'pos-compra',
+};
+
+/**
+ * Build custom_attributes object for a Chatwoot contact from conversation state.
+ */
+export function buildLeadAttributes(conversation) {
+  const phase = conversation.phase ?? 0;
+  const profile = conversation.user_profile || {};
+  return {
+    fase: phase,
+    fase_nome: PHASE_NAMES[phase] || `fase-${phase}`,
+    persona: conversation.persona || 'augusto',
+    produto_recomendado: conversation.recommended_product || null,
+    objetivo_credito: profile.objetivo || profile.credit_goal || null,
+    email: profile.email || null,
+  };
+}
+
+/**
+ * Build labels array for a Chatwoot conversation from phase and persona.
+ */
+export function buildPhaseLabels(phase, persona) {
+  const phaseName = PHASE_NAMES[phase] || `fase-${phase}`;
+  return [`fase-${phase}`, phaseName, persona || 'augusto'];
+}
