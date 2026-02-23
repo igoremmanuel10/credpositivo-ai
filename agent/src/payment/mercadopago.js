@@ -37,9 +37,9 @@ export async function createCheckout({ cpf, name, email, service, price }) {
         },
       },
       back_urls: {
-        success: `${baseUrl}/dash/servicos.html?payment=success`,
-        failure: `${baseUrl}/dash/servicos.html?payment=failure`,
-        pending: `${baseUrl}/dash/servicos.html?payment=pending`,
+        success: `${baseUrl}/dash/servicos?payment=success`,
+        failure: `${baseUrl}/dash/servicos?payment=failure`,
+        pending: `${baseUrl}/dash/servicos?payment=pending`,
       },
       auto_return: 'approved',
       external_reference: cpf,
