@@ -12,9 +12,41 @@ const COST_PER_1M_TOKENS = 0.02;
 // OpenAI client for embeddings
 const openai = new OpenAI({ apiKey: config.openai.apiKey });
 
+// ─── Circuit Breaker ──────────────────────────────────────────────────────────
+const circuitBreaker = {
+  failures: 0,
+  maxFailures: 5,
+  disabledUntil: 0,       // timestamp when circuit breaker resets
+  cooldownMs: 60 * 60 * 1000, // 1 hour cooldown after tripping
+};
+
+function isCircuitOpen() {
+  if (circuitBreaker.failures < circuitBreaker.maxFailures) return false;
+  if (Date.now() > circuitBreaker.disabledUntil) {
+    // Reset after cooldown
+    circuitBreaker.failures = 0;
+    console.log('[Embeddings] Circuit breaker reset after cooldown');
+    return false;
+  }
+  return true;
+}
+
+function recordFailure() {
+  circuitBreaker.failures++;
+  if (circuitBreaker.failures >= circuitBreaker.maxFailures) {
+    circuitBreaker.disabledUntil = Date.now() + circuitBreaker.cooldownMs;
+    console.warn(`[Embeddings] Circuit breaker OPEN — ${circuitBreaker.maxFailures} failures. Disabled for 1h.`);
+  }
+}
+
+function recordSuccess() {
+  circuitBreaker.failures = 0;
+}
+
 /**
  * Generate an embedding vector for the given text.
  * Uses OpenAI's text-embedding-3-small (1536 dimensions).
+ * Circuit breaker: disables for 1h after 5 consecutive failures.
  *
  * @param {string} text - Text to embed
  * @returns {number[]|null} Float array of 1536 dimensions, or null on error
@@ -22,6 +54,11 @@ const openai = new OpenAI({ apiKey: config.openai.apiKey });
 export async function generateEmbedding(text) {
   if (!text || typeof text !== 'string' || text.trim().length === 0) {
     console.warn('[Embeddings] Empty text provided, skipping embedding generation');
+    return null;
+  }
+
+  // Circuit breaker check
+  if (isCircuitOpen()) {
     return null;
   }
 
@@ -52,9 +89,11 @@ export async function generateEmbedding(text) {
       endpoint: 'embedding',
     }).catch(() => {});
 
+    recordSuccess();
     return embedding;
   } catch (err) {
     console.error('[Embeddings] Failed to generate embedding:', err.message);
+    recordFailure();
     return null;
   }
 }

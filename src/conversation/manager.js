@@ -355,8 +355,11 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // 7.9 Fix any incorrect/shortened site links before sending
     const fixedResponseText = fixSiteLinks(cleanedResponseText);
 
+    // 7.95 Pre-send validation: sanitize response
+    const validatedText = validateAgentResponse(fixedResponseText, phone);
+
     // 8. Send response via WhatsApp (with correct bot token for multi-number support)
-    const messageIds = await sendMessages(remoteJid, fixedResponseText, botTokenForReply);
+    const messageIds = await sendMessages(remoteJid, validatedText, botTokenForReply);
 
     // 8.5 Send diagnostico video AFTER text when entering phase 3
     if (newPhase >= 3 && conversation.phase < 3 && config.media.enabled) {
@@ -396,7 +399,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
           const lastMsg = recentMsgs[recentMsgs.length - 1];
           if (lastMsg && lastMsg.role === 'agent') {
             // Lead hasn't responded, send nudge
-            const nudgeText = 'Conseguiu ver? 👇';
+            const nudgeText = 'Conseguiu ver? ð';
             await sendMessages(remoteJid, nudgeText, botTokenForReply);
             await db.addMessage(conversation.id, 'agent', nudgeText, newPhase);
             await cache.incrementHourlyMessageCount(phone);
@@ -780,4 +783,52 @@ function buildFollowupPrompt(eventType, conversation, attempt = 1, persona = 'au
   };
 
   return legacyPrompts[eventType] || `[SISTEMA: Follow-up necessario para ${eventType}. Attempt ${attempt}. Seja breve e humano.]`;
+}
+
+// ─── Pre-Send Validation ──────────────────────────────────────────────────────
+
+const ALLOWED_EMOJIS = ['✅', '❌', '👇', '👉', '🔒'];
+const EMOJI_RE = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}]/gu;
+
+/**
+ * Validates and sanitizes the agent response before sending to WhatsApp.
+ * - Removes forbidden emojis
+ * - Collapses double newlines (anti-split safety net)
+ * - Truncates excessively long messages
+ * - Logs violations for Ana QA to pick up
+ */
+function validateAgentResponse(text, phone) {
+  let cleaned = text;
+  let violations = [];
+
+  // 1. Remove forbidden emojis (keep only allowed ones)
+  const emojiMatches = cleaned.match(EMOJI_RE) || [];
+  const forbidden = emojiMatches.filter(e => !ALLOWED_EMOJIS.includes(e));
+  if (forbidden.length > 0) {
+    for (const emoji of forbidden) {
+      cleaned = cleaned.replaceAll(emoji, '');
+    }
+    violations.push(`emoji_forbidden:${forbidden.join(',')}`);
+  }
+
+  // 2. Collapse \n\n into \n (anti-split safety net, in case client.js split is re-enabled)
+  cleaned = cleaned.replace(/\n{2,}/g, '\n');
+
+  // 3. Truncate if too long (max 1000 chars for WhatsApp readability)
+  if (cleaned.length > 1000) {
+    cleaned = cleaned.substring(0, 997) + '...';
+    violations.push(`msg_truncated:${text.length}chars`);
+  }
+
+  // 4. Remove any residual [METADATA] blocks that leaked into response
+  cleaned = cleaned.replace(/\[METADATA\][\s\S]*?\[\/METADATA\]/g, '').trim();
+
+  // 5. Clean up extra whitespace
+  cleaned = cleaned.replace(/  +/g, ' ').trim();
+
+  if (violations.length > 0) {
+    console.log(`[Validator] ${phone}: ${violations.join(' | ')}`);
+  }
+
+  return cleaned;
 }

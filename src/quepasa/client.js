@@ -229,30 +229,23 @@ export async function downloadMedia(messageId, token = null) {
 }
 
 /**
- * Send multiple messages with 10s delays and typing indicators.
+ * Send a single message with typing indicator.
+ * No longer splits by \n\n — sends everything as ONE bubble.
  */
 export async function sendMessages(chatId, fullText, token = null) {
-  const cleanText = stripMarkdown(fullText);
-  const bubbles = cleanText
-    .split(/\n\n+/)
-    .map(b => b.trim())
-    .filter(Boolean);
+  const cleanText = stripMarkdown(fullText)
+    .replace(/\n{3,}/g, '\n\n')  // collapse excessive newlines
+    .trim();
 
-  const results = [];
-  for (let i = 0; i < bubbles.length; i++) {
-    if (i > 0) {
-      await new Promise(r => setTimeout(r, MESSAGE_DELAY_MS));
-    }
-    // Send typing indicator before each bubble
-    await sendPresence(chatId, token);
-    await new Promise(r => setTimeout(r, 1500)); // Brief pause after typing starts
+  if (!cleanText) return [];
 
-    const result = await sendText(chatId, bubbles[i], token);
-    results.push(result);
-  }
+  // Send typing indicator
+  await sendPresence(chatId, token);
+  await new Promise(r => setTimeout(r, 1500));
 
-  console.log(`[Quepasa] Sent ${bubbles.length} bubbles to ${chatId} (4s intervals)`);
-  return results;
+  const result = await sendText(chatId, cleanText, token);
+  console.log(`[Quepasa] Sent 1 message to ${chatId} (no split)`);
+  return [result];
 }
 
 /**
