@@ -195,3 +195,4 @@ export function msUntilNextBusinessHour() {
   const nextStartUTC = new Date(nextStart.getTime() + 3 * 60 * 60 * 1000);
   return Math.max(0, nextStartUTC.getTime() - now.getTime());
 }
+// CI/CD test
