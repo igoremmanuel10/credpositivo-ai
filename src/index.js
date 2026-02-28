@@ -42,6 +42,7 @@ import { affiliateRouter } from './affiliate/routes.js';
 import { startAnaScheduler } from './ops/ana.js';
 import { startAlexScheduler, sendAlexReportNow, runAlexCheckCycle } from './devops/alex.js';
 import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.js';
+import { startInstagramScheduler } from './social/instagram.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -296,6 +297,7 @@ app.use((err, req, res, next) => {
     startAnaScheduler();
     startAlexScheduler();
     startAdsScheduler();
+    startInstagramScheduler();
 
     // Embedding job: process new conversations every 30 minutes, refresh stale daily
     setInterval(() => {
