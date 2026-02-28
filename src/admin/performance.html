@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CredPositivo — Performance</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-page: #0d1117; --bg-card: #161b22; --bg-input: #1c2330;
+      --bg-hover: #1f2937; --border: #30363d; --accent: #3b82f6;
+      --accent-dim: #1d4ed8; --accent-glow: #60a5fa; --success: #22c55e;
+      --warning: #f59e0b; --danger: #ef4444; --orange: #f97316;
+      --text-pri: #e6edf3; --text-sec: #8b949e; --text-muted: #656d76;
+      --radius: 10px; --shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+    html, body { height: 100%; background: var(--bg-page); color: var(--text-pri); font-family: system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.6; }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: var(--bg-page); } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* Layout */
+    .page { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .header h1 { font-size: 22px; font-weight: 700; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .nav-tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--bg-card); border-radius: var(--radius); padding: 4px; border: 1px solid var(--border); overflow-x: auto; }
+    .nav-tab { padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-sec); border: none; background: none; white-space: nowrap; transition: all .15s; }
+    .nav-tab:hover { color: var(--text-pri); background: var(--bg-hover); }
+    .nav-tab.active { color: #fff; background: var(--accent); }
+    .section { display: none; } .section.active { display: block; }
+
+    /* Cards */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--text-sec); text-transform: uppercase; letter-spacing: .5px; }
+
+    /* Stats */
+    .stat { text-align: center; }
+    .stat-value { font-size: 32px; font-weight: 700; line-height: 1.2; }
+    .stat-label { font-size: 12px; color: var(--text-sec); margin-top: 4px; }
+    .stat-accent { color: var(--accent); }
+    .stat-success { color: var(--success); }
+    .stat-warning { color: var(--warning); }
+    .stat-danger { color: var(--danger); }
+
+    /* Agent Comparison */
+    .agent-card { position: relative; overflow: hidden; }
+    .agent-card .agent-badge { position: absolute; top: 12px; right: 12px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .agent-augusto .agent-badge { background: rgba(59,130,246,.15); color: var(--accent); }
+    .agent-paulo .agent-badge { background: rgba(249,115,22,.15); color: var(--orange); }
+    .metric-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .metric-row:last-child { border-bottom: none; }
+    .metric-label { color: var(--text-sec); font-size: 13px; }
+    .metric-value { font-weight: 600; font-size: 15px; }
+    .metric-bar { height: 6px; background: var(--bg-input); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    .metric-bar-fill { height: 100%; border-radius: 3px; transition: width .5s ease; }
+
+    /* Heatmap */
+    .heatmap-grid { display: grid; grid-template-columns: 60px repeat(24, 1fr); gap: 2px; }
+    .heatmap-cell { aspect-ratio: 1; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: default; transition: transform .1s; }
+    .heatmap-cell:hover { transform: scale(1.3); z-index: 1; }
+    .heatmap-label { font-size: 11px; color: var(--text-sec); display: flex; align-items: center; padding-right: 6px; }
+    .heatmap-hour { font-size: 10px; color: var(--text-muted); text-align: center; padding-bottom: 4px; }
+
+    /* Lead Health */
+    .health-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .health-hot { background: rgba(239,68,68,.15); color: #ef4444; }
+    .health-warm { background: rgba(245,158,11,.15); color: #f59e0b; }
+    .health-cold { background: rgba(59,130,246,.15); color: #3b82f6; }
+    .health-dead { background: rgba(101,109,118,.15); color: #656d76; }
+
+    /* Cooling Alerts */
+    .alert-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px; background: var(--bg-input); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid; }
+    .alert-critical { border-left-color: var(--danger); }
+    .alert-warning { border-left-color: var(--warning); }
+    .alert-attention { border-left-color: var(--accent); }
+    .alert-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .alert-content { flex: 1; }
+    .alert-title { font-weight: 600; font-size: 14px; }
+    .alert-meta { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+    .alert-action { display: inline-block; margin-top: 6px; padding: 4px 10px; background: var(--accent-dim); color: #fff; border-radius: 6px; font-size: 12px; font-weight: 500; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-input); }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    tr:hover td { background: var(--bg-hover); }
+
+    /* Select / Button */
+    select, .btn { padding: 8px 14px; border-radius: 6px; font-size: 13px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-pri); cursor: pointer; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+    /* Chart Container */
+    .chart-container { position: relative; height: 280px; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 40px; color: var(--text-sec); }
+    .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .page { padding: 12px; }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .heatmap-grid { font-size: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <script>
+    // Hide header when loaded inside iframe (dashboard.html)
+    if (window.top !== window.self) {
+      document.documentElement.classList.add('in-iframe');
+    }
+  </script>
+  <style>
+    .in-iframe .header { display: none !important; }
+    .in-iframe .page { padding-top: 0 !important; }
+  </style>
+  <div class="page">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Performance Dashboard</h1>
+        <span style="color: var(--text-sec); font-size: 13px;">Analise de performance dos agentes Augusto & Paulo</span>
+      </div>
+      <div class="header-actions">
+        <select id="periodSelect" onchange="reloadAll()">
+          <option value="7">Ultimos 7 dias</option>
+          <option value="14">Ultimos 14 dias</option>
+          <option value="30" selected>Ultimos 30 dias</option>
+          <option value="60">Ultimos 60 dias</option>
+          <option value="90">Ultimos 90 dias</option>
+        </select>
+        <button class="btn" onclick="reloadAll()">Atualizar</button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showSection('agents')">Agentes</button>
+      <button class="nav-tab" onclick="showSection('heatmap')">Heatmap Horarios</button>
+      <button class="nav-tab" onclick="showSection('health')">Saude do Lead</button>
+      <button class="nav-tab" onclick="showSection('cooling')">Leads Esfriando</button>
+      <button class="nav-tab" onclick="showSection('engagement')">Engajamento</button>
+      <button class="nav-tab" onclick="showSection('abtests')">A/B Tests</button>
+    </div>
+
+    <!-- ============ SECTION: Agent Comparison ============ -->
+    <div id="section-agents" class="section active">
+      <div class="grid-4" id="agent-summary-cards"></div>
+      <div class="grid-2" id="agent-comparison-cards"></div>
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header"><span class="card-title">Tendencia Diaria por Agente</span></div>
+        <div class="chart-container"><canvas id="chartAgentTrend"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Funil de Conversao por Agente</span></div>
+        <div class="chart-container"><canvas id="chartAgentFunnel"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ============ SECTION: Heatmap ============ -->
+    <div id="section-heatmap" class="section">
+      <div class="grid-3" id="heatmap-top-hours"></div>
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header"><span class="card-title">Heatmap — Quando os Leads Respondem</span></div>
+        <div id="heatmap-container" style="overflow-x: auto;"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Taxa de Resposta por Horario</span></div>
+        <div class="chart-container"><canvas id="chartResponseRate"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ============ SECTION: Lead Health ============ -->
+    <div id="section-health" class="section">
+      <div class="grid-4" id="health-summary-cards"></div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Leads por Score de Saude</span>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-sm" onclick="loadHealth('all')" id="btn-all">Todos</button>
+            <button class="btn btn-sm" onclick="loadHealth('hot')" id="btn-hot">Hot</button>
+            <button class="btn btn-sm" onclick="loadHealth('warm')" id="btn-warm">Warm</button>
+            <button class="btn btn-sm" onclick="loadHealth('cold')" id="btn-cold">Cold</button>
+            <button class="btn btn-sm" onclick="loadHealth('dead')" id="btn-dead">Dead</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Lead</th>
+                <th>Telefone</th>
+                <th>Agente</th>
+                <th>Fase</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Msgs User</th>
+                <th>Ultima Msg</th>
+              </tr>
+            </thead>
+            <tbody id="health-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SECTION: Cooling Leads ============ -->
+    <div id="section-cooling" class="section">
+      <div class="grid-3" id="cooling-summary-cards"></div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Leads que Precisam de Atencao</span></div>
+        <div id="cooling-alerts-list"></div>
+      </div>
+    </div>
+
+    <!-- ============ SECTION: Engagement ============ -->
+    <div id="section-engagement" class="section">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Engajamento por Tipo de Mensagem</span></div>
+          <div class="chart-container"><canvas id="chartEngagement"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Proporcao Agent:User por Agente</span></div>
+          <div class="chart-container"><canvas id="chartRatio"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Detalhamento por Tipo</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Total Enviado</th>
+                <th>Reply em 1h</th>
+                <th>Taxa Reply 1h</th>
+                <th>Reply em 24h</th>
+                <th>Taxa Reply 24h</th>
+              </tr>
+            </thead>
+            <tbody id="engagement-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SECTION: A/B Tests ============ -->
+    <div id="section-abtests" class="section">
+      <div id="abtests-list"></div>
+    </div>
+  </div>
+
+  <script>
+    // ─── Auth ───
+    const TOKEN_KEY = 'credpositivo_admin_token';
+    function getToken() { return localStorage.getItem(TOKEN_KEY); }
+    async function apiFetch(url, opts) {
+      opts = opts || {};
+      if (window.__EMBED_KEY) {
+        const sep = url.indexOf('?') >= 0 ? '&' : '?';
+        url = url + sep + 'embed_key=' + encodeURIComponent(window.__EMBED_KEY);
+        const res = await fetch(url, opts);
+        if (!res.ok) return null;
+        return res.json();
+      }
+      const token = getToken();
+      if (!token) { window.location.href = '/admin/dashboard'; return null; }
+      const headers = Object.assign({ Authorization: `Bearer ${token}` }, opts.headers || {});
+      const res = await fetch(url, Object.assign({}, opts, { headers }));
+      if (res.status === 401) { localStorage.removeItem(TOKEN_KEY); window.location.href = '/admin/dashboard'; return null; }
+      return res.json();
+    }
+    function getDays() { return document.getElementById('periodSelect').value; }
+
+    // ─── Navigation ───
+    function showSection(name) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('section-' + name).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // ─── Charts instances ───
+    let chartAgentTrend, chartAgentFunnel, chartResponseRate, chartEngagement, chartRatio;
+    function destroyChart(c) { if (c) c.destroy(); }
+    const CHART_DEFAULTS = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e', font: { size: 11 } } } }, scales: { x: { ticks: { color: '#656d76', font: { size: 10 } }, grid: { color: '#1f2937' } }, y: { ticks: { color: '#656d76', font: { size: 10 } }, grid: { color: '#1f2937' } } } };
+
+    // ─── AGENT PERFORMANCE ───
+    async function loadAgentPerformance() {
+      const data = await apiFetch(`/api/admin/analytics/agent-performance?days=${getDays()}`);
+      if (!data) return;
+
+      const augusto = data.agents.find(a => a.persona === 'augusto') || {};
+      const paulo = data.agents.find(a => a.persona === 'paulo') || {};
+
+      // Summary cards
+      const totalConvs = (parseInt(augusto.total_conversations)||0) + (parseInt(paulo.total_conversations)||0);
+      const totalConverted = (parseInt(augusto.reached_site)||0) + (parseInt(paulo.reached_site)||0);
+      const avgConvRate = totalConvs > 0 ? ((totalConverted / totalConvs) * 100).toFixed(1) : 0;
+      const totalOptOut = (parseInt(augusto.opted_out)||0) + (parseInt(paulo.opted_out)||0);
+
+      document.getElementById('agent-summary-cards').innerHTML = `
+        <div class="card stat"><div class="stat-value stat-accent">${totalConvs}</div><div class="stat-label">Total Conversas</div></div>
+        <div class="card stat"><div class="stat-value stat-success">${avgConvRate}%</div><div class="stat-label">Taxa Conversao (Site)</div></div>
+        <div class="card stat"><div class="stat-value stat-warning">${totalOptOut}</div><div class="stat-label">Opt-outs</div></div>
+        <div class="card stat"><div class="stat-value" style="color:var(--orange)">${(parseFloat(augusto.avg_response_time_sec)||0).toFixed(0)}s / ${(parseFloat(paulo.avg_response_time_sec)||0).toFixed(0)}s</div><div class="stat-label">Tempo Resp. Augusto / Paulo</div></div>
+      `;
+
+      // Agent comparison cards
+      function agentCard(agent, name, colorClass) {
+        const convRate = parseFloat(agent.conversion_rate_site) || 0;
+        const optRate = parseFloat(agent.opt_out_rate) || 0;
+        const engRate = parseFloat(agent.engagement_rate) || 0;
+        return `
+          <div class="card agent-card agent-${name.toLowerCase()}">
+            <span class="agent-badge">${name}</span>
+            <h3 style="font-size:18px; margin-bottom:16px;">${name}</h3>
+            <div class="metric-row"><span class="metric-label">Conversas</span><span class="metric-value">${agent.total_conversations || 0}</span></div>
+            <div class="metric-row"><span class="metric-label">Chegaram ao Site</span><span class="metric-value stat-success">${agent.reached_site || 0}</span></div>
+            <div class="metric-row"><span class="metric-label">Taxa Conversao</span><span class="metric-value">${convRate}%</span></div>
+            <div class="metric-row"><span class="metric-label">Taxa Opt-out</span><span class="metric-value ${optRate > 30 ? 'stat-danger' : ''}">${optRate}%</span></div>
+            <div class="metric-row"><span class="metric-label">Taxa Engajamento</span><span class="metric-value">${engRate}%</span></div>
+            <div class="metric-row"><span class="metric-label">Msgs do Agent</span><span class="metric-value">${agent.agent_messages || 0}</span></div>
+            <div class="metric-row"><span class="metric-label">Msgs do User</span><span class="metric-value">${agent.user_messages || 0}</span></div>
+            <div class="metric-row"><span class="metric-label">Tempo Resp. Medio</span><span class="metric-value">${(parseFloat(agent.avg_response_time_sec)||0).toFixed(0)}s</span></div>
+            <div class="metric-row"><span class="metric-label">Tempo Resp. Mediana</span><span class="metric-value">${(parseFloat(agent.median_response_time_sec)||0).toFixed(0)}s</span></div>
+            <div class="metric-row"><span class="metric-label">Fase Media</span><span class="metric-value">${agent.avg_phase || 0}</span></div>
+            <div class="metric-row"><span class="metric-label">Duracao Media</span><span class="metric-value">${agent.avg_duration_hours || 0}h</span></div>
+            <div class="metric-row"><span class="metric-label">Leads Engajados (3+ msgs)</span><span class="metric-value">${agent.engaged_leads || 0}</span></div>
+            <div class="metric-row"><span class="metric-label">Media Msgs/User por Conversa</span><span class="metric-value">${agent.avg_user_messages_per_conv || 0}</span></div>
+            <div style="margin-top: 12px;">
+              <div class="metric-label" style="margin-bottom:4px;">Conversao ao Site</div>
+              <div class="metric-bar"><div class="metric-bar-fill" style="width:${Math.min(convRate, 100)}%; background:${name === 'Augusto' ? 'var(--accent)' : 'var(--orange)'};"></div></div>
+            </div>
+          </div>
+        `;
+      }
+      document.getElementById('agent-comparison-cards').innerHTML =
+        agentCard(augusto, 'Augusto', 'accent') + agentCard(paulo, 'Paulo', 'orange');
+
+      // Daily trend chart
+      destroyChart(chartAgentTrend);
+      const dates = [...new Set(data.daily_trend.map(d => d.date))].sort();
+      const augustoDaily = dates.map(d => { const r = data.daily_trend.find(t => t.date === d && t.persona === 'augusto'); return r ? parseInt(r.new_conversations) : 0; });
+      const pauloDaily = dates.map(d => { const r = data.daily_trend.find(t => t.date === d && t.persona === 'paulo'); return r ? parseInt(r.new_conversations) : 0; });
+      chartAgentTrend = new Chart(document.getElementById('chartAgentTrend'), {
+        type: 'line',
+        data: {
+          labels: dates.map(d => new Date(d).toLocaleDateString('pt-BR', {day:'2-digit', month:'short'})),
+          datasets: [
+            { label: 'Augusto', data: augustoDaily, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .3 },
+            { label: 'Paulo', data: pauloDaily, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.1)', fill: true, tension: .3 },
+          ]
+        },
+        options: CHART_DEFAULTS
+      });
+
+      // Funnel chart
+      destroyChart(chartAgentFunnel);
+      const phases = ['Antiban (0)', 'Rapport (1)', 'Investigacao (2)', 'Educacao (3)', 'Site (4)', 'Follow-up (5)'];
+      const augustoPhases = phases.map((_, i) => { const r = data.phase_breakdown.find(p => p.persona === 'augusto' && parseInt(p.phase) === i); return r ? parseInt(r.count) : 0; });
+      const pauloPhases = phases.map((_, i) => { const r = data.phase_breakdown.find(p => p.persona === 'paulo' && parseInt(p.phase) === i); return r ? parseInt(r.count) : 0; });
+      chartAgentFunnel = new Chart(document.getElementById('chartAgentFunnel'), {
+        type: 'bar',
+        data: {
+          labels: phases,
+          datasets: [
+            { label: 'Augusto', data: augustoPhases, backgroundColor: 'rgba(59,130,246,.7)', borderRadius: 4 },
+            { label: 'Paulo', data: pauloPhases, backgroundColor: 'rgba(249,115,22,.7)', borderRadius: 4 },
+          ]
+        },
+        options: { ...CHART_DEFAULTS, plugins: { ...CHART_DEFAULTS.plugins, legend: { ...CHART_DEFAULTS.plugins.legend } } }
+      });
+    }
+
+    // ─── HEATMAP ───
+    async function loadHeatmap() {
+      const data = await apiFetch(`/api/admin/analytics/response-heatmap?days=${getDays()}`);
+      if (!data) return;
+
+      // Top hours cards
+      const top3 = data.hours_ranked.slice(0, 3);
+      document.getElementById('heatmap-top-hours').innerHTML = top3.map((h, i) => `
+        <div class="card stat">
+          <div class="stat-value stat-${i === 0 ? 'success' : i === 1 ? 'accent' : 'warning'}">${parseInt(h.hour)}:00</div>
+          <div class="stat-label">${i === 0 ? 'Melhor Horario' : i === 1 ? '2o Melhor' : '3o Melhor'} (${h.message_count} msgs, ${h.unique_leads} leads)</div>
+        </div>
+      `).join('');
+
+      // Heatmap grid
+      const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+      const maxCount = Math.max(...data.heatmap.map(h => parseInt(h.message_count)), 1);
+
+      let html = '<div class="heatmap-grid">';
+      // Header row
+      html += '<div></div>';
+      for (let h = 0; h < 24; h++) html += `<div class="heatmap-hour">${h}h</div>`;
+
+      for (let d = 0; d < 7; d++) {
+        html += `<div class="heatmap-label">${dayNames[d]}</div>`;
+        for (let h = 0; h < 24; h++) {
+          const cell = data.heatmap.find(c => parseInt(c.day_of_week) === d && parseInt(c.hour) === h);
+          const count = cell ? parseInt(cell.message_count) : 0;
+          const intensity = count / maxCount;
+          const bg = count === 0 ? 'var(--bg-input)' :
+            intensity > .7 ? 'rgba(34,197,94,.8)' :
+            intensity > .4 ? 'rgba(34,197,94,.5)' :
+            intensity > .15 ? 'rgba(34,197,94,.25)' :
+            'rgba(34,197,94,.1)';
+          html += `<div class="heatmap-cell" style="background:${bg};" title="${dayNames[d]} ${h}h: ${count} msgs">${count > 0 ? count : ''}</div>`;
+        }
+      }
+      html += '</div>';
+      document.getElementById('heatmap-container').innerHTML = html;
+
+      // Response rate chart
+      destroyChart(chartResponseRate);
+      const hours = data.response_rate_by_hour.sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
+      chartResponseRate = new Chart(document.getElementById('chartResponseRate'), {
+        type: 'bar',
+        data: {
+          labels: hours.map(h => `${parseInt(h.hour)}h`),
+          datasets: [{
+            label: 'Taxa de Reply em 1h (%)',
+            data: hours.map(h => parseFloat(h.reply_rate_pct) || 0),
+            backgroundColor: hours.map(h => (parseFloat(h.reply_rate_pct) || 0) > 40 ? 'rgba(34,197,94,.7)' : 'rgba(59,130,246,.5)'),
+            borderRadius: 4,
+          }]
+        },
+        options: { ...CHART_DEFAULTS, plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false } } }
+      });
+    }
+
+    // ─── LEAD HEALTH ───
+    async function loadHealth(filter = 'all') {
+      const data = await apiFetch(`/api/admin/analytics/lead-health?filter=${filter}&limit=100`);
+      if (!data) return;
+
+      const s = data.summary;
+      document.getElementById('health-summary-cards').innerHTML = `
+        <div class="card stat"><div class="stat-value stat-danger">${s.hot || 0}</div><div class="stat-label">Hot (70-100)</div></div>
+        <div class="card stat"><div class="stat-value stat-warning">${s.warm || 0}</div><div class="stat-label">Warm (40-69)</div></div>
+        <div class="card stat"><div class="stat-value stat-accent">${s.cold || 0}</div><div class="stat-label">Cold (20-39)</div></div>
+        <div class="card stat"><div class="stat-value" style="color:var(--text-muted)">${s.dead || 0}</div><div class="stat-label">Dead (0-19)</div></div>
+      `;
+
+      document.getElementById('health-table-body').innerHTML = data.leads.map(l => {
+        const timeAgo = formatTimeAgo(l.last_message_at);
+        return `<tr>
+          <td><strong>${l.name || 'Sem nome'}</strong></td>
+          <td>${l.phone}</td>
+          <td>${l.persona || '—'}</td>
+          <td>${l.phase}</td>
+          <td><strong>${l.health_score}</strong></td>
+          <td><span class="health-badge health-${l.health_status}">${l.health_status}</span></td>
+          <td>${l.user_msg_count || 0}</td>
+          <td style="color:var(--text-sec)">${timeAgo}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ─── COOLING LEADS ───
+    async function loadCooling() {
+      const data = await apiFetch('/api/admin/analytics/cooling-leads');
+      if (!data) return;
+
+      const s = data.summary;
+      document.getElementById('cooling-summary-cards').innerHTML = `
+        <div class="card stat"><div class="stat-value stat-danger">${s.critical}</div><div class="stat-label">Critico (+48h)</div></div>
+        <div class="card stat"><div class="stat-value stat-warning">${s.warning}</div><div class="stat-label">Alerta (+24h)</div></div>
+        <div class="card stat"><div class="stat-value stat-accent">${s.attention}</div><div class="stat-label">Atencao (+6h)</div></div>
+      `;
+
+      const icons = { critical: '🔴', warning: '🟡', attention: '🔵' };
+      document.getElementById('cooling-alerts-list').innerHTML = data.leads.length === 0
+        ? '<div class="loading">Nenhum lead esfriando no momento</div>'
+        : data.leads.map(l => `
+          <div class="alert-item alert-${l.urgency}">
+            <span class="alert-icon">${icons[l.urgency] || '⚪'}</span>
+            <div class="alert-content">
+              <div class="alert-title">${l.name || l.phone} <span style="color:var(--text-sec); font-weight:400;">— Fase ${l.phase} (${l.persona})</span></div>
+              <div class="alert-meta">Silencio: ${parseFloat(l.hours_silent).toFixed(1)}h | ${l.user_msgs} msgs user / ${l.agent_msgs} msgs agent | Produto: ${l.recommended_product || 'N/A'}</div>
+              <button class="btn btn-sm" style="margin-top:6px; cursor:pointer;" onclick="sendReactivation(${l.id}, '${(l.recommended_action || '').replace(/'/g, "\\'")}', this)">${l.recommended_action}</button>
+            </div>
+          </div>
+        `).join('');
+    }
+
+    // ─── REACTIVATION ───
+    async function sendReactivation(convId, actionType, btn) {
+      const origText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+      btn.style.opacity = '0.6';
+      try {
+        const res = await apiFetch('/api/admin/analytics/reactivate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversation_id: convId, action_type: actionType })
+        });
+        if (res && res.success) {
+          btn.textContent = 'Enviado!';
+          btn.style.background = '#22c55e';
+          btn.style.color = '#fff';
+          // Remove from list after 2s
+          setTimeout(() => {
+            const item = btn.closest('.alert-item');
+            if (item) item.style.display = 'none';
+          }, 2000);
+        } else {
+          btn.textContent = 'Erro: ' + (res ? res.error : 'falha');
+          btn.style.background = '#ef4444';
+          setTimeout(() => { btn.textContent = origText; btn.disabled = false; btn.style.opacity = '1'; btn.style.background = ''; }, 3000);
+        }
+      } catch (err) {
+        btn.textContent = 'Erro';
+        btn.style.background = '#ef4444';
+        setTimeout(() => { btn.textContent = origText; btn.disabled = false; btn.style.opacity = '1'; btn.style.background = ''; }, 3000);
+      }
+    }
+
+    // ─── ENGAGEMENT ───
+    async function loadEngagement() {
+      const data = await apiFetch(`/api/admin/analytics/engagement-by-type?days=${getDays()}`);
+      if (!data) return;
+
+      // Engagement chart
+      destroyChart(chartEngagement);
+      const types = data.engagement_by_type;
+      const typeLabels = { text: 'Texto', audio: 'Audio', video: 'Video', image: 'Imagem', document: 'Documento', social_proof: 'Prova Social' };
+      chartEngagement = new Chart(document.getElementById('chartEngagement'), {
+        type: 'bar',
+        data: {
+          labels: types.map(t => typeLabels[t.message_type] || t.message_type),
+          datasets: [
+            { label: 'Reply 1h (%)', data: types.map(t => parseFloat(t.reply_rate_1h_pct) || 0), backgroundColor: 'rgba(59,130,246,.7)', borderRadius: 4 },
+            { label: 'Reply 24h (%)', data: types.map(t => parseFloat(t.reply_rate_24h_pct) || 0), backgroundColor: 'rgba(34,197,94,.5)', borderRadius: 4 },
+          ]
+        },
+        options: CHART_DEFAULTS
+      });
+
+      // Ratio chart
+      destroyChart(chartRatio);
+      const ratios = data.message_ratio;
+      chartRatio = new Chart(document.getElementById('chartRatio'), {
+        type: 'bar',
+        data: {
+          labels: ratios.map(r => r.persona === 'augusto' ? 'Augusto' : 'Paulo'),
+          datasets: [
+            { label: 'Msgs Agent (media)', data: ratios.map(r => parseFloat(r.avg_agent_msgs) || 0), backgroundColor: 'rgba(59,130,246,.7)', borderRadius: 4 },
+            { label: 'Msgs User (media)', data: ratios.map(r => parseFloat(r.avg_user_msgs) || 0), backgroundColor: 'rgba(34,197,94,.7)', borderRadius: 4 },
+          ]
+        },
+        options: { ...CHART_DEFAULTS, indexAxis: 'y' }
+      });
+
+      // Table
+      document.getElementById('engagement-table-body').innerHTML = types.map(t => `
+        <tr>
+          <td><strong>${typeLabels[t.message_type] || t.message_type}</strong></td>
+          <td>${t.total_sent}</td>
+          <td>${t.got_reply_1h}</td>
+          <td><strong>${t.reply_rate_1h_pct || 0}%</strong></td>
+          <td>${t.got_reply_24h}</td>
+          <td><strong>${t.reply_rate_24h_pct || 0}%</strong></td>
+        </tr>
+      `).join('');
+    }
+
+    // ─── A/B TESTS ───
+    async function loadABTests() {
+      const data = await apiFetch('/api/admin/analytics/ab-overview');
+      if (!data) return;
+
+      if (data.tests.length === 0) {
+        document.getElementById('abtests-list').innerHTML = '<div class="card"><div class="loading">Nenhum teste A/B configurado</div></div>';
+        return;
+      }
+
+      document.getElementById('abtests-list').innerHTML = data.tests.map(test => {
+        const variants = test.variant_results || [];
+        return `
+          <div class="card" style="margin-bottom: 16px;">
+            <div class="card-header">
+              <span class="card-title">${test.name} <span style="color:${test.active ? 'var(--success)' : 'var(--text-muted)'}; font-size:11px;">${test.active ? 'ATIVO' : 'INATIVO'}</span></span>
+              <span style="color:var(--text-sec); font-size:12px;">Target: ${test.target} | Persona: ${test.persona} | ${test.total_assigned} convs</span>
+            </div>
+            ${test.description ? `<p style="color:var(--text-sec); font-size:13px; margin-bottom:12px;">${test.description}</p>` : ''}
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Variante</th><th>Conversas</th><th>Conversoes</th><th>Opt-outs</th><th>Fase Media</th></tr></thead>
+                <tbody>
+                  ${variants.map(v => `
+                    <tr>
+                      <td><strong>${v.variant}</strong></td>
+                      <td>${v.conversations}</td>
+                      <td class="stat-success">${v.conversions}</td>
+                      <td class="stat-danger">${v.opt_outs}</td>
+                      <td>${v.avg_phase}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ─── Helpers ───
+    function formatTimeAgo(dateStr) {
+      if (!dateStr) return '—';
+      const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+      if (diff < 60) return 'agora';
+      if (diff < 3600) return Math.floor(diff / 60) + 'min atras';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h atras';
+      return Math.floor(diff / 86400) + 'd atras';
+    }
+
+    // ─── Init ───
+    async function reloadAll() {
+      await Promise.all([
+        loadAgentPerformance(),
+        loadHeatmap(),
+        loadHealth(),
+        loadCooling(),
+        loadEngagement(),
+        loadABTests(),
+      ]);
+    }
+
+    // Check auth - support embed mode and token passthrough from dashboard iframe
+    const __urlParams = new URLSearchParams(window.location.search);
+    const __embedKey = __urlParams.get('embed_key');
+    const __urlToken = __urlParams.get('token');
+    if (__urlToken) {
+      localStorage.setItem(TOKEN_KEY, __urlToken);
+    }
+    // Read days parameter from dashboard iframe URL
+    var __urlDays = __urlParams.get('days');
+    if (__urlDays) {
+      var periodSel = document.getElementById('periodSelect');
+      if (periodSel) {
+        periodSel.value = __urlDays;
+      }
+    }
+    if (__embedKey) {
+      window.__EMBED_KEY = __embedKey;
+      reloadAll();
+      setInterval(reloadAll, 5 * 60 * 1000);
+    } else if (!getToken()) {
+      window.location.href = '/admin/dashboard';
+    } else {
+      reloadAll();
+      setInterval(reloadAll, 5 * 60 * 1000); // Auto-refresh 5min
+    }
+  </script>
+</body>
+</html>
