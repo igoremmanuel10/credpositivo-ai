@@ -23,6 +23,10 @@ import { db } from '../db/client.js';
 import { sendText, getTokenForWid } from '../quepasa/client.js';
 import { transcribeAudio } from '../audio/transcribe.js';
 import { trackApiCost } from '../monitoring/cost-tracker.js';
+import { sendAlexReportNow, runAlexCheckCycle } from '../devops/alex.js';
+import { formatDailyReport } from '../devops/formatter.js';
+import { getRecentErrors, getErrorPatterns } from '../devops/error-interceptor.js';
+import { generateManagerReport } from '../manager/luan.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -405,6 +409,15 @@ function detectCommand(text) {
     return { command: 'schedule', text };
   }
 
+
+  // Admin report commands
+  if (lower.match(/^#(alex|devops?)/)) {
+    return { command: 'alex_report' };
+  }
+  if (lower.match(/^#(luan|gerente|relatorio)/)) {
+    return { command: 'luan_report' };
+  }
+
   return null;
 }
 
@@ -542,6 +555,34 @@ export async function handleAdmGroupMessage(msg) {
         break;
       case 'schedule':
         response = await handleScheduleCommand(cmd.text || text, memberName, senderPhone, msgId);
+        break;
+      case 'alex_report':
+        console.log('[Agenda] Admin report command: #alex from ' + memberName);
+        try {
+          const health = await runAlexCheckCycle();
+          const errors24h = getRecentErrors(24 * 60);
+          const reportText = formatDailyReport(
+            { overall: health.overall, services: health.services },
+            errors24h, [],
+            health.services?.find(s => s.service === 'api_costs')?.details || null,
+            health.diagnosis || 'Sistema verificado sob demanda.'
+          );
+          response = reportText;
+        } catch (err) {
+          response = 'Erro Alex: ' + err.message;
+        }
+        break;
+      case 'luan_report':
+        console.log('[Agenda] Admin report command: #luan from ' + memberName);
+        try {
+          const { whatsappMessages } = await generateManagerReport({ reportType: 'on_demand', days: 7 });
+          for (const msg of whatsappMessages) {
+            await sendText(ADM_GROUP_JID, msg, getAugustoToken());
+          }
+          response = null;
+        } catch (err) {
+          response = 'Erro Luan: ' + err.message;
+        }
         break;
       default:
         return;

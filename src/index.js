@@ -1,6 +1,9 @@
 import { initSentry, Sentry } from './monitoring/sentry.js';
 initSentry();
 
+import { initErrorInterceptor } from './devops/error-interceptor.js';
+initErrorInterceptor();
+
 import express from 'express';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -37,6 +40,8 @@ import { runMigrations, db } from './db/client.js';
 import { processUnembeddedConversations, refreshStaleEmbeddings } from './ai/embed-job.js';
 import { affiliateRouter } from './affiliate/routes.js';
 import { startAnaScheduler } from './ops/ana.js';
+import { startAlexScheduler, sendAlexReportNow, runAlexCheckCycle } from './devops/alex.js';
+import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -219,6 +224,33 @@ app.get('/api/admin/manager-report', async (req, res) => {
   }
 });
 
+
+// Alex DevOps report - manual trigger (sends via WhatsApp)
+app.post('/api/admin/devops-report', async (req, res) => {
+  try {
+    const result = await sendAlexReportNow();
+    res.json({
+      success: result.success,
+      message: 'Relatorio Alex enviado para ' + result.sentCount + '/' + result.totalPhones + ' telefones',
+      results: result.results,
+    });
+  } catch (err) {
+    console.error('[Admin] DevOps report error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Alex DevOps health - JSON (for dashboard/monitoring)
+app.get('/api/admin/devops-health', async (req, res) => {
+  try {
+    const result = await runAlexCheckCycle();
+    res.json(result);
+  } catch (err) {
+    console.error('[Admin] DevOps health error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('[Express] Unhandled error:', err);
@@ -262,6 +294,8 @@ app.use((err, req, res, next) => {
     startAgendaScheduler();
     startEventDetector();
     startAnaScheduler();
+    startAlexScheduler();
+    startAdsScheduler();
 
     // Embedding job: process new conversations every 30 minutes, refresh stale daily
     setInterval(() => {

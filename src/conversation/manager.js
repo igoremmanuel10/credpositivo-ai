@@ -16,6 +16,7 @@ import { syncLeadToKrayin, syncPhaseChange, syncDealLost } from '../crm/sync.js'
 
 import { handleVoiceCallTrigger } from '../voice/call-handler.js';
 import { generateManagerReport } from '../manager/luan.js';
+import { sendAlexReportNow } from '../devops/alex.js';
 // In-memory map: phone → botTokenForReply (for follow-ups and debounced messages)
 const phoneTokenMap = new Map();
 // In-memory map: phone → persona (detected from bot token at webhook time)
@@ -134,6 +135,22 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     } catch (err) {
       console.error('[Manager] Luan command error:', err.message);
       await sendMessages(remoteJid, ['Erro ao gerar relatorio: ' + err.message], botTokenForReply);
+    }
+    await cache.releaseProcessingLock(phone);
+    return;
+  }
+
+  // Alex DevOps command: admin phones can send #alex or #devops
+  if (isAdmin && combinedText.trim().match(/^#(alex|devops?)/i)) {
+    console.log('[Manager] Alex command from admin ' + phone);
+    try {
+      const alexResult = await sendAlexReportNow();
+      if (!alexResult.success) {
+        await sendMessages(remoteJid, ['Erro ao gerar relatorio Alex: ' + (alexResult.error || 'desconhecido')], botTokenForReply);
+      }
+    } catch (err) {
+      console.error('[Manager] Alex command error:', err.message);
+      await sendMessages(remoteJid, ['Erro ao gerar relatorio DevOps: ' + err.message], botTokenForReply);
     }
     await cache.releaseProcessingLock(phone);
     return;

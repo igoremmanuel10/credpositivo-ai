@@ -242,3 +242,11 @@ export async function buildContextFromSimilar(query, phase = null) {
     return '';
   }
 }
+
+
+export function resetCircuitBreaker() {
+  circuitBreaker.failures = 0;
+  circuitBreaker.disabledUntil = 0;
+  console.log('[Embeddings] Circuit breaker RESET by Ana');
+  return true;
+}

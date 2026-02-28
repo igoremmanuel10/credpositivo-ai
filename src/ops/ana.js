@@ -30,6 +30,7 @@
 import cron from 'node-cron';
 import { db } from '../db/client.js';
 import { sendText, getTokenForWid, getBotInfo } from '../quepasa/client.js';
+import { resetCircuitBreaker, generateEmbedding } from '../ai/embeddings.js';
 import { config, isBusinessHours } from '../config.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -257,6 +258,21 @@ async function runHealthCheck(silent = false) {
     }
 
     await sendAnaAlert(msg.trim());
+
+    // Auto-fix: reset embeddings circuit breaker
+    const embedFails = healthState.failures.get("embeddings") || 0;
+    if (embedFails >= 3) {
+      try {
+        resetCircuitBreaker();
+        const testResult = await generateEmbedding("health check test");
+        if (testResult) {
+          healthState.failures.set("embeddings", 0);
+          await sendAnaAlert("✅ Ana Auto-Fix: Embeddings resetado e testado com sucesso");
+        }
+      } catch (err) {
+        console.log("[Ana] Embeddings auto-fix failed:", err.message);
+      }
+    }
   }
 }
 
