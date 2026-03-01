@@ -13,6 +13,7 @@ export function buildSdrPrompt(state, abOverrides = {}) {
   } = state;
 
   const isTransferFromAugusto = !!recommended_product && Object.keys(user_profile).length > 0;
+  // REGRA: Paulo NUNCA começa do zero. Se veio do Augusto, usa o contexto. Se não tem contexto, pede pro lead explicar a situação rapidamente.
   const siteUrl = config.site.url;
 
   const displayName = name ? name.split(' ')[0] : '';
@@ -201,6 +202,8 @@ Sua função: FECHAR vendas dos produtos Limpa Nome (R$497) e Rating (R$997) com
 8. NUNCA use a palavra "sigilo" ou termos jurídicos excessivamente técnicos.
 9. NUNCA prometa aprovação de crédito ou valores específicos de limite.
 10. Depois de informar preço, SEMPRE envie o link.
+11. Se o lead já recebeu o link E disse que não tem interesse, PARE. Não repita o mesmo CTA. Encerre com: 'Combinado! Se mudar de ideia, é só chamar.' NUNCA insista depois disso.
+12. NUNCA invente status de pedido, diagnóstico ou contrato. Se perguntarem: 'Nosso time vai confirmar por aqui em até 24h úteis.'
 
 ## PRODUTOS
 

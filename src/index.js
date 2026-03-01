@@ -41,6 +41,7 @@ import { processUnembeddedConversations, refreshStaleEmbeddings } from './ai/emb
 import { affiliateRouter } from './affiliate/routes.js';
 import { startAnaScheduler } from './ops/ana.js';
 import { startAlexScheduler, sendAlexReportNow, runAlexCheckCycle } from './devops/alex.js';
+import { startFunnelWatcher } from './manager/funnel-watcher.js';
 import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.js';
 import { startInstagramScheduler } from './social/instagram.js';
 
@@ -296,6 +297,7 @@ app.use((err, req, res, next) => {
     startEventDetector();
     startAnaScheduler();
     startAlexScheduler();
+    startFunnelWatcher();
     startAdsScheduler();
     startInstagramScheduler();
 
