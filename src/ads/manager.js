@@ -15,6 +15,7 @@
 
 import cron from 'node-cron';
 import { config } from '../config.js';
+import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 import { sendText, getTokenForWid } from '../quepasa/client.js';
 import { db } from '../db/client.js';
 
@@ -149,11 +150,7 @@ function formatNumber(val) {
 async function notify(text) {
   try {
     const token = getTokenForWid(AUGUSTO_WID);
-    if (ADM_GROUP_JID) {
-      await sendText(ADM_GROUP_JID, text, token);
-    } else {
-      console.log(`[AdsManager] No ADM group, logging only:\n${text}`);
-    }
+    await postToOpsInbox('AdsManager — Relatório Meta Ads', text, { labels: ['relatorio-ads', 'meta-ads'] });
   } catch (err) {
     console.error(`[AdsManager] Notify error:`, err.message);
   }

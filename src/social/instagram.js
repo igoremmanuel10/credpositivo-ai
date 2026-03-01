@@ -17,6 +17,7 @@
 import cron from 'node-cron';
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config.js';
+import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 import { sendText, getTokenForWid } from '../quepasa/client.js';
 import { db } from '../db/client.js';
 
@@ -236,7 +237,7 @@ async function notify(text) {
   try {
     const token = getTokenForWid(AUGUSTO_WID);
     if (ADM_GROUP_JID) {
-      await sendText(ADM_GROUP_JID, text, token);
+      await postToOpsInbox('Instagram — Publicação', text, { labels: ['instagram', 'social-media'] });
     }
   } catch (err) {
     console.error('[Instagram] Notify error:', err.message);

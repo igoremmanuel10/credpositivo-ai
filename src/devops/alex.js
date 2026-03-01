@@ -16,6 +16,7 @@ import cron from 'node-cron';
 import crypto from 'crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config.js';
+import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 import { db } from '../db/client.js';
 import { sendText } from '../quepasa/client.js';
 import { checkAllServices } from './health-checker.js';
@@ -191,6 +192,7 @@ async function sendCriticalAlert(service, error, aiDiagnosis) {
   for (const phone of REPORT_PHONES) {
     try {
       await sendText(phone, alertText);
+      await postToOpsInbox('Alex — ALERTA CRÍTICO', alertText, { labels: ['alerta-critico', 'devops'] });
       console.log('[Alex] Critical alert sent to ' + phone);
     } catch (err) {
       console.error('[Alex] Failed to send alert to ' + phone + ':', err.message);
@@ -247,7 +249,7 @@ export async function sendAlexReportNow() {
     const results = [];
     for (const phone of REPORT_PHONES) {
       try {
-        await sendText(phone, reportText);
+        await postToOpsInbox('Alex — Relatório de Saúde do Sistema', reportText, { labels: ['relatorio-alex', 'devops'] });
         results.push({ phone, status: 'sent' });
         console.log('[Alex] Daily report sent to ' + phone);
       } catch (err) {

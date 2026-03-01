@@ -67,11 +67,11 @@ const healthState = {
 async function sendAnaAlert(text) {
   const token = getBotToken();
   try {
-    await sendText(ADM_GROUP_JID, text, token);
+    await postToOpsInbox('Ana — Relatório de Pipeline', text, { labels: ['relatorio-ana', 'pipeline'] });
   } catch (err) {
     console.error('[Ana] Alert send failed:', err.message);
     try {
-      await sendText(ADMIN_PHONES[0], text, token);
+      await postToOpsInbox('Ana — Relatório de Pipeline', text, { labels: ['relatorio-ana', 'pipeline'] });
     } catch (e) {
       console.error('[Ana] Fallback failed:', e.message);
     }

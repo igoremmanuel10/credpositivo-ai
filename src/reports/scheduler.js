@@ -4,6 +4,7 @@ import { generateWeeklyRatingReport } from './weekly-rating-report.js';
 import { sendText } from '../quepasa/client.js';
 import { config } from '../config.js';
 import { generateManagerReport } from '../manager/luan.js';
+import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 
 const REPORT_PHONES = ['5511932145806', '557191234115', '557187700120'];
 
@@ -22,28 +23,15 @@ export async function sendDailyReportNow() {
 
   try {
     const report = await generateDailyReport();
-    const results = [];
-
-    for (const phone of REPORT_PHONES) {
-      try {
-        await sendText(phone, report);
-        console.log('[ReportScheduler] Report sent to ' + phone);
-        results.push({ phone, status: 'sent' });
-      } catch (err) {
-        console.error('[ReportScheduler] Failed to send to ' + phone + ':', err.message);
-        results.push({ phone, status: 'failed', error: err.message });
-      }
-    }
-
-    const sentCount = results.filter(r => r.status === 'sent').length;
-    console.log('[ReportScheduler] Report delivered to ' + sentCount + '/' + REPORT_PHONES.length + ' phones');
+    await postToOpsInbox('Relatório Diário — CredPositivo', report, { labels: ['relatorio-diario'] });
+    console.log('[ReportScheduler] Relatório diário postado no Chatwoot Operações');
 
     return {
-      success: sentCount > 0,
+      success: true,
       report,
-      results,
-      sentCount,
-      totalPhones: REPORT_PHONES.length,
+      results: [{ channel: 'chatwoot-ops', status: 'sent' }],
+      sentCount: 1,
+      totalPhones: 1,
     };
   } catch (err) {
     console.error('[ReportScheduler] Failed to generate report:', err.message);
@@ -70,30 +58,19 @@ export async function sendManagerReportNow(reportType = 'daily', days = 7) {
   console.log('[ReportScheduler] Triggering Luan manager report...');
   try {
     const { whatsappMessages } = await generateManagerReport({ reportType, days });
-    const results = [];
-
-    for (const phone of REPORT_PHONES) {
-      try {
-        for (const msg of whatsappMessages) {
-          await sendText(phone, msg);
-        }
-        console.log('[ReportScheduler] Luan report sent to ' + phone);
-        results.push({ phone, status: 'sent' });
-      } catch (err) {
-        console.error('[ReportScheduler] Luan report failed for ' + phone + ':', err.message);
-        results.push({ phone, status: 'failed', error: err.message });
-      }
-    }
-
-    const sentCount = results.filter(r => r.status === 'sent').length;
-    console.log('[ReportScheduler] Luan report delivered to ' + sentCount + '/' + REPORT_PHONES.length + ' phones');
+    const fullReport = whatsappMessages.join('\n\n---\n\n');
+    const title = reportType === 'weekly'
+      ? 'Luan — Relatório Semanal (Estratégico)'
+      : 'Luan — Relatório Gerencial Diário';
+    await postToOpsInbox(title, fullReport, { labels: ['relatorio-luan', `relatorio-${reportType}`] });
+    console.log('[ReportScheduler] Luan report postado no Chatwoot Operações');
 
     return {
-      success: sentCount > 0,
-      report: whatsappMessages.join('\n---\n'),
-      results,
-      sentCount,
-      totalPhones: REPORT_PHONES.length,
+      success: true,
+      report: fullReport,
+      results: [{ channel: 'chatwoot-ops', status: 'sent' }],
+      sentCount: 1,
+      totalPhones: 1,
     };
   } catch (err) {
     console.error('[ReportScheduler] Luan report error:', err.message);
@@ -160,34 +137,10 @@ export async function sendWeeklyRatingReportNow() {
 
   try {
     const report = await generateWeeklyRatingReport();
-    const targets = [];
+    await postToOpsInbox('Relatório Semanal — Rating Bancário', report, { labels: ['relatorio-rating', 'semanal'] });
+    console.log('[ReportScheduler] Weekly rating report postado no Chatwoot Operações');
 
-    // Send to group if configured
-    if (RATING_GROUP_ID) {
-      targets.push(RATING_GROUP_ID);
-    }
-
-    // Also send to admin phones
-    for (const phone of REPORT_PHONES) {
-      targets.push(phone);
-    }
-
-    const results = [];
-    for (const target of targets) {
-      try {
-        await sendText(target, report, PAULO_TOKEN);
-        console.log('[ReportScheduler] Weekly rating report sent to ' + target);
-        results.push({ target, status: 'sent' });
-      } catch (err) {
-        console.error('[ReportScheduler] Weekly rating failed for ' + target + ':', err.message);
-        results.push({ target, status: 'failed', error: err.message });
-      }
-    }
-
-    const sentCount = results.filter(r => r.status === 'sent').length;
-    console.log('[ReportScheduler] Weekly rating delivered to ' + sentCount + '/' + targets.length);
-
-    return { success: sentCount > 0, report, results, sentCount, totalTargets: targets.length };
+    return { success: true, report, results: [{ channel: 'chatwoot-ops', status: 'sent' }], sentCount: 1, totalTargets: 1 };
   } catch (err) {
     console.error('[ReportScheduler] Failed to generate weekly rating report:', err.message);
     return { success: false, error: err.message, results: [], sentCount: 0, totalTargets: 0 };

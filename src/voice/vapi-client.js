@@ -142,12 +142,7 @@ export async function createOutboundCall(phoneNumber, options = {}) {
     body.metadata = metadata;
   }
 
-  // Add server URL for webhooks if configured
-  if (config.vapi.serverUrl) {
-    body.server = {
-      url: config.vapi.serverUrl,
-    };
-  }
+  // Note: server URL is configured in Vapi dashboard, not per-call
 
   // Add max duration
   if (config.vapi.maxCallDurationSeconds) {

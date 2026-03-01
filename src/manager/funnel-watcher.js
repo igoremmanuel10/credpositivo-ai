@@ -14,6 +14,7 @@ import cron from 'node-cron';
 import { db } from '../db/client.js';
 import { sendText } from '../quepasa/client.js';
 import { isBusinessHours } from '../config.js';
+import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 
 const ADMIN_PHONES = ['5511932145806', '557191234115', '557187700120'];
 
@@ -259,6 +260,9 @@ async function sendAlertIfCooldownOk(type, message) {
   const now = Date.now();
   const last = alertCooldown.get(type) || 0;
   if (now - last < ALERT_COOLDOWN_MS) return;
+
+  // Post to Chatwoot Operações inbox
+  await postToOpsInbox('FunnelWatcher — Alerta', alertText, { labels: ['funnel-watcher', 'alerta'] }).catch(() => {});
 
   for (const phone of ADMIN_PHONES) {
     try {
