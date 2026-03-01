@@ -26,7 +26,7 @@ import { vapiWebhookRouter } from "./voice/vapi-webhook.js";
 import { startVapiScheduler } from "./voice/scheduler.js";
 import { getBridgeHealth } from './bridge-health.js';
 import { startBridgeWatchdog } from './bridge-watchdog.js';
-import { startReportScheduler, sendDailyReportNow, sendWeeklyRatingReportNow, sendManagerReportNow } from './reports/scheduler.js';
+import { startReportScheduler, sendDailyReportNow, sendWeeklyRatingReportNow, sendManagerReportNow, sendTeamMeetingNow } from './reports/scheduler.js';
 import { generateManagerReport } from './manager/luan.js';
 import { getCostSummary } from './monitoring/cost-tracker.js';
 import { analyticsRouter } from './api/analytics.js';
@@ -41,6 +41,7 @@ import { processUnembeddedConversations, refreshStaleEmbeddings } from './ai/emb
 import { affiliateRouter } from './affiliate/routes.js';
 import { startAnaScheduler } from './ops/ana.js';
 import { startAlexScheduler, sendAlexReportNow, runAlexCheckCycle } from './devops/alex.js';
+import { startUnansweredMonitor, checkAndFixUnanswered } from './monitoring/unanswered-monitor.js';
 import { startFunnelWatcher } from './manager/funnel-watcher.js';
 import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.js';
 import { startInstagramScheduler } from './social/instagram.js';
@@ -214,6 +215,31 @@ app.post('/api/admin/manager-report', async (req, res) => {
   }
 });
 
+
+// Team meeting report - manual trigger
+app.post('/api/admin/team-meeting', async (req, res) => {
+  try {
+    const days = parseInt(req.body.days || '7');
+    const result = await sendTeamMeetingNow('on_demand', days);
+    res.json({
+      success: result.success,
+      message: 'Reuniao de time executada',
+    });
+  } catch (err) {
+    console.error('[Admin] Team meeting error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/admin/check-unanswered', async (req, res) => {
+  try {
+    const result = await checkAndFixUnanswered();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Luan manager report - JSON only (for dashboard)
 app.get('/api/admin/manager-report', async (req, res) => {
   try {
@@ -286,7 +312,7 @@ app.use((err, req, res, next) => {
     `);
 
     startFollowupScheduler();
-    startReengagementScheduler();
+    // startReengagementScheduler(); // DISABLED: redundant with followup scheduler
     initWavoip();
     startVapiScheduler();
     startBridgeWatchdog();
@@ -297,6 +323,7 @@ app.use((err, req, res, next) => {
     startEventDetector();
     startAnaScheduler();
     startAlexScheduler();
+    startUnansweredMonitor();
     startFunnelWatcher();
     startAdsScheduler();
     startInstagramScheduler();

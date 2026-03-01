@@ -1201,6 +1201,7 @@
       <button class="nav-tab" data-tab="performance">Performance</button>
       <button class="nav-tab" data-tab="pipeline">Pipeline</button>
       <button class="nav-tab" data-tab="leads">Leads</button>
+      <button class="nav-tab" data-tab="reports">Relatorios</button>
     </nav>
 
     <div class="header-actions">
@@ -1586,9 +1587,128 @@
 
     </div>
     <!-- /tab-leads -->
+    <!-- ==================== TAB: RELATORIOS DO SISTEMA ==================== -->
+    <div class="tab-panel" id="tab-reports">
+      <div class="main" style="max-width:1200px; margin:0 auto; padding:24px 16px;">
+
+        <!-- ALEX HEALTH SUMMARY -->
+        <div class="table-card" style="margin-bottom:24px;">
+          <div class="table-header">
+            <div class="table-title">Alex DevOps — Health Monitor (24h)</div>
+            <div class="table-desc">Status do monitoramento automatico do sistema</div>
+          </div>
+          <div id="alex-summary-state">
+            <div class="state-loading" id="alex-summary-loading">
+              <div class="spinner"></div>
+              <span>Carregando...</span>
+            </div>
+          </div>
+          <div id="alex-summary-content" style="display:none;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:16px;">
+              <div style="text-align:center; padding:16px; background:var(--bg-input); border-radius:var(--radius); border:1px solid var(--border);">
+                <div style="font-size:24px; font-weight:700; color:var(--accent);" id="alex-total-checks">0</div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Checks (24h)</div>
+              </div>
+              <div style="text-align:center; padding:16px; background:var(--bg-input); border-radius:var(--radius); border:1px solid var(--border);">
+                <div style="font-size:24px; font-weight:700; color:var(--danger);" id="alex-critical">0</div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Criticos</div>
+              </div>
+              <div style="text-align:center; padding:16px; background:var(--bg-input); border-radius:var(--radius); border:1px solid var(--border);">
+                <div style="font-size:24px; font-weight:700; color:var(--warning);" id="alex-warnings">0</div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Avisos</div>
+              </div>
+              <div style="text-align:center; padding:16px; background:var(--bg-input); border-radius:var(--radius); border:1px solid var(--border);">
+                <div style="font-size:24px; font-weight:700; color:var(--success);" id="alex-auto-fixed">0</div>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Auto-Fix</div>
+              </div>
+            </div>
+            <div style="font-size:12px; color:var(--text-sec); margin-bottom:12px;">
+              Ultimo check: <span id="alex-last-check">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ALEX RECENT LOGS -->
+        <div class="table-card" style="margin-bottom:24px;">
+          <div class="table-header">
+            <div class="table-title">Alex — Logs Recentes</div>
+            <div class="table-desc">Eventos relevantes detectados pelo monitoramento</div>
+          </div>
+          <div id="alex-logs-state">
+            <div class="state-loading" id="alex-logs-loading" style="display:none;">
+              <div class="spinner"></div>
+              <span>Carregando...</span>
+            </div>
+          </div>
+          <div class="table-wrap" id="alex-logs-wrap" style="display:none;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Severidade</th>
+                  <th>Categoria</th>
+                  <th>Descricao</th>
+                  <th>Auto-Fix</th>
+                </tr>
+              </thead>
+              <tbody id="alex-logs-tbody"></tbody>
+            </table>
+          </div>
+          <div id="alex-logs-empty" style="display:none; padding:24px; text-align:center; color:var(--text-sec); font-size:13px;">
+            Nenhum log relevante nas ultimas 24h — sistema estavel
+          </div>
+        </div>
+
+        <!-- LUAN MANAGER REPORTS -->
+        <div class="table-card" style="margin-bottom:24px;">
+          <div class="table-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div class="table-title">Luan — Relatorios Gerenciais</div>
+              <div class="table-desc">Analise de performance e pipeline gerada por IA</div>
+            </div>
+            <button id="btn-trigger-luan" onclick="triggerLuanReport()" style="padding:8px 16px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius); cursor:pointer; font-size:12px; font-weight:600;">
+              Gerar Agora
+            </button>
+          </div>
+          <div id="luan-reports-state">
+            <div class="state-loading" id="luan-reports-loading">
+              <div class="spinner"></div>
+              <span>Carregando relatorios...</span>
+            </div>
+          </div>
+          <div id="luan-reports-content" style="display:none;"></div>
+          <div id="luan-reports-empty" style="display:none; padding:24px; text-align:center; color:var(--text-sec); font-size:13px;">
+            Nenhum relatorio gerado ainda. Clique em "Gerar Agora" para criar o primeiro.
+          </div>
+        </div>
+
+        <!-- MANUAL REPORT TRIGGERS -->
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Acoes Manuais</div>
+            <div class="table-desc">Disparar relatorios manualmente</div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:12px; padding:4px 0;">
+            <button onclick="triggerDailyReport()" style="padding:10px 20px; background:var(--bg-input); color:var(--text-pri); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:500;">
+              Relatorio Diario
+            </button>
+            <button onclick="triggerWeeklyReport()" style="padding:10px 20px; background:var(--bg-input); color:var(--text-pri); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:500;">
+              Relatorio Semanal Rating
+            </button>
+            <button onclick="triggerLuanReport()" style="padding:10px 20px; background:var(--bg-input); color:var(--text-pri); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:500;">
+              Luan — Analise Gerencial
+            </button>
+          </div>
+          <div id="trigger-result" style="display:none; margin-top:12px; padding:12px; border-radius:var(--radius); font-size:13px;"></div>
+        </div>
+
+      </div>
+    </div>
+    <!-- /tab-reports -->
 
   </main>
 </div>
+
 
 <!-- TOAST -->
 <div id="toast"></div>
@@ -1932,6 +2052,7 @@
         leadsState.offset = 0;
         loadLeads();
       }
+      if (name === 'reports') { loadSystemReports(); }
     });
   });
 
@@ -3152,6 +3273,175 @@
   } else {
     boot();
   }
+
+  var reportsLoaded = false;
+
+  async function loadSystemReports() {
+    if (reportsLoaded) return;
+    try {
+      var data = await apiFetch('/api/admin/analytics/system-reports?limit=20');
+      if (!data) return;
+
+      // Alex summary
+      var alex = data.alex || {};
+      var summary = alex.summary_24h || {};
+      document.getElementById('alex-total-checks').textContent = summary.total_checks || '0';
+      document.getElementById('alex-critical').textContent = summary.critical || '0';
+      document.getElementById('alex-warnings').textContent = summary.warnings || '0';
+      document.getElementById('alex-auto-fixed').textContent = summary.auto_fixed || '0';
+      document.getElementById('alex-last-check').textContent = summary.last_check
+        ? new Date(summary.last_check).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        : 'Nunca';
+      document.getElementById('alex-summary-loading').style.display = 'none';
+      document.getElementById('alex-summary-content').style.display = 'block';
+
+      // Alex logs
+      var logs = alex.recent_logs || [];
+      var logsTbody = document.getElementById('alex-logs-tbody');
+      if (logs.length === 0) {
+        document.getElementById('alex-logs-empty').style.display = 'block';
+        document.getElementById('alex-logs-wrap').style.display = 'none';
+      } else {
+        logsTbody.innerHTML = '';
+        logs.slice(0, 15).forEach(function(log) {
+          var sevColor = log.severity === 'critical' ? 'var(--danger)' : log.severity === 'warning' ? 'var(--warning)' : 'var(--text-sec)';
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td style="white-space:nowrap; font-size:12px;">' + new Date(log.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</td>'
+            + '<td><span style="color:' + sevColor + '; font-weight:600; font-size:12px; text-transform:uppercase;">' + (log.severity || 'info') + '</span></td>'
+            + '<td style="font-size:12px;">' + (log.category || '—') + '</td>'
+            + '<td style="font-size:12px; max-width:400px; overflow:hidden; text-overflow:ellipsis;">' + (log.description || '—') + '</td>'
+            + '<td style="font-size:12px;">' + (log.auto_fixed ? '<span style="color:var(--success);">Sim</span>' : '—') + '</td>';
+          logsTbody.appendChild(tr);
+        });
+        document.getElementById('alex-logs-wrap').style.display = 'block';
+        document.getElementById('alex-logs-empty').style.display = 'none';
+      }
+
+      // Luan reports
+      var reports = data.manager_reports || [];
+      var container = document.getElementById('luan-reports-content');
+      document.getElementById('luan-reports-loading').style.display = 'none';
+
+      if (reports.length === 0) {
+        document.getElementById('luan-reports-empty').style.display = 'block';
+        container.style.display = 'none';
+      } else {
+        container.innerHTML = '';
+        reports.forEach(function(report) {
+          var healthColor = report.pipeline_health === 'healthy' ? 'var(--success)' : report.pipeline_health === 'critical' ? 'var(--danger)' : 'var(--warning)';
+          var prioColor = report.priority === 'high' || report.priority === 'alta' ? 'var(--danger)' : report.priority === 'medium' || report.priority === 'media' ? 'var(--warning)' : 'var(--text-sec)';
+          var dateStr = new Date(report.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          var typeLabel = report.report_type === 'daily' ? 'Diario' : report.report_type === 'weekly' ? 'Semanal' : report.report_type;
+
+          var card = document.createElement('div');
+          card.style.cssText = 'border:1px solid var(--border); border-radius:var(--radius); margin-bottom:16px; overflow:hidden;';
+
+          var header = document.createElement('div');
+          header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:14px 18px; background:var(--bg-input); cursor:pointer; user-select:none;';
+          header.innerHTML = '<div style="display:flex; align-items:center; gap:12px;">'
+            + '<span style="font-weight:600; font-size:14px; color:var(--text-pri);">' + typeLabel + ' — ' + dateStr + '</span>'
+            + '<span style="font-size:11px; padding:2px 8px; border-radius:10px; background:' + healthColor + '20; color:' + healthColor + '; font-weight:600;">' + (report.pipeline_health || 'N/A') + '</span>'
+            + '<span style="font-size:11px; padding:2px 8px; border-radius:10px; background:' + prioColor + '20; color:' + prioColor + '; font-weight:600;">Prioridade: ' + (report.priority || 'N/A') + '</span>'
+            + '</div>'
+            + '<span style="font-size:18px; color:var(--text-sec); transition:transform 0.2s;" class="report-chevron">&#9660;</span>';
+
+          var body = document.createElement('div');
+          body.style.cssText = 'padding:18px; display:none; border-top:1px solid var(--border);';
+
+          var reportText = (report.report_text || 'Sem conteudo').replace(/\n/g, '<br>');
+          var recoText = report.recommendations ? '<div style="margin-top:16px; padding:14px; background:rgba(59,130,246,0.08); border-radius:var(--radius); border-left:3px solid var(--accent);"><div style="font-weight:600; font-size:13px; color:var(--accent); margin-bottom:8px;">Recomendacoes</div><div style="font-size:13px; color:var(--text-pri); line-height:1.6;">' + report.recommendations.replace(/\n/g, '<br>') + '</div></div>' : '';
+
+          body.innerHTML = '<div style="font-size:13px; color:var(--text-pri); line-height:1.7; white-space:pre-wrap; font-family:monospace; max-height:500px; overflow-y:auto;">' + reportText + '</div>' + recoText;
+
+          header.addEventListener('click', function() {
+            var isOpen = body.style.display !== 'none';
+            body.style.display = isOpen ? 'none' : 'block';
+            header.querySelector('.report-chevron').style.transform = isOpen ? '' : 'rotate(180deg)';
+          });
+
+          card.appendChild(header);
+          card.appendChild(body);
+          container.appendChild(card);
+        });
+        container.style.display = 'block';
+        document.getElementById('luan-reports-empty').style.display = 'none';
+      }
+
+      reportsLoaded = true;
+    } catch (err) {
+      console.error('[Reports] Load error:', err);
+      document.getElementById('alex-summary-loading').innerHTML = '<span style="color:var(--danger);">Erro ao carregar</span>';
+      document.getElementById('luan-reports-loading').innerHTML = '<span style="color:var(--danger);">Erro ao carregar</span>';
+    }
+  }
+
+  async function triggerLuanReport() {
+    var btn = document.getElementById('btn-trigger-luan');
+    var resultDiv = document.getElementById('trigger-result');
+    btn.disabled = true;
+    btn.textContent = 'Gerando...';
+    resultDiv.style.display = 'block';
+    resultDiv.style.background = 'var(--bg-input)';
+    resultDiv.style.color = 'var(--text-sec)';
+    resultDiv.textContent = 'Gerando relatorio Luan... (pode levar 30-60 segundos)';
+
+    try {
+      var data = await apiFetch('/api/admin/manager-report', { method: 'POST' });
+      resultDiv.style.background = 'rgba(34,197,94,0.1)';
+      resultDiv.style.color = 'var(--success)';
+      resultDiv.textContent = 'Relatorio gerado com sucesso!';
+      reportsLoaded = false;
+      setTimeout(function() { loadSystemReports(); }, 1000);
+    } catch (err) {
+      resultDiv.style.background = 'rgba(239,68,68,0.1)';
+      resultDiv.style.color = 'var(--danger)';
+      resultDiv.textContent = 'Erro: ' + (err.message || 'Falha ao gerar relatorio');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Gerar Agora';
+  }
+
+  async function triggerDailyReport() {
+    var resultDiv = document.getElementById('trigger-result');
+    resultDiv.style.display = 'block';
+    resultDiv.style.background = 'var(--bg-input)';
+    resultDiv.style.color = 'var(--text-sec)';
+    resultDiv.textContent = 'Enviando relatorio diario...';
+    try {
+      await apiFetch('/api/admin/daily-report', { method: 'POST' });
+      resultDiv.style.background = 'rgba(34,197,94,0.1)';
+      resultDiv.style.color = 'var(--success)';
+      resultDiv.textContent = 'Relatorio diario enviado!';
+    } catch (err) {
+      resultDiv.style.background = 'rgba(239,68,68,0.1)';
+      resultDiv.style.color = 'var(--danger)';
+      resultDiv.textContent = 'Erro: ' + (err.message || 'Falha');
+    }
+  }
+
+  async function triggerWeeklyReport() {
+    var resultDiv = document.getElementById('trigger-result');
+    resultDiv.style.display = 'block';
+    resultDiv.style.background = 'var(--bg-input)';
+    resultDiv.style.color = 'var(--text-sec)';
+    resultDiv.textContent = 'Enviando relatorio semanal de rating...';
+    try {
+      await apiFetch('/api/admin/weekly-rating-report', { method: 'POST' });
+      resultDiv.style.background = 'rgba(34,197,94,0.1)';
+      resultDiv.style.color = 'var(--success)';
+      resultDiv.textContent = 'Relatorio semanal de rating enviado!';
+    } catch (err) {
+      resultDiv.style.background = 'rgba(239,68,68,0.1)';
+      resultDiv.style.color = 'var(--danger)';
+      resultDiv.textContent = 'Erro: ' + (err.message || 'Falha');
+    }
+  }
+
+  // Expose trigger functions to global scope for onclick handlers
+  window.triggerLuanReport = triggerLuanReport;
+  window.triggerDailyReport = triggerDailyReport;
+  window.triggerWeeklyReport = triggerWeeklyReport;
+
 
 })();
 </script>

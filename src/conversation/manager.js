@@ -6,7 +6,8 @@ import { getAgentResponse } from '../ai/claude.js';
 import { applyMetadataUpdates } from './state.js';
 import { getMediaForPhase, getProductAudios, getFollowupAudio, getProvaSocial, getDiagnosticoVideo } from '../media/assets.js';
 import { sendMediaBase64 } from '../quepasa/client.js';
-import { fixSiteLinks } from '../ai/output-filter.js';
+import { fixSiteLinks, cleanForWhatsApp } from '../ai/output-filter.js';
+import { createCheckout } from '../payment/mercadopago.js';
 import { config } from '../config.js';
 import { resolvePersona } from '../sdr/persona.js';
 import { captureError } from '../monitoring/sentry.js';
@@ -17,6 +18,53 @@ import { syncLeadToKrayin, syncPhaseChange, syncDealLost } from '../crm/sync.js'
 import { handleVoiceCallTrigger } from '../voice/call-handler.js';
 import { generateManagerReport } from '../manager/luan.js';
 import { sendAlexReportNow } from '../devops/alex.js';
+
+// === PAYMENT LINK: Generate personalized MP checkout link ===
+const PRODUCT_PRICES = { diagnostico: 97, limpa_nome: 497, rating: 997 };
+
+async function generatePaymentLink(conversation, metadata) {
+  try {
+    const product = metadata.recommended_product || conversation.recommended_product;
+    if (!product || !PRODUCT_PRICES[product]) {
+      console.log('[PaymentLink] No valid product for checkout:', product);
+      return null;
+    }
+
+    const price = PRODUCT_PRICES[product];
+    const name = conversation.name || conversation.user_profile?.nome || '';
+    const phone = conversation.phone || '';
+    const cpf = conversation.user_profile?.cpf || '';
+    const email = conversation.user_profile?.email || '';
+
+    const checkout = await createCheckout({
+      cpf: cpf || phone,
+      name,
+      email,
+      service: product,
+      price,
+    });
+
+    if (checkout?.initPoint) {
+      console.log(`[PaymentLink] Generated MP link for ${phone}: ${product} R$${price}`);
+      return checkout.initPoint;
+    }
+    return null;
+  } catch (err) {
+    console.error('[PaymentLink] Failed to generate checkout:', err.message);
+    return null;
+  }
+}
+
+function replaceSiteUrlWithPaymentLink(text, paymentUrl, siteUrl) {
+  if (!paymentUrl || !text) return text;
+  const escaped = siteUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escaped, 'gi');
+  if (regex.test(text)) {
+    return text.replace(regex, paymentUrl);
+  }
+  return text + '\n\n' + paymentUrl;
+}
+
 // In-memory map: phone → botTokenForReply (for follow-ups and debounced messages)
 const phoneTokenMap = new Map();
 // In-memory map: phone → persona (detected from bot token at webhook time)
@@ -370,7 +418,15 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     }
 
     // 7.9 Fix any incorrect/shortened site links before sending
-    const fixedResponseText = fixSiteLinks(cleanedResponseText);
+    // 7.9 Fix links + generate payment link if applicable
+    let fixedResponseText = cleanForWhatsApp(fixSiteLinks(cleanedResponseText));
+    if (metadata.should_send_link && newPhase >= 3) {
+      const paymentUrl = await generatePaymentLink(conversation, metadata);
+      if (paymentUrl) {
+        fixedResponseText = replaceSiteUrlWithPaymentLink(fixedResponseText, paymentUrl, config.site.url);
+        console.log(`[Manager] Replaced site URL with MP payment link for ${phone}`);
+      }
+    }
 
     // 7.95 Pre-send validation: sanitize response
     const validatedText = validateAgentResponse(fixedResponseText, phone);
@@ -676,7 +732,7 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
 
   if (!responseText) return;
 
-  const fixedText = fixSiteLinks(responseText);
+  const fixedText = cleanForWhatsApp(fixSiteLinks(responseText));
 
   // Legacy TTS audio for specific events
   const legacyAudioEvents = ['purchase_completed', 'purchase_followup', 'reengagement'];

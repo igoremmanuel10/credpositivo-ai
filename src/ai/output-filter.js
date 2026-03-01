@@ -202,3 +202,56 @@ export function buildCorrectionInstruction(violations) {
 - NEVER use artificial urgency
 Rewrite the SAME message intent but compliant.`;
 }
+
+/**
+ * Clean text for WhatsApp delivery:
+ * - Strip markdown bold/italic/code formatting
+ * - Remove ALL emojis (broken or not)
+ */
+export function cleanForWhatsApp(text) {
+  let cleaned = text;
+
+  // Strip markdown bold (**text** or __text__)
+  cleaned = cleaned.replace(/\*\*(.+?)\*\*/g, '$1');
+  cleaned = cleaned.replace(/__(.+?)__/g, '$1');
+
+  // Strip markdown italic (*text* but not contractions like "it's")
+  cleaned = cleaned.replace(/(?<!\w)\*([^*]+?)\*(?!\w)/g, '$1');
+
+  // Strip markdown code
+  cleaned = cleaned.replace(/`([^`]+?)`/g, '$1');
+
+  // Strip markdown headers
+  cleaned = cleaned.replace(/^#{1,3}\s+/gm, '');
+
+  // Remove ALL emoji characters (comprehensive Unicode ranges)
+  cleaned = cleaned.replace(/[\u{1F600}-\u{1F64F}]/gu, '');
+  cleaned = cleaned.replace(/[\u{1F300}-\u{1F5FF}]/gu, '');
+  cleaned = cleaned.replace(/[\u{1F680}-\u{1F6FF}]/gu, '');
+  cleaned = cleaned.replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '');
+  cleaned = cleaned.replace(/[\u{2600}-\u{26FF}]/gu, '');
+  cleaned = cleaned.replace(/[\u{2700}-\u{27BF}]/gu, '');
+  cleaned = cleaned.replace(/[\u{FE00}-\u{FE0F}]/gu, '');
+  cleaned = cleaned.replace(/[\u{200D}]/gu, '');
+  cleaned = cleaned.replace(/[\u{20E3}]/gu, '');
+  cleaned = cleaned.replace(/[\u{E0020}-\u{E007F}]/gu, '');
+  cleaned = cleaned.replace(/[\u{1F900}-\u{1F9FF}]/gu, '');
+  cleaned = cleaned.replace(/[\u{1FA00}-\u{1FA6F}]/gu, '');
+  cleaned = cleaned.replace(/[\u{1FA70}-\u{1FAFF}]/gu, '');
+  cleaned = cleaned.replace(/[\u{231A}-\u{231B}]/gu, '');
+  cleaned = cleaned.replace(/[\u{23E9}-\u{23FA}]/gu, '');
+  cleaned = cleaned.replace(/[\u{25AA}-\u{25FE}]/gu, '');
+  cleaned = cleaned.replace(/[\u{2614}-\u{2615}]/gu, '');
+  cleaned = cleaned.replace(/[\u{2648}-\u{2653}]/gu, '');
+  cleaned = cleaned.replace(/[\u{2934}-\u{2935}]/gu, '');
+  cleaned = cleaned.replace(/[\u{2B05}-\u{2B07}]/gu, '');
+  cleaned = cleaned.replace(/[\u{2B1B}-\u{2B1C}]/gu, '');
+  cleaned = cleaned.replace(/[\u{2B50}]/gu, '');
+  cleaned = cleaned.replace(/[\u{2B55}]/gu, '');
+  cleaned = cleaned.replace(/[✅❌👇👆👉✓✗☑☒⭐🌟💡🔥🎯🚀💰📊📈📉🏆💪🤝🙏❤️💙💚🔑🔗📍📎✨🎉🎊🛑⚠️✋🤔🏠🏦💳📱💻🔎📞📝🎁🔴🟢🟡]/gu, '');
+
+  // Clean double spaces
+  cleaned = cleaned.replace(/  +/g, ' ').trim();
+
+  return cleaned;
+}

@@ -648,3 +648,38 @@ analyticsRouter.get('/api/admin/analytics/insights', async (req, res) => {
   }
 });
 
+
+/**
+ * GET /api/admin/analytics/system-reports
+ * Returns recent manager reports and alex health logs for the dashboard.
+ */
+analyticsRouter.get('/api/admin/analytics/system-reports', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '20'), 50);
+
+    const managerReports = await db.query(
+      'SELECT id, report_type, period_days, report_text, recommendations, pipeline_health, priority, created_at FROM manager_reports ORDER BY created_at DESC LIMIT $1',
+      [limit]
+    );
+
+    const alexSummary = await db.query(
+      "SELECT COUNT(*) as total_checks, COUNT(*) FILTER (WHERE severity = 'critical') as critical, COUNT(*) FILTER (WHERE severity = 'warning') as warnings, COUNT(*) FILTER (WHERE auto_fixed = true) as auto_fixed, MAX(created_at) as last_check FROM alex_logs WHERE created_at >= NOW() - INTERVAL '24 hours'"
+    );
+
+    const alexLogs = await db.query(
+      "SELECT id, cycle_id, event_type, severity, category, description, auto_fixed, fix_result, created_at FROM alex_logs WHERE severity IN ('critical', 'warning', 'info') ORDER BY created_at DESC LIMIT $1",
+      [limit]
+    );
+
+    res.json({
+      manager_reports: managerReports.rows,
+      alex: {
+        summary_24h: alexSummary.rows[0] || {},
+        recent_logs: alexLogs.rows,
+      },
+    });
+  } catch (err) {
+    console.error('[API] System reports error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});

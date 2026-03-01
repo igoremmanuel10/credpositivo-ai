@@ -4,6 +4,7 @@ import { generateWeeklyRatingReport } from './weekly-rating-report.js';
 import { sendText } from '../quepasa/client.js';
 import { config } from '../config.js';
 import { generateManagerReport } from '../manager/luan.js';
+import { generateTeamMeeting } from '../manager/team-meeting.js';
 import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 
 const REPORT_PHONES = ['5511932145806', '557191234115', '557187700120'];
@@ -46,13 +47,7 @@ export async function sendDailyReportNow() {
 }
 
 /**
- * Start the daily report scheduler.
- * Sends report 3x/day: 10:00, 18:00, 23:00 BRT
- * (13:00, 21:00, 02:00 UTC)
- */
-
-/**
- * Send the Luan manager performance report to admin phones.
+ * Send the Luan manager performance report (kept for on-demand API use).
  */
 export async function sendManagerReportNow(reportType = 'daily', days = 7) {
   console.log('[ReportScheduler] Triggering Luan manager report...');
@@ -80,6 +75,37 @@ export async function sendManagerReportNow(reportType = 'daily', days = 7) {
       results: [],
       sentCount: 0,
       totalPhones: REPORT_PHONES.length,
+    };
+  }
+}
+
+/**
+ * Run full team meeting: Luan collects, 5 agents analyze, Igor consolidates.
+ * Posts to Ops Inbox in Chatwoot.
+ */
+export async function sendTeamMeetingNow(reportType = 'weekly', days = 7) {
+  console.log('[ReportScheduler] Triggering team meeting...');
+  try {
+    const { report } = await generateTeamMeeting({ reportType, days });
+    const title = 'Reuniao de Time — Analise de Funil';
+    await postToOpsInbox(title, report, { labels: ['reuniao-time', 'relatorio-semanal', 'igor'] });
+    console.log('[ReportScheduler] Team meeting postado no Chatwoot Operacoes');
+
+    return {
+      success: true,
+      report,
+      results: [{ channel: 'chatwoot-ops', status: 'sent' }],
+      sentCount: 1,
+      totalPhones: 1,
+    };
+  } catch (err) {
+    console.error('[ReportScheduler] Team meeting error:', err.message);
+    return {
+      success: false,
+      error: err.message,
+      results: [],
+      sentCount: 0,
+      totalPhones: 1,
     };
   }
 }
@@ -113,19 +139,17 @@ export function startReportScheduler() {
 
   console.log('[ReportScheduler] Scheduled weekly rating report: Monday 10:00 BRT');
 
-  // Luan manager report: 09:00 BRT = 12:00 UTC (Mon-Sat)
-  cron.schedule('0 12 * * 1-6', async () => {
-    console.log('[ReportScheduler] Cron Luan 09h BRT - manager report');
-    await sendManagerReportNow('daily', 1);
+  // === TEAM MEETING: Monday 07:00 BRT = 10:00 UTC ===
+  cron.schedule('0 10 * * 1', async () => {
+    console.log('[ReportScheduler] Cron Monday 07h BRT - team meeting');
+    await sendTeamMeetingNow('weekly', 7);
   });
 
-  // Luan weekly strategic report: Monday 08:00 BRT = 11:00 UTC
-  cron.schedule('0 11 * * 1', async () => {
-    console.log('[ReportScheduler] Cron Luan Monday 08h BRT - weekly manager report');
-    await sendManagerReportNow('weekly', 7);
-  });
+  console.log('[ReportScheduler] Scheduled team meeting: Monday 07:00 BRT');
 
-  console.log('[ReportScheduler] Scheduled Luan manager reports: daily 09:00 BRT + weekly Monday 08:00 BRT');
+  // OLD Luan solo reports — DISABLED (replaced by team meeting)
+  // cron.schedule('0 12 * * 1-6', ...) — daily 09:00 BRT
+  // cron.schedule('0 11 * * 1', ...) — weekly Monday 08:00 BRT
 
 }
 
