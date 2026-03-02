@@ -45,6 +45,7 @@ import { startUnansweredMonitor, checkAndFixUnanswered } from './monitoring/unan
 import { startFunnelWatcher } from './manager/funnel-watcher.js';
 import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.js';
 import { startInstagramScheduler } from './social/instagram.js';
+import { runCeoCycle } from './ceo/musk.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -227,6 +228,22 @@ app.post('/api/admin/team-meeting', async (req, res) => {
     });
   } catch (err) {
     console.error('[Admin] Team meeting error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Musk CEO directive - manual trigger
+app.post('/api/admin/ceo-report', async (req, res) => {
+  try {
+    const days = parseInt(req.body.days || '7');
+    const result = await runCeoCycle({ days, postToOps: true });
+    res.json({
+      success: true,
+      directive: result.directive,
+      message: 'Diretiva CEO emitida',
+    });
+  } catch (err) {
+    console.error('[Admin] CEO report error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
