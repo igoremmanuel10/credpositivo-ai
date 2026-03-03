@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import { config } from '../config.js';
 
-const redis = new Redis(config.redis.url);
+export const redis = new Redis(config.redis.url);
 
 const CACHE_TTL = 3600; // 1 hour
 const DAY_TTL = 86400;  // 24 hours

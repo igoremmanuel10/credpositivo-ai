@@ -17,7 +17,7 @@ import { db } from '../db/client.js';
 import { isBusinessHours } from '../config.js';
 import { handleVoiceCallTrigger } from '../voice/call-handler.js';
 import { handleFollowup } from './manager.js';
-import { cache } from '../db/redis.js';
+import { cache, redis } from '../db/redis.js';
 
 const DETECTION_INTERVAL_MINUTES = 30;
 
@@ -88,10 +88,10 @@ async function detectAbandonedOrders() {
 
       // Check Redis to avoid duplicate
       const detectedKey = `event_detected:order_abandoned:${phone}`;
-      const alreadyDetected = await cache.client.get(detectedKey);
+      const alreadyDetected = await redis.get(detectedKey);
       if (alreadyDetected) continue;
 
-      await cache.client.set(detectedKey, '1', 'EX', 48 * 3600);
+      await redis.set(detectedKey, '1', 'EX', 48 * 3600);
 
       const hoursAgo = ((Date.now() - new Date(order.created_at).getTime()) / (1000 * 60 * 60)).toFixed(1);
 
@@ -189,10 +189,10 @@ async function detectAbandonedConversations() {
       if (messages.length === 0 || messages[0].role !== 'agent') continue;
 
       const detectedKey = `event_detected:conv_abandoned:${conv.phone}`;
-      const alreadyDetected = await cache.client.get(detectedKey);
+      const alreadyDetected = await redis.get(detectedKey);
       if (alreadyDetected) continue;
 
-      await cache.client.set(detectedKey, '1', 'EX', 48 * 3600);
+      await redis.set(detectedKey, '1', 'EX', 48 * 3600);
 
       const hoursAgo = ((Date.now() - new Date(conv.last_message_at).getTime()) / (1000 * 60 * 60)).toFixed(1);
       console.log(`[EventDetector] Abandoned conversation: ${conv.phone} (${conv.name || '?'}, ${conv.recommended_product || '?'}, ${hoursAgo}h ago, no order created)`);
