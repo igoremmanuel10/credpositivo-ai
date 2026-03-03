@@ -70,11 +70,12 @@ export async function getAgentResponse(conversationState, messageHistory, userMe
 }
 
 /**
- * Call Claude Haiku with automatic retry on rate limit (429).
- * Retries up to 3 times with exponential backoff.
+ * Call Claude Haiku with automatic retry on rate limit (429) / overloaded (529).
+ * Retries up to 4 times with aggressive backoff for 529.
+ * Falls back to GPT-4o-mini if all Claude retries fail.
  */
 async function callClaude(systemPrompt, messages, attempt = 1) {
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 4;
 
   try {
     const response = await anthropic.messages.create({
@@ -108,18 +109,71 @@ async function callClaude(systemPrompt, messages, attempt = 1) {
   } catch (err) {
     // Retry on rate limit (429) or overloaded (529)
     if ((err.status === 429 || err.status === 529) && attempt <= MAX_RETRIES) {
+      // Aggressive backoff for 529: 3s, 8s, 20s, 45s
       const retryAfter = err.headers?.['retry-after'];
-      const backoffMs = retryAfter ? parseInt(retryAfter) * 1000 : (1000 * Math.pow(2, attempt - 1));
-      const waitMs = Math.min(backoffMs + Math.random() * 500, 15000);
+      const backoffMs = retryAfter
+        ? parseInt(retryAfter) * 1000
+        : err.status === 529
+          ? [3000, 8000, 20000, 45000][attempt - 1] || 45000
+          : 1000 * Math.pow(2, attempt - 1);
+      const waitMs = Math.min(backoffMs + Math.random() * 1000, 60000);
 
       console.warn(`[Claude] Rate limit/overloaded (${err.status}, attempt ${attempt}/${MAX_RETRIES}). Retrying in ${Math.round(waitMs)}ms...`);
       await new Promise(r => setTimeout(r, waitMs));
       return callClaude(systemPrompt, messages, attempt + 1);
     }
 
+    // All Claude retries exhausted — try GPT-4o-mini as fallback
+    if (err.status === 429 || err.status === 529) {
+      console.warn(`[Claude] All ${MAX_RETRIES} retries failed (${err.status}). Falling back to GPT-4o-mini...`);
+      try {
+        return await callGptFallback(systemPrompt, messages);
+      } catch (gptErr) {
+        console.error(`[GPT Fallback] Also failed: ${gptErr.message}`);
+        captureError(err, { module: 'claude', action: 'callClaude', extra: { status: err.status, attempt, fallback: 'gpt-failed' } });
+        throw err;
+      }
+    }
+
     captureError(err, { module: 'claude', action: 'callClaude', extra: { status: err.status, attempt } });
     throw err;
   }
+}
+
+/**
+ * GPT-4o-mini fallback when Claude is overloaded.
+ * Uses the same system prompt and messages format.
+ */
+async function callGptFallback(systemPrompt, messages) {
+  const gptMessages = [
+    { role: 'system', content: systemPrompt },
+    ...messages,
+  ];
+
+  const response = await openaiClient.chat.completions.create({
+    model: 'gpt-4o-mini',
+    max_tokens: 500,
+    temperature: 0.7,
+    messages: gptMessages,
+  });
+
+  const text = response.choices[0]?.message?.content || '';
+  const metadata = extractMetadata(text);
+  console.log(`[AI] GPT Fallback | Metadata: ${JSON.stringify(metadata.data)}`);
+  console.log(`[AI] Model: gpt-4o-mini (fallback) | Tokens: ${response.usage?.prompt_tokens || 0}in/${response.usage?.completion_tokens || 0}out`);
+
+  trackApiCost({
+    provider: 'openai',
+    model: 'gpt-4o-mini',
+    inputTokens: response.usage?.prompt_tokens || 0,
+    outputTokens: response.usage?.completion_tokens || 0,
+    endpoint: 'chat-fallback',
+  }).catch(() => {});
+
+  return {
+    text: metadata.cleanText,
+    metadata: metadata.data,
+  };
 }
 
 /**

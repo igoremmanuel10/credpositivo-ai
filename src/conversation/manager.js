@@ -327,7 +327,22 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     }
 
     // 5. Get AI response (use persona from conversation or detected from bot token)
-    const { text: responseText, metadata } = await getAgentResponse(state, messages, combinedText, activePersona, abOverrides);
+    let responseText, metadata;
+    try {
+      ({ text: responseText, metadata } = await getAgentResponse(state, messages, combinedText, activePersona, abOverrides));
+    } catch (aiErr) {
+      console.error(`[Manager] AI completely failed for ${phone} (${aiErr.status || aiErr.message}). Sending emergency response.`);
+      // Emergency static response — lead NEVER goes unanswered
+      const emergencyResponses = {
+        0: 'Opa, tudo bem? Aqui e o Augusto da CredPositivo. Me conta, o que voce ta buscando resolver?',
+        1: 'Desculpa a demora! Me conta mais sobre a sua situacao pra eu te ajudar melhor.',
+        2: 'Opa, desculpa a demora! Estava verificando aqui. Me conta, o que mais te preocupa na sua situacao?',
+        3: 'Desculpa a demora! Estou aqui pra te ajudar. Ficou alguma duvida sobre o diagnostico?',
+      };
+      responseText = emergencyResponses[conversation.phase] || emergencyResponses[0];
+      metadata = { phase: conversation.phase };
+      captureError(aiErr, { module: 'manager', action: 'emergency_response', extra: { phone, phase: conversation.phase } });
+    }
 
     // DEBUG: Phase transition and metadata tracking
     console.log(`[Manager] Phase transition: ${conversation.phase} → ${metadata.phase ?? 'no change'} | metadata keys: ${Object.keys(metadata).join(',')}`);
