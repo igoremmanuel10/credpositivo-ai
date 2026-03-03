@@ -123,8 +123,8 @@ const NORMALIZED_BANNED = [
   'credito garantido',
   'serasa vai',
   'spc vai',
-  'rating bancario',
-  'perfil bancario',
+  // 'rating bancario' — REMOVIDO: termo essencial na Fase 2 (educação sobre rating)
+  // 'perfil bancario' — REMOVIDO: bot precisa falar sobre perfil bancário
 ];
 
 /**
