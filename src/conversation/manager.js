@@ -431,8 +431,30 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // 7.95 Pre-send validation: sanitize response
     const validatedText = validateAgentResponse(fixedResponseText, phone);
 
-    // 8. Send response via WhatsApp (with correct bot token for multi-number support)
-    const messageIds = await sendMessages(remoteJid, validatedText, botTokenForReply);
+    // 8. Human-like delay: wait 8-15s before sending (avoids robotic feel)
+    const minDelay = 8000;
+    const maxDelay = 15000;
+    const humanDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    console.log(`[Manager] Human delay: ${(humanDelay / 1000).toFixed(1)}s before sending to ${phone}`);
+    await new Promise(r => setTimeout(r, humanDelay));
+
+    // 8.1 Send response via WhatsApp — split by \n\n into separate bubbles
+    const messageParts = validatedText.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
+    let messageIds = [];
+    if (messageParts.length > 1) {
+      console.log(`[Manager] Splitting response into ${messageParts.length} bubbles for ${phone}`);
+      for (let i = 0; i < messageParts.length; i++) {
+        const ids = await sendMessages(remoteJid, messageParts[i], botTokenForReply);
+        messageIds.push(...ids);
+        if (i < messageParts.length - 1) {
+          // 2-4s typing delay between bubbles
+          const bubbleDelay = 2000 + Math.floor(Math.random() * 2000);
+          await new Promise(r => setTimeout(r, bubbleDelay));
+        }
+      }
+    } else {
+      messageIds = await sendMessages(remoteJid, validatedText, botTokenForReply);
+    }
 
     // 8.5 Send diagnostico video AFTER text when entering phase 3
     if (newPhase >= 3 && conversation.phase < 3 && config.media.enabled) {
@@ -472,7 +494,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
           const lastMsg = recentMsgs[recentMsgs.length - 1];
           if (lastMsg && lastMsg.role === 'agent') {
             // Lead hasn't responded, send nudge
-            const nudgeText = 'Conseguiu ver? ð';
+            const nudgeText = 'Conseguiu ver?';
             await sendMessages(remoteJid, nudgeText, botTokenForReply);
             await db.addMessage(conversation.id, 'agent', nudgeText, newPhase);
             await cache.incrementHourlyMessageCount(phone);

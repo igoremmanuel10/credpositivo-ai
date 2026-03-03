@@ -84,18 +84,14 @@ async function checkQuepasa() {
 async function checkChatwoot() {
   const start = Date.now();
   try {
-    const url = `${config.chatwoot.apiUrl}/auth/sign_in`;
-    // Just check if the server responds (any status)
-    const resp = await fetch(url, {
-      method: 'HEAD',
-      signal: AbortSignal.timeout(10000),
-    }).catch(() => fetch(`${config.chatwoot.apiUrl}/api/v1/profile`, {
+    // Use authenticated profile endpoint — reliable check
+    const resp = await fetch(`${config.chatwoot.apiUrl}/api/v1/profile`, {
       headers: { api_access_token: config.chatwoot.apiToken },
       signal: AbortSignal.timeout(10000),
-    }));
+    });
     return {
       service: 'chatwoot',
-      status: resp.ok || resp.status < 500 ? 'ok' : 'degraded',
+      status: resp.ok ? 'ok' : resp.status < 500 ? 'ok' : 'degraded',
       responseTimeMs: Date.now() - start,
     };
   } catch (err) {

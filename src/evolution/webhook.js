@@ -19,36 +19,74 @@ import { handleAdmGroupMessage, ADM_GROUP_JID } from '../agenda/manager.js';
 import { db } from '../db/client.js';
 
 export const webhookRouter = Router();
+// === SMART CIRCUIT BREAKER ===
+// Protects against reconnection floods while allowing legitimate ad leads through.
+// 4 layers: system filter, sync filter, flood detection, lead filter.
+const circuitBreaker = {
+  windowMs: 30 * 1000,       // 30s sliding window
+  maxNoAdsInWindow: 10,      // max 10 non-ads messages per window
+  noAdsTimestamps: [],       // timestamps of non-ads messages
+  paused: false,
+  pauseUntil: 0,
+  pauseDurationMs: 120 * 1000, // 2 min pause if triggered
+
+  // Returns true if message should be BLOCKED
+  check(hasAds) {
+    const now = Date.now();
+
+    // If paused, block non-ads messages
+    if (this.paused && now < this.pauseUntil) {
+      if (hasAds) return false; // Ads leads always pass
+      console.log("[CircuitBreaker] PAUSED - blocking non-ads message");
+      return true;
+    }
+    if (this.paused && now >= this.pauseUntil) {
+      this.paused = false;
+      console.log("[CircuitBreaker] Pause expired, resuming");
+    }
+
+    // Ads messages always pass, no counting
+    if (hasAds) return false;
+
+    // Slide window: remove old timestamps
+    this.noAdsTimestamps = this.noAdsTimestamps.filter(t => (now - t) < this.windowMs);
+    this.noAdsTimestamps.push(now);
+
+    // Trip breaker if too many non-ads messages
+    if (this.noAdsTimestamps.length > this.maxNoAdsInWindow) {
+      this.paused = true;
+      this.pauseUntil = now + this.pauseDurationMs;
+      console.error("[CircuitBreaker] TRIPPED! " + this.noAdsTimestamps.length + " non-ads msgs in 30s. Pausing 2min.");
+      return true;
+    }
+    return false;
+  }
+};
+
+function isSyncMessage(msg, text, pushName) {
+  if (msg.type === "system") return true;
+  // Text is exactly the pushName or chat title = contact sync, not a real message
+  if (text && pushName && text.trim() === pushName.trim()) return true;
+  const chatTitle = msg.chat?.title || "";
+  if (text && chatTitle && text.trim() === chatTitle.trim()) return true;
+  return false;
+}
+
 
 /**
- * Check if a phone number belongs to an existing lead in the database.
+ * Check if a phone number is in the blocklist (personal contacts).
+ * Returns true if the number is BLOCKED.
  */
-async function isExistingLead(phone) {
+async function isBlockedPhone(phone) {
   try {
     const { rows } = await db.query(
-      'SELECT id FROM conversations WHERE phone = $1 LIMIT 1',
+      'SELECT phone FROM phone_blocklist WHERE phone = $1 LIMIT 1',
       [phone]
     );
     return rows.length > 0;
   } catch {
     return false;
   }
-}
-
-/**
- * Check if an incoming message is from a legitimate lead (not a personal contact).
- * Returns true if the message should be processed, false if it should be ignored.
- */
-async function isLeadMessage(msg, phone) {
-  // 1. Has ads attribution (came from Instagram/Facebook ad) → always a lead
-  if (msg.ads && msg.ads.id) return true;
-
-  // 2. Already exists in our DB → existing lead
-  if (await isExistingLead(phone)) return true;
-
-  // 3. New contact without ads data → likely a personal contact, ignore
-  console.log(`[LeadFilter] Ignoring message from ${phone} (no ads data, not in DB — likely personal contact)`);
-  return false;
 }
 
 /**
@@ -81,10 +119,10 @@ webhookRouter.post('/webhook/quepasa', async (req, res) => {
     // WORKAROUND: Quepasa has a bug where incoming audio from users is marked as fromme:true.
     // For audio messages, we skip the fromme check and use trackId to filter our own TTS audio.
     const isFromMe = msg.fromMe || msg.from_me || msg.fromme;
-    if (isFromMe && msgType !== 'audio') return;
+    if (isFromMe && msgType !== 'audio' && msgType !== 'ptt') return;
 
     // For audio: skip if it's our own TTS audio (has trackId or filename starting with audio_)
-    if (isFromMe && msgType === 'audio') {
+    if (isFromMe && (msgType === 'audio' || msgType === 'ptt')) {
       const trackId = msg.trackId || msg.track_id || '';
       const fileName = msg.attachment?.filename || '';
       if (trackId.startsWith('agent-') || fileName.startsWith('audio_')) {
@@ -123,7 +161,7 @@ webhookRouter.post('/webhook/quepasa', async (req, res) => {
     let text = msg.text || msg.body || msg.message?.text || msg.message?.conversation || '';
 
     // --- AUDIO: transcribe via Whisper ---
-    if (!text && msgType === 'audio' && msg.id) {
+    if (!text && (msgType === 'audio' || msgType === 'ptt') && msg.id) {
       try {
         const audioWid = msg.wid || '';
         const audioToken = getTokenForWid(audioWid);
@@ -205,8 +243,34 @@ webhookRouter.post('/webhook/quepasa', async (req, res) => {
 
     console.log(`[Quepasa] Message from ${phone} (${pushName}) via wid ${wid ? wid.substring(0, 15) : 'unknown'}: ${text.substring(0, 100)}`);
 
-    // LEAD FILTER: Only process messages from real leads (ads or existing DB record)
-    if (!(await isLeadMessage(msg, phone))) return;
+    // LAYER 1: System messages (logout, reconnect, etc.) — never process
+    if (msg.type === 'system') {
+      console.log('[Filter:L1] System message ignored: ' + (msg.text || '').substring(0, 80));
+      return;
+    }
+
+    // LAYER 2: Sync messages (text = contact name) — never process
+    if (isSyncMessage(msg, text, pushName)) {
+      console.log('[Filter:L2] Sync message ignored from ' + phone);
+      return;
+    }
+
+    // LAYER 3: Circuit breaker — ads leads always pass, non-ads rate limited
+    const hasAds = !!(msg.ads && msg.ads.id);
+    if (circuitBreaker.check(hasAds)) {
+      console.log('[Filter:L3] Circuit breaker blocked ' + phone);
+      return;
+    }
+
+    // LAYER 4: Blocklist — block personal contacts, allow everyone else
+    if (await isBlockedPhone(phone)) {
+      console.log('[Filter:L4] Blocked personal contact: ' + phone);
+      return;
+    }
+
+    // Track if this was an audio message (for TTS response)
+    const isAudioMessage = msgType === 'audio' || msgType === 'ptt';
+    const isImageMessage = msgType === 'image' || msgType === 'video';
 
     // 1. Forward to Chatwoot (route to correct inbox based on which bot number received it)
     const botPhone = wid ? wid.split(':')[0] : '';
@@ -219,7 +283,7 @@ webhookRouter.post('/webhook/quepasa', async (req, res) => {
         const convId = conversation.id;
         if (convId) {
           let label = text;
-          if (msgType === 'audio') label = `[Audio] ${text}`;
+          if (msgType === 'audio' || msgType === 'ptt') label = `[Audio] ${text}`;
           else if (msgType === 'image') label = `[Foto] ${text}`;
           else if (msgType === 'video') label = `[Vídeo] ${text}`;
           await chatwootSendMessage(convId, label, 'incoming');
@@ -233,7 +297,7 @@ webhookRouter.post('/webhook/quepasa', async (req, res) => {
     }
 
     // 2. Process with AI agent (pass botTokenForReply + botPhone for multi-number/persona support)
-    handleIncomingMessage(phone, chatId, text, pushName, botTokenForReply, botPhone).catch(err => {
+    handleIncomingMessage(phone, chatId, text, pushName, botTokenForReply, botPhone, isAudioMessage, isImageMessage).catch(err => {
       console.error(`[Quepasa Webhook] Error processing message from ${phone}:`, err);
     });
 

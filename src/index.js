@@ -46,6 +46,7 @@ import { startFunnelWatcher } from './manager/funnel-watcher.js';
 import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.js';
 import { startInstagramScheduler } from './social/instagram.js';
 import { runCeoCycle } from './ceo/musk.js';
+import { startIgorScheduler, getIgorStatus, runIgorCycleNow } from './orchestrator/igor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -248,6 +249,22 @@ app.post('/api/admin/ceo-report', async (req, res) => {
   }
 });
 
+// Igor Orchestrator - status
+app.get('/api/admin/igor-status', (req, res) => {
+  res.json(getIgorStatus());
+});
+
+// Igor Orchestrator - manual cycle trigger
+app.post('/api/admin/igor-cycle', async (req, res) => {
+  try {
+    await runIgorCycleNow();
+    res.json({ success: true, ...getIgorStatus() });
+  } catch (err) {
+    console.error('[Admin] Igor cycle error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/admin/check-unanswered', async (req, res) => {
   try {
     const result = await checkAndFixUnanswered();
@@ -344,6 +361,7 @@ app.use((err, req, res, next) => {
     startFunnelWatcher();
     startAdsScheduler();
     startInstagramScheduler();
+    startIgorScheduler();
 
     // Embedding job: process new conversations every 30 minutes, refresh stale daily
     setInterval(() => {

@@ -32,6 +32,7 @@ import { db } from '../db/client.js';
 import { sendText, getTokenForWid, getBotInfo } from '../quepasa/client.js';
 import { resetCircuitBreaker, generateEmbedding } from '../ai/embeddings.js';
 import { config, isBusinessHours } from '../config.js';
+import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

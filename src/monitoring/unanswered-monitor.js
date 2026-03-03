@@ -21,7 +21,7 @@ const UNANSWERED_THRESHOLD_MINUTES = 10; // consider unanswered after 10 min
 const MAX_RETRIES = 2; // max retry attempts per conversation
 const RETRY_COOLDOWN_HOURS = 4; // don't retry same conversation within 4h
 const MAX_FIXES_PER_RUN = 5; // max conversations to fix per run
-const MIN_MSG_LENGTH = 3; // skip messages shorter than this (emoji, single char)
+const MIN_MSG_LENGTH = 1; // allow "Ok", "Sim", "Não" — only skip pure emoji
 
 // Track retries in memory (resets on restart — acceptable)
 const retryTracker = new Map(); // phone -> { count, lastAttempt }

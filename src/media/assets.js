@@ -155,8 +155,8 @@ function loadFollowupAudio(persona) {
  * Returns { base64, fileName } or null if not available.
  */
 export function getFollowupAudio(persona) {
-  if (!config.media.enabled) return null;
-  return loadFollowupAudio(persona);
+  // Pre-recorded follow-up audios removed — TTS handles this now
+  return null;
 }
 
 // ============================================================

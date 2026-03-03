@@ -147,9 +147,18 @@ export function startReportScheduler() {
 
   console.log('[ReportScheduler] Scheduled team meeting: Monday 07:00 BRT');
 
-  // OLD Luan solo reports — DISABLED (replaced by team meeting)
-  // cron.schedule('0 12 * * 1-6', ...) — daily 09:00 BRT
-  // cron.schedule('0 11 * * 1', ...) — weekly Monday 08:00 BRT
+  // Luan solo reports — daily 09:00 BRT (Mon-Sat) + weekly Monday 08:00 BRT
+  cron.schedule('0 12 * * 1-6', async () => {
+    console.log('[ReportScheduler] Cron 09h BRT - Luan daily report');
+    await sendManagerReportNow('daily', 1);
+  });
+
+  cron.schedule('0 11 * * 1', async () => {
+    console.log('[ReportScheduler] Cron Monday 08h BRT - Luan weekly report');
+    await sendManagerReportNow('weekly', 7);
+  });
+
+  console.log('[ReportScheduler] Luan reports: daily 09:00 BRT (Mon-Sat) + weekly Mon 08:00 BRT');
 
 }
 
