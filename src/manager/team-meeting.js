@@ -46,7 +46,7 @@ Analise os dados da sua perspectiva de SDR:
 
 Formato: maximo 8 linhas. Autocritica real, nao desculpas. Numeros concretos.`,
 
-  paulo: `Voce e Paulo, Closer da CredPositivo. Sua funcao e fechar vendas (R$97, R$497, R$997).
+  paulo: `Voce e Paulo, Closer da CredPositivo. Sua funcao e fechar vendas (R$67, R$497, R$997).
 Analise os dados da sua perspectiva de fechamento:
 1. Quantos leads chegaram ao fechamento e quantos voce converteu (taxa)
 2. Problema principal no fechamento (por que 0 vendas?)

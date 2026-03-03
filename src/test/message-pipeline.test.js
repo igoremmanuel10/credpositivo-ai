@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 // Import the sanitization function directly
 // We mock config since output-filter imports it
-const originalConfig = { site: { url: 'https://credpositivo.com/cadastro' } };
+const originalConfig = { site: { url: 'https://credpositivo.com/diagnostico' } };
 
 // Dynamic import to handle ESM + config dependency
 let sanitizeForWhatsApp, fixSiteLinks;
@@ -99,9 +99,9 @@ describe('sanitizeForWhatsApp', () => {
   });
 
   it('preserves site links', () => {
-    const input = 'Acessa aqui: https://credpositivo.com/cadastro';
+    const input = 'Acessa aqui: https://credpositivo.com/diagnostico';
     const result = sanitizeForWhatsApp(input);
-    assert.ok(result.includes('credpositivo.com/cadastro'));
+    assert.ok(result.includes('credpositivo.com/diagnostico'));
   });
 
   it('handles combined dirty input', () => {

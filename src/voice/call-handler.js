@@ -358,7 +358,7 @@ function buildCallOverrides(eventType, leadName, produto, eventData) {
         messages: [
           {
             role: 'system',
-            content: `CONTEXTO DESTA CHAMADA: O lead ${leadName} fez o Diagnostico de Credito (R$97) e o resultado mostrou situacao complexa${eventData.summary ? ': ' + eventData.summary : ''}. Explique o resultado de forma simples e acessivel. Se fizer sentido, mencione que o servico Limpa Nome (R$397) pode ajudar a resolver as pendencias encontradas. NAO force venda. Seja genuinamente util.`,
+            content: `CONTEXTO DESTA CHAMADA: O lead ${leadName} fez o Diagnostico de Credito (R$67) e o resultado mostrou situacao complexa${eventData.summary ? ': ' + eventData.summary : ''}. Explique o resultado de forma simples e acessivel. Se fizer sentido, mencione que o servico Limpa Nome (R$397) pode ajudar a resolver as pendencias encontradas. NAO force venda. Seja genuinamente util.`,
           },
         ],
       };
@@ -373,7 +373,7 @@ function buildCallOverrides(eventType, leadName, produto, eventData) {
         messages: [
           {
             role: 'system',
-            content: `CONTEXTO DESTA CHAMADA: Follow-up de lead quente (fase ${eventData?.phase || 3}). O lead ${leadName} ja conversou no WhatsApp e mostrou interesse${produto ? ' em ' + formatProductName(produto) : ''}. Esta e uma ligacao de follow-up (tentativa ${eventData?.attempt || 1}). Seu objetivo e retomar o contato de forma amigavel, entender o que faltou pra ele decidir, e responder duvidas. NAO pressione. Se nao tiver interesse, agradeca e encerre gentilmente. Se tiver duvidas sobre preco: Diagnostico R$97, Limpa Nome R$397, Rating R$997.`,
+            content: `CONTEXTO DESTA CHAMADA: Follow-up de lead quente (fase ${eventData?.phase || 3}). O lead ${leadName} ja conversou no WhatsApp e mostrou interesse${produto ? ' em ' + formatProductName(produto) : ''}. Esta e uma ligacao de follow-up (tentativa ${eventData?.attempt || 1}). Seu objetivo e retomar o contato de forma amigavel, entender o que faltou pra ele decidir, e responder duvidas. NAO pressione. Se nao tiver interesse, agradeca e encerre gentilmente. Se tiver duvidas sobre preco: Diagnostico R$67, Limpa Nome R$397, Rating R$997.`,
           },
         ],
       };

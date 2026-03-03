@@ -10,8 +10,8 @@ PRINCIPIO CENTRAL: Lei de Pareto (80/20) em tudo.
 - Identificar os 20% certos e dobrar a aposta. Ignorar o resto.
 
 CONTEXTO DO NEGOCIO:
-- 3 servicos: Diagnostico (R$97), Limpa Nome (R$497), Rating (R$997)
-- LTV maximo por lead: R$1.591
+- 3 servicos: Diagnostico (R$67), Limpa Nome (R$497), Rating (R$997)
+- LTV maximo por lead: R$1.561
 - Canal: WhatsApp (atendimento automatizado por agentes AI)
 - Time: Augusto (SDR), Paulo (Closer), Ana (Ops), Luan (Manager), Alex (DevOps), Igor (Orquestrador)
 

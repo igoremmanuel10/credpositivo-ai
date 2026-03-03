@@ -20,7 +20,7 @@ import { generateManagerReport } from '../manager/luan.js';
 import { sendAlexReportNow } from '../devops/alex.js';
 
 // === PAYMENT LINK: Generate personalized MP checkout link ===
-const PRODUCT_PRICES = { diagnostico: 97, limpa_nome: 497, rating: 997 };
+const PRODUCT_PRICES = { diagnostico: 67, limpa_nome: 497, rating: 997 };
 
 async function generatePaymentLink(conversation, metadata) {
   try {
@@ -420,15 +420,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     const cleanedResponseText = responseText.replace(/\[AUDIO\]/g, '').trim();
 
     // 7.9 Fix any incorrect/shortened site links before sending
-    // 7.9 Fix links + generate payment link if applicable
     let fixedResponseText = sanitizeForWhatsApp(fixSiteLinks(cleanedResponseText), phone);
-    if (metadata.should_send_link && newPhase >= 3) {
-      const paymentUrl = await generatePaymentLink(conversation, metadata);
-      if (paymentUrl) {
-        fixedResponseText = replaceSiteUrlWithPaymentLink(fixedResponseText, paymentUrl, config.site.url);
-        console.log(`[Manager] Replaced site URL with MP payment link for ${phone}`);
-      }
-    }
 
     // 8. Human-like delay: wait 8-15s before sending (avoids robotic feel)
     const minDelay = 8000;

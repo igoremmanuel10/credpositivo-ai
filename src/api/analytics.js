@@ -254,7 +254,7 @@ analyticsRouter.get('/api/admin/analytics/conversations', async (req, res) => {
 analyticsRouter.get('/api/admin/analytics/pipeline', async (req, res) => {
   try {
     const days = parseInt(req.query.days || '30');
-    const PRODUCT_VALUES = { diagnostico: 97, limpa_nome: 497, rating: 997 };
+    const PRODUCT_VALUES = { diagnostico: 67, limpa_nome: 497, rating: 997 };
 
     // Aligned with conversation phases 0-4 + follow-up + opted-out
     const STAGE_DEFS = [

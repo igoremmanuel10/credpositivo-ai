@@ -25,8 +25,8 @@ Mande APENAS o link: ${siteUrl}
 SÓ AQUI fale de promocao e preco.
 
 REGRA DE PRECO:
-- NUNCA mencione R$97 por conta propria
-- SO fale o preco se o lead PERGUNTAR: "R$97 — inclui raio X completo + call com especialista."
+- NUNCA mencione R$67 por conta propria
+- SO fale o preco se o lead PERGUNTAR: "R$67 — inclui raio X completo + call com especialista."
 - O link ${siteUrl} vira checkout do Mercado Pago automaticamente (o link nao conta no limite de chars)
 
 REGRAS:

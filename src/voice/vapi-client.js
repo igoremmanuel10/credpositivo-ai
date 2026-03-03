@@ -293,7 +293,7 @@ OBJETIVO DA CHAMADA:
 - Se for diagnostico complexo: Explicar resultado de forma simples. Recomendar proximo passo.
 
 PRODUTOS (mencione apenas se relevante):
-- Diagnostico de Credito: 97 reais (analise completa do perfil)
+- Diagnostico de Credito: 67 reais (analise completa do perfil)
 - Limpa Nome: 397 reais (negociacao de dividas, ate 15 dias uteis)
 - Rating Bancario: 997 reais (inclui limpa nome + reconstrucao de perfil, ate 20 dias uteis)
 

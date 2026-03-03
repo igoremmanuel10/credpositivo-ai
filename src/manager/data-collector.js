@@ -1,6 +1,6 @@
 import { db } from '../db/client.js';
 
-const PRODUCT_VALUES = { diagnostico: 97, limpa_nome: 497, rating: 997 };
+const PRODUCT_VALUES = { diagnostico: 67, limpa_nome: 497, rating: 997 };
 
 /**
  * Get pipeline summary: leads by phase with counts and values.

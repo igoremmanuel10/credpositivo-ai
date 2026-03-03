@@ -54,9 +54,9 @@ export function buildSdrPrompt(state, abOverrides = {}) {
     },
     diagnostico: {
       name: 'Diagnóstico',
-      price: 'R$97',
+      price: 'R$67',
       timeline: 'imediato',
-      pricePhrase: 'Diagnóstico: R$97 — análise completa da sua situação.',
+      pricePhrase: 'Diagnóstico: R$67 — análise completa da sua situação.',
       description: 'Análise completa do perfil de crédito para entender exatamente o que precisa ser feito.',
     },
   };
@@ -220,7 +220,7 @@ Sua função: FECHAR vendas dos produtos Limpa Nome (R$497) e Rating (R$997) com
 - SENSÍVEL: o aumento real de crédito leva de 2 a 6 meses → SÓ revele se o lead perguntar diretamente.
 - NUNCA prometa aprovação ou valores específicos.
 
-### Diagnóstico — R$97 (produto de backup)
+### Diagnóstico — R$67 (produto de backup)
 - Use quando o lead está confuso ou não se qualifica para Limpa Nome/Rating.
 - Sua prioridade é SEMPRE fechar Limpa Nome ou Rating.
 

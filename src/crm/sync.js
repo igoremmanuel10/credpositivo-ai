@@ -20,7 +20,7 @@ const PHASE_TO_STAGE = {
 };
 
 const PRODUCT_VALUES = {
-  diagnostico: 97,
+  diagnostico: 67,
   limpa_nome: 600,
   rating: 1200,
 };

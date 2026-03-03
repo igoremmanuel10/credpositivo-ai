@@ -51,7 +51,7 @@ export const config = {
   },
 
   site: {
-    url: process.env.SITE_URL || 'https://www.credpositivo.com/cadastro',
+    url: process.env.SITE_URL || 'https://www.credpositivo.com/diagnostico',
     whatsappNumber: process.env.WHATSAPP_NUMBER || '5571936180654',
     ebookUrl: process.env.EBOOK_URL || '',
   },
