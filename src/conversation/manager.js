@@ -906,8 +906,10 @@ function validateAgentResponse(text, phone) {
     violations.push(`emoji_forbidden:${forbidden.join(',')}`);
   }
 
-  // 2. Collapse \n\n into \n (anti-split safety net, in case client.js split is re-enabled)
-  cleaned = cleaned.replace(/\n{2,}/g, '\n');
+  // 2. Preserve \n\n for bubble splitting (manager line ~442 splits by \n\n)
+  // Previously collapsed \n\n into \n which DESTROYED bubble separation.
+  // Only collapse 3+ newlines into exactly 2 (preserves intentional splits).
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
   // 3. Truncate if too long (max 1000 chars for WhatsApp readability)
   if (cleaned.length > 1000) {
