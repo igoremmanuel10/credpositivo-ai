@@ -389,9 +389,10 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       }
     }
 
-    // 7.8 Phase 2 media: audio diagnostico + tutorial video + rating image
-    console.log('[Manager] Media check: should_send_product_audios=' + metadata.should_send_product_audios + ', should_send_prova_social=' + metadata.should_send_prova_social + ', media.enabled=' + config.media.enabled);
-    if (metadata.should_send_product_audios && config.media.enabled) {
+    // 7.8 Phase 2 media: audio diagnostico + tutorial video + rating image (send ONCE per conversation)
+    const productAudiosSent = conversation.user_profile?.product_audios_sent || false;
+    console.log('[Manager] Media check: should_send_product_audios=' + metadata.should_send_product_audios + ', already_sent=' + productAudiosSent + ', should_send_prova_social=' + metadata.should_send_prova_social + ', media.enabled=' + config.media.enabled);
+    if (metadata.should_send_product_audios && config.media.enabled && !productAudiosSent) {
       try {
         const audioDiag = getAudioDiagnostico();
         if (audioDiag) {
@@ -410,9 +411,16 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
           await sendMediaBase64(remoteJid, ratingImg.base64, '', ratingImg.fileName, botTokenForReply);
           console.log(`[Manager] Rating info image sent to ${phone}`);
         }
+        // Mark as sent to prevent duplicate sends
+        const updatedProfile = { ...(conversation.user_profile || {}), product_audios_sent: true };
+        await db.updateConversation(conversation.id, { user_profile: updatedProfile });
+        conversation.user_profile = updatedProfile;
+        console.log(`[Manager] Phase 2 media marked as sent for ${phone}`);
       } catch (err) {
         console.error(`[Manager] Failed to send Phase 2 media:`, err.message);
       }
+    } else if (metadata.should_send_product_audios && productAudiosSent) {
+      console.log(`[Manager] Phase 2 media already sent to ${phone}. Skipping duplicate.`);
     }
 
     // 7.85 Strip [AUDIO] tag from response text (legacy cleanup)
