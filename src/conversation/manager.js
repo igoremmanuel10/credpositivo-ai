@@ -404,43 +404,25 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       }
     }
 
-    // 7.8 Phase 2 media: audio diagnostico + tutorial video + rating image (send ONCE per conversation)
+    // 7.8 Phase 2 media: ONLY prova social (1 video of real client)
     const productAudiosSent = conversation.user_profile?.product_audios_sent || false;
     console.log('[Manager] Media check: should_send_product_audios=' + metadata.should_send_product_audios + ', already_sent=' + productAudiosSent + ', should_send_prova_social=' + metadata.should_send_prova_social + ', media.enabled=' + config.media.enabled);
     if (metadata.should_send_product_audios && config.media.enabled && !productAudiosSent) {
       try {
-        const audioDiag = getAudioDiagnostico();
-        if (audioDiag) {
-          await sendMediaBase64(remoteJid, audioDiag.base64, '', audioDiag.fileName, botTokenForReply, audioDiag.mimetype);
-          console.log(`[Manager] Audio diagnostico sent to ${phone}`);
-          await new Promise(r => setTimeout(r, 3000));
-        }
-        const tutorial = getTutorialVideo();
-        if (tutorial) {
-          await sendMediaBase64(remoteJid, tutorial.base64, '', tutorial.fileName, botTokenForReply, tutorial.mimetype);
-          console.log(`[Manager] Tutorial video sent to ${phone}`);
-          await new Promise(r => setTimeout(r, 3000));
-        }
-        const ratingImg = getRatingInfoImage();
-        if (ratingImg) {
-          await sendMediaBase64(remoteJid, ratingImg.base64, '', ratingImg.fileName, botTokenForReply, ratingImg.mimetype);
-          console.log(`[Manager] Rating info image sent to ${phone}`);
-          await new Promise(r => setTimeout(r, 3000));
-        }
-        // Send prova social AUTOMATICALLY with Phase 2 materials
+        // Send ONLY prova social — no audio/video/image barrage
         const provaSocialCount = conversation.user_profile?.prova_social_count || 0;
         if (provaSocialCount < 1) {
           const provaSocial = getProvaSocialNew(0);
           if (provaSocial) {
             await sendMediaBase64(remoteJid, provaSocial.base64, '', provaSocial.fileName, botTokenForReply, provaSocial.mimetype);
-            console.log(`[Manager] Prova social 1/3 sent with Phase 2 materials to ${phone}`);
+            console.log(`[Manager] Prova social 1/3 sent to ${phone}`);
           }
         }
-        // Mark as sent to prevent duplicate sends
+        // Mark as sent
         const updatedProfile = { ...(conversation.user_profile || {}), product_audios_sent: true, prova_social_count: Math.max(provaSocialCount, 1) };
         await db.updateConversation(conversation.id, { user_profile: updatedProfile });
         conversation.user_profile = updatedProfile;
-        console.log(`[Manager] Phase 2 media + prova social marked as sent for ${phone}`);
+        console.log(`[Manager] Phase 2 prova social marked as sent for ${phone}`);
       } catch (err) {
         console.error(`[Manager] Failed to send Phase 2 media:`, err.message);
       }
