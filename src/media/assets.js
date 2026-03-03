@@ -28,7 +28,7 @@ function loadFile(key, fileName, type, mimetype) {
 // ============================================================
 export function getAudioApresentacao() {
   if (!config.media.enabled) return null;
-  return loadFile('audio_apresentacao', 'audio_apresentacao.ogg', 'audio', 'audio/ogg');
+  return loadFile('audio_apresentacao', 'audio_apresentacao.mp3', 'audio', 'audio/mpeg');
 }
 
 // ============================================================
@@ -36,7 +36,7 @@ export function getAudioApresentacao() {
 // ============================================================
 export function getAudioDiagnostico() {
   if (!config.media.enabled) return null;
-  return loadFile('audio_diagnostico', 'audio_diagnostico.ogg', 'audio', 'audio/ogg');
+  return loadFile('audio_diagnostico', 'audio_diagnostico.mp3', 'audio', 'audio/mpeg');
 }
 
 // ============================================================
@@ -44,7 +44,7 @@ export function getAudioDiagnostico() {
 // ============================================================
 export function getTutorialVideo() {
   if (!config.media.enabled) return null;
-  return loadFile('tutorial_na_pratica', 'tutorial_na_pratica.mov', 'video', 'video/quicktime');
+  return loadFile('tutorial_na_pratica', 'tutorial_na_pratica.mp4', 'video', 'video/mp4');
 }
 
 // ============================================================

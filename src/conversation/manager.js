@@ -237,7 +237,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
         try {
           const welcomeAudio = getAudioApresentacao();
           if (welcomeAudio) {
-            await sendMediaBase64(remoteJid, welcomeAudio.base64, '', welcomeAudio.fileName, botTokenForReply);
+            await sendMediaBase64(remoteJid, welcomeAudio.base64, '', welcomeAudio.fileName, botTokenForReply, welcomeAudio.mimetype);
             console.log(`[Manager] Welcome audio sent to ${phone} (new conversation)`);
             await new Promise(r => setTimeout(r, 15000)); // 15s delay for lead to listen
           }
@@ -396,19 +396,19 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       try {
         const audioDiag = getAudioDiagnostico();
         if (audioDiag) {
-          await sendMediaBase64(remoteJid, audioDiag.base64, '', audioDiag.fileName, botTokenForReply);
+          await sendMediaBase64(remoteJid, audioDiag.base64, '', audioDiag.fileName, botTokenForReply, audioDiag.mimetype);
           console.log(`[Manager] Audio diagnostico sent to ${phone}`);
           await new Promise(r => setTimeout(r, 3000));
         }
         const tutorial = getTutorialVideo();
         if (tutorial) {
-          await sendMediaBase64(remoteJid, tutorial.base64, '', tutorial.fileName, botTokenForReply);
+          await sendMediaBase64(remoteJid, tutorial.base64, '', tutorial.fileName, botTokenForReply, tutorial.mimetype);
           console.log(`[Manager] Tutorial video sent to ${phone}`);
           await new Promise(r => setTimeout(r, 3000));
         }
         const ratingImg = getRatingInfoImage();
         if (ratingImg) {
-          await sendMediaBase64(remoteJid, ratingImg.base64, '', ratingImg.fileName, botTokenForReply);
+          await sendMediaBase64(remoteJid, ratingImg.base64, '', ratingImg.fileName, botTokenForReply, ratingImg.mimetype);
           console.log(`[Manager] Rating info image sent to ${phone}`);
         }
         // Mark as sent to prevent duplicate sends
@@ -481,7 +481,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
           const provaSocial = getProvaSocialNew(provaSocialCount);
           if (provaSocial) {
             await new Promise(r => setTimeout(r, 2000));
-            await sendMediaBase64(remoteJid, provaSocial.base64, '', provaSocial.fileName, botTokenForReply);
+            await sendMediaBase64(remoteJid, provaSocial.base64, '', provaSocial.fileName, botTokenForReply, provaSocial.mimetype);
             console.log(`[Manager] Prova social ${provaSocialCount + 1}/3 sent to ${phone}`);
             // Track how many provas sociais were sent
             const updatedProfile = { ...(conversation.user_profile || {}), prova_social_count: provaSocialCount + 1 };
@@ -661,7 +661,7 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
     try {
       const audioData = getFollowupAudio(persona);
       if (audioData) {
-        await sendMediaBase64(target, audioData.base64, '', audioData.fileName, token);
+        await sendMediaBase64(target, audioData.base64, '', audioData.fileName, token, audioData.mimetype);
         await db.addMessage(conversation.id, 'agent', `[Audio follow-up 24h - ${persona}]`, conversation.phase);
         console.log(`[Followup] Pre-recorded audio sent for ${persona} to ${conversation.phone}`);
         // Send complementary text after audio (3s delay)
@@ -705,7 +705,7 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
         const provaSocial = getProvaSocial(persona, conversation.id);
         if (provaSocial) {
           const caption = getProvaSocialCaption(conversation.id + 10);
-          await sendMediaBase64(target, provaSocial.base64, caption, provaSocial.fileName, token);
+          await sendMediaBase64(target, provaSocial.base64, caption, provaSocial.fileName, token, provaSocial.mimetype);
           await db.addMessage(conversation.id, 'agent', `[Prova social - ${provaSocial.fileName}] ${caption}`, conversation.phase);
           return;
         }
@@ -722,7 +722,7 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
       const provaSocial = getProvaSocial(persona, conversation.id + attempt);
       if (provaSocial) {
         const caption = getProvaSocialCaption(conversation.id + attempt);
-        await sendMediaBase64(target, provaSocial.base64, caption, provaSocial.fileName, token);
+        await sendMediaBase64(target, provaSocial.base64, caption, provaSocial.fileName, token, provaSocial.mimetype);
         await db.addMessage(conversation.id, 'agent', `[Prova social - ${provaSocial.fileName}] ${caption}`, conversation.phase);
         console.log(`[Followup] Prova social sent: ${provaSocial.fileName} to ${conversation.phone}`);
         // Send contextual follow-up text after media (3s delay)

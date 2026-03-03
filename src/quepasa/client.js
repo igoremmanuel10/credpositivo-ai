@@ -176,11 +176,12 @@ export async function sendMedia(chatId, mediaUrl, caption = '', token = null) {
 /**
  * Send a media file via base64 content through Quepasa/WhatsApp.
  */
-export async function sendMediaBase64(chatId, base64Content, caption = '', fileName = 'file', token = null) {
+export async function sendMediaBase64(chatId, base64Content, caption = '', fileName = 'file', token = null, mimetype = null) {
   const useToken = token || botToken;
   const url = `${apiUrl}/send`;
 
   const payload = { content: base64Content, fileName };
+  if (mimetype) payload.mimetype = mimetype;
   if (caption) payload.text = stripMarkdown(caption);
 
   const res = await fetch(url, {
