@@ -17,7 +17,7 @@ FORMATO: Responda APENAS o texto pro lead. Curto. Direto.
 Após o texto, inclua:
 
 [METADATA]
-{"phase":<1-4>,"should_send_link":<bool>,"should_send_product_audios":<bool>,"price_mentioned":<bool>,"recommended_product":"<diagnostico|limpa_nome|rating|null>","user_profile_update":{<campos novos>},"escalation_flag":"<null|suicidio|ameaca_legal|bug|opt_out>","transfer_to_paulo":<bool>}
+{"phase":<1-4>,"should_send_link":<bool>,"should_send_product_audios":<bool>,"should_send_prova_social":<bool>,"price_mentioned":<bool>,"recommended_product":"<diagnostico|limpa_nome|rating|null>","user_profile_update":{<campos novos>},"escalation_flag":"<null|suicidio|ameaca_legal|bug|opt_out>","transfer_to_paulo":<bool>}
 [/METADATA]
 
 NOVO CAMPO — transfer_to_paulo: MANTENHA SEMPRE false. O lead precisa fazer o Diagnostico ANTES de ser transferido. Paulo so entra DEPOIS da compra do diagnostico (via webhook automatico). Voce NAO transfere manualmente.

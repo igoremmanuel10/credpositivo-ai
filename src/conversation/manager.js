@@ -4,7 +4,7 @@ import { sendMessages, sendMedia } from '../quepasa/client.js';
 import { findOrCreateContact, findOrCreateConversation, getInboxForPhone, sendOutgoingMessage, updateContactAttributes, setConversationLabels, buildLeadAttributes, buildPhaseLabels } from '../chatwoot/client.js';
 import { getAgentResponse } from '../ai/claude.js';
 import { applyMetadataUpdates } from './state.js';
-import { getMediaForPhase, getProductAudios, getFollowupAudio, getProvaSocial, getDiagnosticoVideo } from '../media/assets.js';
+import { getMediaForPhase, getProductAudios, getFollowupAudio, getProvaSocial, getDiagnosticoVideo, getAudioApresentacao, getAudioDiagnostico, getTutorialVideo, getRatingInfoImage, getProvaSocialNew } from '../media/assets.js';
 import { sendMediaBase64 } from '../quepasa/client.js';
 import { fixSiteLinks, sanitizeForWhatsApp } from '../ai/output-filter.js';
 import { createCheckout } from '../payment/mercadopago.js';
@@ -232,6 +232,19 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       const botPhone = Object.entries(config.sdr.phoneToPersona).find(([, p]) => p === persona)?.[0] || '';
       conversation = await db.createConversation(phone, pushName || null, persona, botPhone);
       console.log(`[Manager] New conversation created for ${phone} (persona: ${persona})`);
+      // Phase 0: Send welcome audio (Augusto's voice) before AI responds
+      if (persona === 'augusto' && config.media.enabled) {
+        try {
+          const welcomeAudio = getAudioApresentacao();
+          if (welcomeAudio) {
+            await sendMediaBase64(remoteJid, welcomeAudio.base64, '', welcomeAudio.fileName, botTokenForReply);
+            console.log(`[Manager] Welcome audio sent to ${phone} (new conversation)`);
+            await new Promise(r => setTimeout(r, 15000)); // 15s delay for lead to listen
+          }
+        } catch (err) {
+          console.error(`[Manager] Failed to send welcome audio:`, err.message);
+        }
+      }
       // CRM: Sync new lead to Krayin (non-blocking)
       syncLeadToKrayin(conversation, pushName, persona).catch(err => {
         console.error('[CRM] Failed to sync new lead:', err.message);
@@ -376,46 +389,35 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       }
     }
 
-    // 7.8 Send product explanation audios ONLY when AI decides (via metadata flag)
-    console.log('[Manager] Audio check: should_send_product_audios=' + metadata.should_send_product_audios + ', media.enabled=' + config.media.enabled + ', responseText has [AUDIO]=' + responseText.includes('[AUDIO]'));
+    // 7.8 Phase 2 media: audio diagnostico + tutorial video + rating image
+    console.log('[Manager] Media check: should_send_product_audios=' + metadata.should_send_product_audios + ', should_send_prova_social=' + metadata.should_send_prova_social + ', media.enabled=' + config.media.enabled);
     if (metadata.should_send_product_audios && config.media.enabled) {
-      const productAudios = getProductAudios();
-      if (productAudios) {
-        try {
-          for (let i = 0; i < productAudios.length; i++) {
-            await sendMediaBase64(remoteJid, productAudios[i].base64, '', productAudios[i].fileName, botTokenForReply);
-            console.log(`[Manager] Sent product audio ${productAudios[i].fileName} to ${phone}`);
-            if (i < productAudios.length - 1) {
-              await new Promise(r => setTimeout(r, 2000));
-            }
-          }
-        } catch (err) {
-          console.error(`[Manager] Failed to send product audios:`, err.message);
+      try {
+        const audioDiag = getAudioDiagnostico();
+        if (audioDiag) {
+          await sendMediaBase64(remoteJid, audioDiag.base64, '', audioDiag.fileName, botTokenForReply);
+          console.log(`[Manager] Audio diagnostico sent to ${phone}`);
+          await new Promise(r => setTimeout(r, 3000));
         }
+        const tutorial = getTutorialVideo();
+        if (tutorial) {
+          await sendMediaBase64(remoteJid, tutorial.base64, '', tutorial.fileName, botTokenForReply);
+          console.log(`[Manager] Tutorial video sent to ${phone}`);
+          await new Promise(r => setTimeout(r, 3000));
+        }
+        const ratingImg = getRatingInfoImage();
+        if (ratingImg) {
+          await sendMediaBase64(remoteJid, ratingImg.base64, '', ratingImg.fileName, botTokenForReply);
+          console.log(`[Manager] Rating info image sent to ${phone}`);
+        }
+      } catch (err) {
+        console.error(`[Manager] Failed to send Phase 2 media:`, err.message);
       }
     }
 
-    // 7.85 Strip [AUDIO] tag from text and fallback: if AI wrote [AUDIO] but metadata missed the flag, send audios
+    // 7.85 Strip [AUDIO] tag from response text (legacy cleanup)
     const hasAudioTag = responseText.includes('[AUDIO]');
     const cleanedResponseText = responseText.replace(/\[AUDIO\]/g, '').trim();
-
-    if (hasAudioTag && !metadata.should_send_product_audios && config.media.enabled) {
-      console.log('[Manager] AI wrote [AUDIO] tag but metadata missed should_send_product_audios. Sending audios as fallback.');
-      const fallbackAudios = getProductAudios();
-      if (fallbackAudios) {
-        try {
-          for (let i = 0; i < fallbackAudios.length; i++) {
-            await sendMediaBase64(remoteJid, fallbackAudios[i].base64, '', fallbackAudios[i].fileName, botTokenForReply);
-            console.log('[Manager] Sent fallback product audio ' + fallbackAudios[i].fileName + ' to ' + phone);
-            if (i < fallbackAudios.length - 1) {
-              await new Promise(r => setTimeout(r, 2000));
-            }
-          }
-        } catch (err) {
-          console.error('[Manager] Failed to send fallback product audios:', err.message);
-        }
-      }
-    }
 
     // 7.9 Fix any incorrect/shortened site links before sending
     // 7.9 Fix links + generate payment link if applicable
@@ -471,51 +473,44 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       messageIds = await sendMessages(remoteJid, fixedResponseText, botTokenForReply);
     }
 
-    // 8.5 Send diagnostico video AFTER text when entering phase 3
-    if (newPhase >= 3 && conversation.phase < 3 && config.media.enabled) {
+    // 8.5 Phase 3: Send prova social on objection (AI sets should_send_prova_social)
+    if (metadata.should_send_prova_social && config.media.enabled) {
       try {
-        const diagVideo = getDiagnosticoVideo();
-        if (diagVideo) {
-          await new Promise(r => setTimeout(r, 2000));
-          await sendMediaBase64(remoteJid, diagVideo.base64, '', diagVideo.fileName, botTokenForReply);
-          console.log(`[Manager] Diagnostico video sent to ${phone} (phase ${conversation.phase}->3 transition)`);
-        }
-      } catch (err) {
-        console.error(`[Manager] Failed to send diagnostico video:`, err.message);
-      }
-
-      // 8.6 Send prova social AFTER video (30s delay)
-      try {
-        const provaSocial = getProvaSocial('augusto', conversation.id);
-        if (provaSocial) {
-          await new Promise(r => setTimeout(r, 30000));
-          await sendMediaBase64(remoteJid, provaSocial.base64, '', provaSocial.fileName, botTokenForReply);
-          console.log(`[Manager] Prova social sent to ${phone} (phase 3 transition): ${provaSocial.fileName}`);
+        const provaSocialCount = conversation.user_profile?.prova_social_count || 0;
+        if (provaSocialCount < 3) {
+          const provaSocial = getProvaSocialNew(provaSocialCount);
+          if (provaSocial) {
+            await new Promise(r => setTimeout(r, 2000));
+            await sendMediaBase64(remoteJid, provaSocial.base64, '', provaSocial.fileName, botTokenForReply);
+            console.log(`[Manager] Prova social ${provaSocialCount + 1}/3 sent to ${phone}`);
+            // Track how many provas sociais were sent
+            const updatedProfile = { ...(conversation.user_profile || {}), prova_social_count: provaSocialCount + 1 };
+            await db.updateConversation(conversation.id, { user_profile: updatedProfile });
+            conversation.user_profile = updatedProfile;
+          }
+        } else {
+          console.log(`[Manager] All 3 provas sociais already sent to ${phone}. Skipping.`);
         }
       } catch (err) {
         console.error(`[Manager] Failed to send prova social:`, err.message);
       }
 
-      // 8.7 Schedule nudge if lead doesn't react to video (1.5-2 min)
-      const nudgeDelay = 90000 + Math.floor(Math.random() * 30000); // 90-120s
+      // Schedule nudge if lead doesn't react to prova social (1.5-2 min)
+      const nudgeDelay = 90000 + Math.floor(Math.random() * 30000);
       if (nudgeTimers.has(phone)) {
         clearTimeout(nudgeTimers.get(phone));
       }
       const nudgeTimer = setTimeout(async () => {
         try {
           nudgeTimers.delete(phone);
-          // Check if lead responded since the video
           const recentMsgs = await db.getMessages(conversation.id, 2);
           const lastMsg = recentMsgs[recentMsgs.length - 1];
           if (lastMsg && lastMsg.role === 'agent') {
-            // Lead hasn't responded, send nudge
             const nudgeText = 'Conseguiu ver?';
             await sendMessages(remoteJid, nudgeText, botTokenForReply);
             await db.addMessage(conversation.id, 'agent', nudgeText, newPhase);
             await cache.incrementHourlyMessageCount(phone);
-            console.log(`[Manager] Nudge sent to ${phone} after ${nudgeDelay/1000}s (no response after video)`);
-          } else {
-            console.log(`[Manager] Nudge skipped for ${phone} (lead already responded)`);
+            console.log(`[Manager] Nudge sent to ${phone} after ${nudgeDelay/1000}s (no response after prova social)`);
           }
         } catch (err) {
           console.error(`[Manager] Nudge failed for ${phone}:`, err.message);
