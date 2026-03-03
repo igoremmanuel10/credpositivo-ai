@@ -204,27 +204,10 @@ Rewrite the SAME message intent but compliant.`;
 }
 
 /**
- * Clean text for WhatsApp delivery:
- * - Strip markdown bold/italic/code formatting
- * - Remove ALL emojis (broken or not)
+ * Strip all emoji characters from text (comprehensive Unicode ranges).
  */
-export function cleanForWhatsApp(text) {
+function stripEmojis(text) {
   let cleaned = text;
-
-  // Strip markdown bold (**text** or __text__)
-  cleaned = cleaned.replace(/\*\*(.+?)\*\*/g, '$1');
-  cleaned = cleaned.replace(/__(.+?)__/g, '$1');
-
-  // Strip markdown italic (*text* but not contractions like "it's")
-  cleaned = cleaned.replace(/(?<!\w)\*([^*]+?)\*(?!\w)/g, '$1');
-
-  // Strip markdown code
-  cleaned = cleaned.replace(/`([^`]+?)`/g, '$1');
-
-  // Strip markdown headers
-  cleaned = cleaned.replace(/^#{1,3}\s+/gm, '');
-
-  // Remove ALL emoji characters (comprehensive Unicode ranges)
   cleaned = cleaned.replace(/[\u{1F600}-\u{1F64F}]/gu, '');
   cleaned = cleaned.replace(/[\u{1F300}-\u{1F5FF}]/gu, '');
   cleaned = cleaned.replace(/[\u{1F680}-\u{1F6FF}]/gu, '');
@@ -249,9 +232,75 @@ export function cleanForWhatsApp(text) {
   cleaned = cleaned.replace(/[\u{2B50}]/gu, '');
   cleaned = cleaned.replace(/[\u{2B55}]/gu, '');
   cleaned = cleaned.replace(/[✅❌👇👆👉✓✗☑☒⭐🌟💡🔥🎯🚀💰📊📈📉🏆💪🤝🙏❤️💙💚🔑🔗📍📎✨🎉🎊🛑⚠️✋🤔🏠🏦💳📱💻🔎📞📝🎁🔴🟢🟡]/gu, '');
+  return cleaned;
+}
 
-  // Clean double spaces
+/**
+ * Strip markdown formatting (bold, italic, code, headers).
+ */
+function stripMarkdown(text) {
+  let cleaned = text;
+  cleaned = cleaned.replace(/\*\*(.+?)\*\*/g, '$1');
+  cleaned = cleaned.replace(/__(.+?)__/g, '$1');
+  cleaned = cleaned.replace(/(?<!\w)\*([^*]+?)\*(?!\w)/g, '$1');
+  cleaned = cleaned.replace(/`([^`]+?)`/g, '$1');
+  cleaned = cleaned.replace(/^#{1,3}\s+/gm, '');
+  return cleaned;
+}
+
+/**
+ * Unified sanitization for WhatsApp delivery.
+ * Combines all text cleaning into ONE function:
+ * 1. Strip markdown
+ * 2. Remove ALL emojis
+ * 3. Remove leaked [METADATA] blocks
+ * 4. Collapse 3+ newlines into exactly 2 (preserves bubble splits)
+ * 5. Clean double spaces
+ * 6. Truncate if > 1000 chars
+ *
+ * @param {string} text - Raw text from AI
+ * @param {string} phone - Phone number for logging
+ * @returns {string} Sanitized text ready for WhatsApp
+ */
+export function sanitizeForWhatsApp(text, phone = '') {
+  let cleaned = text;
+  let violations = [];
+
+  // 1. Strip markdown formatting
+  cleaned = stripMarkdown(cleaned);
+
+  // 2. Remove ALL emojis
+  const before = cleaned;
+  cleaned = stripEmojis(cleaned);
+  if (cleaned.length < before.length) {
+    violations.push('emojis_removed');
+  }
+
+  // 3. Remove leaked [METADATA] blocks
+  cleaned = cleaned.replace(/\[METADATA\][\s\S]*?\[\/METADATA\]/g, '');
+
+  // 4. Collapse 3+ newlines into exactly 2 (preserves \n\n for bubble splitting)
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  // 5. Clean double spaces
   cleaned = cleaned.replace(/  +/g, ' ').trim();
 
+  // 6. Truncate if too long (max 1000 chars for WhatsApp readability)
+  if (cleaned.length > 1000) {
+    cleaned = cleaned.substring(0, 997) + '...';
+    violations.push(`msg_truncated:${text.length}chars`);
+  }
+
+  if (violations.length > 0 && phone) {
+    console.log(`[Sanitizer] ${phone}: ${violations.join(' | ')}`);
+  }
+
   return cleaned;
+}
+
+/**
+ * @deprecated Use sanitizeForWhatsApp() instead.
+ */
+export function cleanForWhatsApp(text) {
+  return sanitizeForWhatsApp(text);
 }

@@ -6,7 +6,7 @@ import { getAgentResponse } from '../ai/claude.js';
 import { applyMetadataUpdates } from './state.js';
 import { getMediaForPhase, getProductAudios, getFollowupAudio, getProvaSocial, getDiagnosticoVideo } from '../media/assets.js';
 import { sendMediaBase64 } from '../quepasa/client.js';
-import { fixSiteLinks, cleanForWhatsApp } from '../ai/output-filter.js';
+import { fixSiteLinks, sanitizeForWhatsApp } from '../ai/output-filter.js';
 import { createCheckout } from '../payment/mercadopago.js';
 import { config } from '../config.js';
 import { resolvePersona } from '../sdr/persona.js';
@@ -419,7 +419,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
 
     // 7.9 Fix any incorrect/shortened site links before sending
     // 7.9 Fix links + generate payment link if applicable
-    let fixedResponseText = cleanForWhatsApp(fixSiteLinks(cleanedResponseText));
+    let fixedResponseText = sanitizeForWhatsApp(fixSiteLinks(cleanedResponseText), phone);
     if (metadata.should_send_link && newPhase >= 3) {
       const paymentUrl = await generatePaymentLink(conversation, metadata);
       if (paymentUrl) {
@@ -427,9 +427,6 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
         console.log(`[Manager] Replaced site URL with MP payment link for ${phone}`);
       }
     }
-
-    // 7.95 Pre-send validation: sanitize response
-    const validatedText = validateAgentResponse(fixedResponseText, phone);
 
     // 8. Human-like delay: wait 8-15s before sending (avoids robotic feel)
     const minDelay = 8000;
@@ -439,21 +436,39 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     await new Promise(r => setTimeout(r, humanDelay));
 
     // 8.1 Send response via WhatsApp — split by \n\n into separate bubbles
-    const messageParts = validatedText.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
+    const messageParts = fixedResponseText.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
+
+    // 8.2 Enforce max 150 chars per bubble — break oversized at nearest space
+    const finalParts = [];
+    for (const part of messageParts) {
+      if (part.length <= 150) {
+        finalParts.push(part);
+      } else {
+        let remaining = part;
+        while (remaining.length > 150) {
+          let breakPoint = remaining.lastIndexOf(' ', 150);
+          if (breakPoint <= 0) breakPoint = 150;
+          finalParts.push(remaining.substring(0, breakPoint).trim());
+          remaining = remaining.substring(breakPoint).trim();
+        }
+        if (remaining.length > 0) finalParts.push(remaining);
+      }
+    }
+
     let messageIds = [];
-    if (messageParts.length > 1) {
-      console.log(`[Manager] Splitting response into ${messageParts.length} bubbles for ${phone}`);
-      for (let i = 0; i < messageParts.length; i++) {
-        const ids = await sendMessages(remoteJid, messageParts[i], botTokenForReply);
+    if (finalParts.length > 1) {
+      console.log(`[Manager] Splitting response into ${finalParts.length} bubbles for ${phone}`);
+      for (let i = 0; i < finalParts.length; i++) {
+        const ids = await sendMessages(remoteJid, finalParts[i], botTokenForReply);
         messageIds.push(...ids);
-        if (i < messageParts.length - 1) {
+        if (i < finalParts.length - 1) {
           // 2-4s typing delay between bubbles
           const bubbleDelay = 2000 + Math.floor(Math.random() * 2000);
           await new Promise(r => setTimeout(r, bubbleDelay));
         }
       }
     } else {
-      messageIds = await sendMessages(remoteJid, validatedText, botTokenForReply);
+      messageIds = await sendMessages(remoteJid, fixedResponseText, botTokenForReply);
     }
 
     // 8.5 Send diagnostico video AFTER text when entering phase 3
@@ -754,7 +769,7 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
 
   if (!responseText) return;
 
-  const fixedText = cleanForWhatsApp(fixSiteLinks(responseText));
+  const fixedText = sanitizeForWhatsApp(fixSiteLinks(responseText));
 
   // Legacy TTS audio for specific events
   const legacyAudioEvents = ['purchase_completed', 'purchase_followup', 'reengagement'];
@@ -880,52 +895,4 @@ function buildFollowupPrompt(eventType, conversation, attempt = 1, persona = 'au
   return legacyPrompts[eventType] || `[SISTEMA: Follow-up necessario para ${eventType}. Attempt ${attempt}. Seja breve e humano.]`;
 }
 
-// ─── Pre-Send Validation ──────────────────────────────────────────────────────
-
-const ALLOWED_EMOJIS = ['✅', '❌', '👇', '👉', '🔒'];
-const EMOJI_RE = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}]/gu;
-
-/**
- * Validates and sanitizes the agent response before sending to WhatsApp.
- * - Removes forbidden emojis
- * - Collapses double newlines (anti-split safety net)
- * - Truncates excessively long messages
- * - Logs violations for Ana QA to pick up
- */
-function validateAgentResponse(text, phone) {
-  let cleaned = text;
-  let violations = [];
-
-  // 1. Remove forbidden emojis (keep only allowed ones)
-  const emojiMatches = cleaned.match(EMOJI_RE) || [];
-  const forbidden = emojiMatches.filter(e => !ALLOWED_EMOJIS.includes(e));
-  if (forbidden.length > 0) {
-    for (const emoji of forbidden) {
-      cleaned = cleaned.replaceAll(emoji, '');
-    }
-    violations.push(`emoji_forbidden:${forbidden.join(',')}`);
-  }
-
-  // 2. Preserve \n\n for bubble splitting (manager line ~442 splits by \n\n)
-  // Previously collapsed \n\n into \n which DESTROYED bubble separation.
-  // Only collapse 3+ newlines into exactly 2 (preserves intentional splits).
-  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-
-  // 3. Truncate if too long (max 1000 chars for WhatsApp readability)
-  if (cleaned.length > 1000) {
-    cleaned = cleaned.substring(0, 997) + '...';
-    violations.push(`msg_truncated:${text.length}chars`);
-  }
-
-  // 4. Remove any residual [METADATA] blocks that leaked into response
-  cleaned = cleaned.replace(/\[METADATA\][\s\S]*?\[\/METADATA\]/g, '').trim();
-
-  // 5. Clean up extra whitespace
-  cleaned = cleaned.replace(/  +/g, ' ').trim();
-
-  if (violations.length > 0) {
-    console.log(`[Validator] ${phone}: ${violations.join(' | ')}`);
-  }
-
-  return cleaned;
-}
+// validateAgentResponse() removed — all sanitization now in sanitizeForWhatsApp() (output-filter.js)
