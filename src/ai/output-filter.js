@@ -212,7 +212,6 @@ export function buildCorrectionInstruction(violations) {
 - NEVER use artificial urgency
 Rewrite the SAME message intent but compliant.`;
 }
-}
 
 /**
  * Strip all emoji characters from text (comprehensive Unicode ranges).

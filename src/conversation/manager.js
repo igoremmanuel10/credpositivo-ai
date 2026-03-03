@@ -477,8 +477,8 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
         console.error(`[Manager] Failed to send prova social:`, err.message);
       }
 
-      // Schedule nudge if lead doesn't react to prova social (1.5-2 min)
-      const nudgeDelay = 90000 + Math.floor(Math.random() * 30000);
+      // Schedule nudge if lead doesn't react to prova social (5-8 min)
+      const nudgeDelay = 300000 + Math.floor(Math.random() * 180000);
       if (nudgeTimers.has(phone)) {
         clearTimeout(nudgeTimers.get(phone));
       }

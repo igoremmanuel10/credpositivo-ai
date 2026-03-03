@@ -121,6 +121,15 @@ async function retryConversation(conv) {
     return { success: false, reason: 'no_remote_jid' };
   }
 
+  // Skip if agent already responded recently (prevents duplicate messages)
+  if (conv.last_agent_msg_at) {
+    const agentMsgAge = Date.now() - new Date(conv.last_agent_msg_at).getTime();
+    if (agentMsgAge < 120000) { // 2 minutes
+      console.log(`[UnansweredMonitor] Skipping ${phone}: agent responded ${Math.round(agentMsgAge/1000)}s ago`);
+      return { success: false, reason: 'recent_agent_msg' };
+    }
+  }
+
   console.log(`[UnansweredMonitor] Retrying response for ${phone} (${conv.name || 'unknown'}) — last user msg: "${lastMsg.substring(0, 80)}"`);
 
   try {
