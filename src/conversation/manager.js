@@ -452,41 +452,8 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     console.log(`[Manager] Human delay: ${(humanDelay / 1000).toFixed(1)}s before sending to ${phone}`);
     await new Promise(r => setTimeout(r, humanDelay));
 
-    // 8.1 Send response via WhatsApp — split by \n\n into separate bubbles
-    const messageParts = fixedResponseText.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
-
-    // 8.2 Enforce max 150 chars per bubble — break oversized at nearest space
-    const finalParts = [];
-    for (const part of messageParts) {
-      if (part.length <= 150) {
-        finalParts.push(part);
-      } else {
-        let remaining = part;
-        while (remaining.length > 150) {
-          let breakPoint = remaining.lastIndexOf(' ', 150);
-          if (breakPoint <= 0) breakPoint = 150;
-          finalParts.push(remaining.substring(0, breakPoint).trim());
-          remaining = remaining.substring(breakPoint).trim();
-        }
-        if (remaining.length > 0) finalParts.push(remaining);
-      }
-    }
-
-    let messageIds = [];
-    if (finalParts.length > 1) {
-      console.log(`[Manager] Splitting response into ${finalParts.length} bubbles for ${phone}`);
-      for (let i = 0; i < finalParts.length; i++) {
-        const ids = await sendMessages(remoteJid, finalParts[i], botTokenForReply);
-        messageIds.push(...ids);
-        if (i < finalParts.length - 1) {
-          // 2-4s typing delay between bubbles
-          const bubbleDelay = 2000 + Math.floor(Math.random() * 2000);
-          await new Promise(r => setTimeout(r, bubbleDelay));
-        }
-      }
-    } else {
-      messageIds = await sendMessages(remoteJid, fixedResponseText, botTokenForReply);
-    }
+    // 8.1 Send response via WhatsApp — single message (no splitting)
+    let messageIds = await sendMessages(remoteJid, fixedResponseText, botTokenForReply);
 
     // 8.5 Phase 3: Send prova social on objection (AI sets should_send_prova_social)
     if (metadata.should_send_prova_social && config.media.enabled) {
