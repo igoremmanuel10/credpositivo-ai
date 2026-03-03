@@ -174,6 +174,11 @@ export function filterOutput(text, phase = 0) {
     }
   }
 
+  // ALWAYS check for wrong diagnostic price (R$97 is WRONG, should be R$67)
+  if (/R\$\s*97/i.test(text)) {
+    violations.push('wrong_price_97');
+  }
+
   // Check normalized patterns against accent-stripped text
   const normalizedText = normalize(text);
   for (const phrase of NORMALIZED_BANNED) {
@@ -192,8 +197,13 @@ export function filterOutput(text, phase = 0) {
  * Build a correction instruction when filter catches violations.
  */
 export function buildCorrectionInstruction(violations) {
+  const hasWrongPrice = violations.includes('wrong_price_97');
+  const priceNote = hasWrongPrice
+    ? '\n- CRITICAL: You wrote R$97 which is WRONG. The diagnostic costs R$67 (SIXTY-SEVEN). Fix this.'
+    : '';
   return `COMPLIANCE VIOLATION DETECTED. Your previous response contained banned content (patterns: ${violations.join(', ')}). Rewrite your response following these rules:
-- NEVER mention prices in R$ or reais
+- NEVER mention prices in R$ or reais (unless in phase 3+ and lead asked)
+- The diagnostic price is R$67, NOT R$97. NEVER write R$97.${priceNote}
 - NEVER promise score increase or credit approval
 - NEVER use sale imperatives (compre, pague, adquira)
 - NEVER mention "atendente", "humano", "closer", "robô", "IA", "chatbot"
@@ -201,6 +211,7 @@ export function buildCorrectionInstruction(violations) {
 - NEVER mention technical terms (Bacen, SCR, thin file, webhook, API)
 - NEVER use artificial urgency
 Rewrite the SAME message intent but compliant.`;
+}
 }
 
 /**

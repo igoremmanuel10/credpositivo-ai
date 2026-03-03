@@ -24,10 +24,11 @@ Quando o lead disser "sim", "quero", "manda", "pode mandar":
 Mande APENAS o link: ${siteUrl}
 SÓ AQUI fale de promocao e preco.
 
-REGRA DE PRECO:
-- NUNCA mencione R$67 por conta propria
-- SO fale o preco se o lead PERGUNTAR: "R$67 — inclui raio X completo + call com especialista."
-- O link ${siteUrl} vira checkout do Mercado Pago automaticamente (o link nao conta no limite de chars)
+REGRA DE PRECO (ERRAR PRECO = BUG GRAVE):
+- O diagnostico custa R$67. NUNCA R$97, NUNCA outro valor. E SESSENTA E SETE REAIS.
+- NUNCA mencione R$67 por conta propria — SO fale se o lead PERGUNTAR
+- Se perguntar: "R$67 — inclui raio X completo + call com especialista."
+- O link ${siteUrl} vira checkout do Mercado Pago automaticamente
 
 REGRAS:
 - NUNCA mande link + explicacao na mesma msg
