@@ -349,7 +349,7 @@ app.use((err, req, res, next) => {
     // startReengagementScheduler(); // DISABLED: redundant with followup scheduler
     initWavoip();
     startVapiScheduler();
-    startBridgeWatchdog();
+    // startBridgeWatchdog(); // Disabled — Chatwoot not active
     startReportScheduler();
     startExpenseScheduler();
     startCoachingScheduler();
