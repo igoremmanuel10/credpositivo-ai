@@ -33,7 +33,7 @@ function buildAugustoPrompt(state, abOverrides = {}) {
   const core = getCorePrompt(state);
 
   const phaseTarget = phase <= 1 ? 'greeting' : phase === 2 ? 'investigation' : phase === 3 ? 'education' : 'closing';
-  const phaseInstructions = abOverrides[phaseTarget] || getPhaseInstructions(phase, siteUrl, isReturning);
+  const phaseInstructions = abOverrides[phaseTarget] || getPhaseInstructions(phase, siteUrl, isReturning, state);
 
   const objections = getObjections(phase, siteUrl);
   const footer = getFooter(siteUrl);
@@ -44,9 +44,9 @@ function buildAugustoPrompt(state, abOverrides = {}) {
 /**
  * Route to the correct phase module.
  */
-function getPhaseInstructions(phase, siteUrl, isReturning) {
+function getPhaseInstructions(phase, siteUrl, isReturning, state) {
   if (phase <= 1) return getPhase01(siteUrl, isReturning);
-  if (phase === 2) return getPhase2();
+  if (phase === 2) return getPhase2(state);
   if (phase === 3) return getPhase3(siteUrl);
   return getPhase4(siteUrl);
 }

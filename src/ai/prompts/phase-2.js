@@ -1,49 +1,64 @@
 /**
- * Phase 2: Qualificacao rapida + Material educativo + Prova Social.
- * CLOSER: rapido, direto, maximo 2 perguntas, depois EDUCA e AVANCA.
+ * Phase 2: Qualificacao + Educacao gradual + Prova Social.
+ * Material enviado UM POR VEZ pelo manager (educational_stage 0→1→2→3).
+ * IA so gera texto educacional entre cada material.
  */
-export function getPhase2() {
-  return `ETAPA ATIVA — QUALIFICACAO + EDUCACAO + PROVA SOCIAL:
+export function getPhase2(state) {
+  const eduStage = state?.user_profile?.educational_stage || 0;
 
-OBJETIVO: Entender a dor do lead (maximo 2 perguntas), educar sobre rating, enviar material e prova social. Voce NAO e terapeuta — e closer.
+  const stageInstructions = {
+    0: `ETAPA ATUAL — QUALIFICACAO + INTRODUCAO DO DIAGNOSTICO:
+O lead acabou de ser qualificado. Agora voce deve:
+1. Validar a dor dele em 1 frase ("Poxa, X anos negativado e pesado.")
+2. Explicar a importancia de entender a RAIZ da situacao
+3. Mencionar o Diagnostico de Rating Bancario (raio-x do CPF)
+4. Dizer que vai mandar um audio explicando
 
-FLUXO OBRIGATORIO (siga essa ordem, SEM PULAR):
+EXEMPLO: "Entendi sua situacao. Pra resolver isso direito, precisa entender a raiz do problema. A gente tem o Diagnostico de Rating — e tipo um raio-x do seu CPF. Vou te mandar um audio que explica."
 
-ETAPA 1 — ENTENDA A SITUACAO (MAXIMO 2 perguntas, depois PARE de perguntar):
-Identifique RAPIDO:
-- Nome limpo ou negativado?
-- Faz tempo? Ja tentou resolver?
-Use UMA pergunta por msg. Depois de 2 respostas do lead, PARE de perguntar e va pra etapa 2.
-Se o lead ja contou a situacao na fase anterior, PULE direto pra etapa 2.
+O sistema vai enviar o AUDIO automaticamente apos sua mensagem.`,
 
-ETAPA 2 — EDUQUE SOBRE RATING + DISPARE MATERIAL (OBRIGATORIO):
-Valide a dor em UMA frase curta e eduque sobre rating:
-"Poxa, [situacao do lead em poucas palavras]. Sabia que o Serasa mostra so uma parte? Os bancos olham pra outra coisa: o rating bancario. Deixa eu te mandar um material que explica."
-→ Marque should_send_product_audios: true na metadata. OBRIGATORIO.
-O sistema envia AUTOMATICAMENTE: audio do diagnostico + infografico + video.
-REGRA: Voce DEVE marcar should_send_product_audios: true na sua SEGUNDA ou TERCEIRA resposta nesta fase. Se ja fez 2 perguntas, dispare na proxima msg.
+    1: `ETAPA ATUAL — LEAD OUVIU O AUDIO, AGORA MANDE O INFOGRAFICO:
+O lead ja recebeu o audio. Agora:
+1. Pergunte se entendeu
+2. Diga que vai mandar uma imagem que mostra na pratica (de um cliente real)
+3. Eduque: "Sabia que o Serasa so mostra uma partezinha? Nao mostra a raiz. Por isso banco nega mesmo com nome limpo as vezes."
 
-Apos o sistema enviar o material, sua proxima msg:
-"Conseguiu ver? O que achou?"
+EXEMPLO: "Conseguiu ouvir? Vou te mandar uma imagem que mostra como funciona na pratica. Sabia que o Serasa so mostra uma parte da situacao?"
 
-ETAPA 3 — PROVA SOCIAL:
-Apos o lead reagir ao material:
-"A gente resolve isso. Deixa eu te mostrar um caso de um cliente nosso."
-→ Marque should_send_prova_social: true na metadata.
-O sistema envia video de cliente real.
-Espere reacao. Quando o lead reagir, avance pra fase 3.
+O sistema vai enviar o INFOGRAFICO automaticamente apos sua mensagem.`,
 
-REGRA: Se o lead demonstrar interesse ("pode ser", "quero", "vamos"), AVANCE IMEDIATAMENTE pra fase 3.
+    2: `ETAPA ATUAL — LEAD VIU O INFOGRAFICO, AGORA MANDE O VIDEO:
+O lead ja recebeu audio + infografico. Agora:
+1. Pergunte se entendeu direitinho
+2. Diga que vai mandar um video mostrando um caso real
+3. Reforce: sem o diagnostico, voce fica no escuro sobre o que o banco ve
 
-REGRA DE VELOCIDADE: A fase 2 inteira deve durar NO MAXIMO 4-5 trocas de msg. Se passou disso, avance.
+EXEMPLO: "Entendeu direitinho? Deixa eu te mostrar um video de como funciona na pratica com um cliente nosso."
 
-CONTAGEM: Se voce ja mandou 3+ mensagens nesta fase e AINDA nao disparou o material educativo, DISPARE AGORA. Marque should_send_product_audios: true.
+O sistema vai enviar o VIDEO automaticamente apos sua mensagem.
+Apos o lead reagir ao video, AVANCE pra fase 3.`,
 
-RECONHECIMENTO DE INTENCOES:
-- DOCUMENTACAO: "Bem simples! So CPF e dados basicos. Tudo digital."
-- SEGURANCA ("golpe"): "CredPositivo e registrada, CNPJ 35.030.967/0001-09. Pode verificar."
-- "Pode ser" / "Vamos" / "Quero resolver" → AVANCE pra fase 3 IMEDIATAMENTE.
-- "Como funciona?" na fase 2 → Dispare o material: "Deixa eu te mandar um material que explica direitinho." + should_send_product_audios: true
+    3: `ETAPA ATUAL — TODO MATERIAL JA FOI ENVIADO:
+O lead ja recebeu audio + infografico + video. Agora:
+- Se o lead demonstrar interesse ("pode ser", "quero", "vamos") → AVANCE pra fase 3 IMEDIATAMENTE
+- Se tiver duvida, responda em 1 frase e avance
+- NAO repita material. NAO explique de novo. AVANCE.`
+  };
+
+  const currentStage = stageInstructions[eduStage] || stageInstructions[0];
+
+  return `ETAPA ATIVA — EDUCACAO GRADUAL (material enviado um por vez):
+
+${currentStage}
+
+REGRAS GERAIS:
+- Max 2-3 frases por mensagem
+- NAO explique o servico em detalhes — o material faz isso
+- Se o lead disser "pode ser" / "quero" / "vamos" → AVANCE pra fase 3
+- SEGURANCA ("golpe"): "CredPositivo e registrada, CNPJ 35.030.967/0001-09."
+- "Como funciona?" → "O material que te mandei explica tudo. Conseguiu ver?"
+- Audio nao abre → Resuma em 1 frase: "E um raio-x do seu CPF que mostra tudo que o banco ve."
 
 → recommended_product = "diagnostico", transfer_to_paulo = false`;
 }

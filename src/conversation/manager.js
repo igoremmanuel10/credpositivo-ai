@@ -404,22 +404,16 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       }
     }
 
-    // 7.8 Calculate educational material flags (sending happens AFTER text)
-    const educationalSent = conversation.user_profile?.educational_material_sent || false;
-    const aiRequestedEducational = metadata.should_send_audio_diagnostico || metadata.should_send_product_audios;
-    // AUTO-DISPATCH: If lead was already in phase 2+ and material not sent, auto-dispatch
-    const autoDispatchEducational = !educationalSent && conversation.phase >= 2 && (metadata.phase ?? conversation.phase) >= 2;
-    if (autoDispatchEducational && !aiRequestedEducational) {
-      console.log(`[Manager] AUTO-DISPATCH: Lead ${phone} in phase ${conversation.phase}→${metadata.phase}, educational not sent. Forcing dispatch.`);
-    }
-    // HARD BLOCK: Never send educational material in phase 0-1 (menu must come first)
+    // 7.8 Staged educational material (one piece per message, not all at once)
     const effectivePhase = metadata.phase ?? conversation.phase;
-    const phaseAllowsEducational = effectivePhase >= 2;
-    const shouldSendEducational = (aiRequestedEducational || autoDispatchEducational) && config.media.enabled && !educationalSent && phaseAllowsEducational;
-    if ((aiRequestedEducational || autoDispatchEducational) && !phaseAllowsEducational) {
-      console.log(`[Manager] BLOCKED educational material: phase ${effectivePhase} < 2. Must qualify first.`);
-    }
-    console.log('[Manager] Media check: ai_requested=' + aiRequestedEducational + ', auto_dispatch=' + autoDispatchEducational + ', phase=' + effectivePhase + ', educational_sent=' + educationalSent + ', media.enabled=' + config.media.enabled);
+    const eduStage = conversation.user_profile?.educational_stage || 0;
+    // Stage 0: nothing sent yet
+    // Stage 1: audio sent, waiting for reaction
+    // Stage 2: infographic sent, waiting for reaction
+    // Stage 3: video sent, all done
+    const phaseAllowsEducational = effectivePhase >= 2 && conversation.phase >= 2;
+    const shouldAdvanceEdu = phaseAllowsEducational && eduStage < 3 && config.media.enabled;
+    console.log('[Manager] Edu stage: ' + eduStage + ', phase=' + effectivePhase + ', should_advance=' + shouldAdvanceEdu);
 
     // 7.85 Strip [AUDIO] tag from response text (legacy cleanup)
     const hasAudioTag = responseText.includes('[AUDIO]');
@@ -438,44 +432,46 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // 8.1 Send TEXT response FIRST via WhatsApp
     let messageIds = await sendMessages(remoteJid, fixedResponseText, botTokenForReply);
 
-    // 8.2 THEN send educational material (text arrives first, then media follows)
-    if (shouldSendEducational) {
+    // 8.2 STAGED educational material: one piece per message, with conversation between each
+    if (shouldAdvanceEdu) {
       try {
         await new Promise(r => setTimeout(r, 3000)); // 3s gap after text
+        let newStage = eduStage;
 
-        // 1. Audio explicando o diagnóstico
-        const audioDiag = getAudioDiagnostico();
-        if (audioDiag) {
-          await sendMediaBase64(remoteJid, audioDiag.base64, '', audioDiag.fileName, botTokenForReply, audioDiag.mimetype);
-          console.log(`[Manager] Educational audio sent to ${phone}`);
-          await new Promise(r => setTimeout(r, 5000)); // 5s delay before next
+        if (eduStage === 0) {
+          // Stage 0→1: Send ONLY the audio
+          const audioDiag = getAudioDiagnostico();
+          if (audioDiag) {
+            await sendMediaBase64(remoteJid, audioDiag.base64, '', audioDiag.fileName, botTokenForReply, audioDiag.mimetype);
+            console.log(`[Manager] Edu stage 0→1: Audio sent to ${phone}`);
+          }
+          newStage = 1;
+        } else if (eduStage === 1) {
+          // Stage 1→2: Send ONLY the infographic
+          const ratingImg = getRatingInfoImage();
+          if (ratingImg) {
+            await sendMediaBase64(remoteJid, ratingImg.base64, '', ratingImg.fileName, botTokenForReply, ratingImg.mimetype);
+            console.log(`[Manager] Edu stage 1→2: Infographic sent to ${phone}`);
+          }
+          newStage = 2;
+        } else if (eduStage === 2) {
+          // Stage 2→3: Send video tutorial
+          const tutorialVid = getTutorialVideo();
+          if (tutorialVid) {
+            await sendMediaBase64(remoteJid, tutorialVid.base64, '', tutorialVid.fileName, botTokenForReply, tutorialVid.mimetype);
+            console.log(`[Manager] Edu stage 2→3: Video sent to ${phone}`);
+          }
+          newStage = 3;
         }
 
-        // 2. Infográfico do rating
-        const ratingImg = getRatingInfoImage();
-        if (ratingImg) {
-          await sendMediaBase64(remoteJid, ratingImg.base64, '', ratingImg.fileName, botTokenForReply, ratingImg.mimetype);
-          console.log(`[Manager] Rating infographic sent to ${phone}`);
-          await new Promise(r => setTimeout(r, 3000)); // 3s delay before next
-        }
-
-        // 3. Vídeo do dashboard/tutorial
-        const tutorialVid = getTutorialVideo();
-        if (tutorialVid) {
-          await sendMediaBase64(remoteJid, tutorialVid.base64, '', tutorialVid.fileName, botTokenForReply, tutorialVid.mimetype);
-          console.log(`[Manager] Tutorial video sent to ${phone}`);
-        }
-
-        // Mark educational material as sent
-        const updatedProfile = { ...(conversation.user_profile || {}), educational_material_sent: true };
+        // Update stage in user_profile
+        const updatedProfile = { ...(conversation.user_profile || {}), educational_stage: newStage, educational_material_sent: newStage >= 3 };
         await db.updateConversation(conversation.id, { user_profile: updatedProfile });
         conversation.user_profile = updatedProfile;
-        console.log(`[Manager] Educational material marked as sent for ${phone}`);
+        console.log(`[Manager] Educational stage updated: ${eduStage}→${newStage} for ${phone}`);
       } catch (err) {
         console.error(`[Manager] Failed to send educational material:`, err.message);
       }
-    } else if ((metadata.should_send_audio_diagnostico || metadata.should_send_product_audios) && educationalSent) {
-      console.log(`[Manager] Educational material already sent to ${phone}. Skipping.`);
     }
 
     // 8.5 Phase 3: Send prova social on objection (AI sets should_send_prova_social)
