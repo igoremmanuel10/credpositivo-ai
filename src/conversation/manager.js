@@ -309,6 +309,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       name: conversation.name || pushName || null,
       user_profile: conversation.user_profile || {},
       recommended_product: conversation.recommended_product,
+      message_count: conversation.message_count || 0,
     };
 
     // 4.5. A/B test variant assignment
@@ -411,7 +412,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // Stage 1: audio sent, waiting for reaction
     // Stage 2: infographic sent, waiting for reaction
     // Stage 3: video sent, all done
-    const phaseAllowsEducational = effectivePhase >= 2 && conversation.phase >= 2;
+    const phaseAllowsEducational = effectivePhase >= 2;
     // At edu_stage 0, only dispatch audio if AI actually introduced the diagnostic
     // (AI text must mention "audio" or "diagnostico" — prevents dispatch during qualification)
     const aiIntroducedDiagnostic = eduStage > 0 || /audio|diagnostico|raio.?x/i.test(responseText);
