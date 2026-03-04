@@ -169,7 +169,23 @@ async function simulateScenario(scenario) {
       break;
     }
 
-    const { data: metadata, cleanText: responseText } = parseMetadata(fullResponse);
+    let { data: metadata, cleanText: responseText } = parseMetadata(fullResponse);
+
+    // FORCE MENU: Same logic as manager.js — if phase 0 first msg and no menu, inject it
+    const MENU_TEXT = 'Opa, seja bem-vindo(a) ao CredPositivo! Me chamo Augusto, estou aqui pra te ajudar.\n\nQual dessas opções abaixo você está buscando?\n1 - Diagnóstico de Rating\n2 - Limpa Nome\n3 - Rating Bancário\n4 - Já estava em atendimento';
+    if (state.phase === 0 && state.message_count <= 1) {
+      const norm = responseText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      if (!norm.includes('qual dessas opcoes') && !norm.includes('1 - diagnostico')) {
+        console.log(`      [FORCE-MENU] AI skipped menu → injecting hardcoded menu`);
+        responseText = MENU_TEXT;
+        metadata = { phase: 0, should_send_link: false, should_send_product_audios: false, recommended_product: null, transfer_to_paulo: false };
+      }
+    }
+
+    // DEFAULT METADATA: Same as manager.js
+    if (!metadata || Object.keys(metadata).length === 0) {
+      metadata = { phase: state.phase };
+    }
 
     // EXACT same dispatch logic as manager.js (no aiIntroduced check)
     const effectivePhase = metadata?.phase ?? state.phase;

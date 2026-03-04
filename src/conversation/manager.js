@@ -345,6 +345,23 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       captureError(aiErr, { module: 'manager', action: 'emergency_response', extra: { phone, phase: conversation.phase } });
     }
 
+    // FORCE MENU: If phase 0 and AI didn't send the menu, inject it
+    const MENU_TEXT = 'Opa, seja bem-vindo(a) ao CredPositivo! Me chamo Augusto, estou aqui pra te ajudar.\n\nQual dessas opções abaixo você está buscando?\n1 - Diagnóstico de Rating\n2 - Limpa Nome\n3 - Rating Bancário\n4 - Já estava em atendimento';
+    if (conversation.phase === 0 && conversation.message_count <= 1) {
+      const normalized = (responseText || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      if (!normalized.includes('qual dessas opcoes') && !normalized.includes('1 - diagnostico')) {
+        console.warn(`[Manager] AI skipped menu for ${phone}. Forcing menu text.`);
+        responseText = MENU_TEXT;
+        metadata = { phase: 0, should_send_link: false, should_send_product_audios: false, recommended_product: null, transfer_to_paulo: false };
+      }
+    }
+
+    // DEFAULT METADATA: If AI forgot metadata, provide defaults
+    if (!metadata || Object.keys(metadata).length === 0) {
+      console.warn(`[Manager] AI returned no metadata for ${phone}. Using defaults.`);
+      metadata = { phase: conversation.phase };
+    }
+
     // DEBUG: Phase transition and metadata tracking
     console.log(`[Manager] Phase transition: ${conversation.phase} → ${metadata.phase ?? 'no change'} | metadata keys: ${Object.keys(metadata).join(',')}`);
 
