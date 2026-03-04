@@ -406,8 +406,17 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
 
     // 7.8 Phase 2: Material educativo sequencial (áudio → infográfico → vídeo dashboard)
     const educationalSent = conversation.user_profile?.educational_material_sent || false;
-    const shouldSendEducational = (metadata.should_send_audio_diagnostico || metadata.should_send_product_audios) && config.media.enabled && !educationalSent;
-    console.log('[Manager] Media check: should_send_audio_diagnostico=' + metadata.should_send_audio_diagnostico + ', educational_sent=' + educationalSent + ', should_send_prova_social=' + metadata.should_send_prova_social + ', media.enabled=' + config.media.enabled);
+    const aiRequestedEducational = metadata.should_send_audio_diagnostico || metadata.should_send_product_audios;
+    // AUTO-DISPATCH: If lead was already in phase 2+ and material not sent, auto-dispatch
+    // conversation.phase = phase BEFORE this message, metadata.phase = phase AFTER
+    // First message entering phase 2: conversation.phase=1, skip (let AI ask qualifying question)
+    // Second message in phase 2: conversation.phase=2, auto-dispatch material
+    const autoDispatchEducational = !educationalSent && conversation.phase >= 2 && (metadata.phase ?? conversation.phase) >= 2;
+    if (autoDispatchEducational && !aiRequestedEducational) {
+      console.log(`[Manager] AUTO-DISPATCH: Lead ${phone} in phase ${conversation.phase}→${metadata.phase}, educational not sent. Forcing dispatch.`);
+    }
+    const shouldSendEducational = (aiRequestedEducational || autoDispatchEducational) && config.media.enabled && !educationalSent;
+    console.log('[Manager] Media check: ai_requested=' + aiRequestedEducational + ', auto_dispatch=' + autoDispatchEducational + ', educational_sent=' + educationalSent + ', media.enabled=' + config.media.enabled);
     if (shouldSendEducational) {
       try {
         // 1. Audio explicando o diagnóstico
