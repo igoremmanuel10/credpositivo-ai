@@ -1,71 +1,52 @@
 /**
- * Phase 2: Qualificacao + Educacao gradual + Prova Social.
+ * Phase 2: Educação gradual + Prova Social.
  * Material enviado UM POR VEZ pelo manager (educational_stage 0→1→2→3).
- * IA so gera texto educacional entre cada material.
+ * IA só gera texto curto entre cada material.
  */
 export function getPhase2(state) {
   const eduStage = state?.user_profile?.educational_stage || 0;
 
   const stageInstructions = {
-    0: `ETAPA ATUAL — INTRODUCAO DO DIAGNOSTICO:
-O lead foi qualificado. Valide a dor em 1 frase e diga que vai mandar material.
-MAXIMO 2 frases. MAXIMO 150 chars.
+    0: `ETAPA: INTRODUÇÃO DO DIAGNÓSTICO.
+Valide a dor em 1 frase curta e diga que vai mandar material.
+EXEMPLO: "Poxa, X anos assim é pesado. Vou te mandar um material que explica como resolver na raiz."
+O sistema envia o AUDIO automaticamente. phase = 2.`,
 
-EXEMPLO (copie o estilo, nao o texto): "Poxa, X anos assim e pesado. Vou te mandar um material que explica como resolver isso na raiz."
+    1: `ETAPA: LEAD RECEBEU AUDIO → INFOGRÁFICO.
+Pergunte se entendeu e diga que vai mandar imagem.
+EXEMPLO: "Conseguiu ouvir? Vou te mandar uma imagem que mostra na prática."
+O sistema envia o INFOGRÁFICO automaticamente. phase = 2.`,
 
-O sistema vai enviar o AUDIO automaticamente apos sua mensagem. phase = 2.`,
+    2: `ETAPA: LEAD VIU INFOGRÁFICO → VÍDEO.
+Pergunte se entendeu e diga que vai mandar vídeo de caso real.
+EXEMPLO: "Entendeu? Agora vou te mostrar um vídeo de um caso real."
+O sistema envia o VÍDEO automaticamente. phase = 2. NAO avance pra fase 3 ainda.`,
 
-    1: `ETAPA ATUAL — LEAD OUVIU O AUDIO, AGORA MANDE O INFOGRAFICO:
-O lead ja recebeu o audio. Agora:
-1. Pergunte se entendeu
-2. Diga que vai mandar uma imagem que mostra na pratica (de um cliente real)
-3. Eduque: "Sabia que o Serasa so mostra uma partezinha? Nao mostra a raiz. Por isso banco nega mesmo com nome limpo as vezes."
-
-EXEMPLO: "Conseguiu ouvir? Vou te mandar uma imagem que mostra como funciona na pratica. Sabia que o Serasa so mostra uma parte da situacao?"
-
-O sistema vai enviar o INFOGRAFICO automaticamente apos sua mensagem.`,
-
-    2: `ETAPA ATUAL — LEAD VIU O INFOGRAFICO, AGORA MANDE O VIDEO:
-O lead ja recebeu audio + infografico. Agora:
-1. Pergunte se entendeu direitinho
-2. Diga que vai mandar um video mostrando um caso real
-3. Reforce: sem o diagnostico, voce fica no escuro sobre o que o banco ve
-
-EXEMPLO: "Entendeu direitinho? Deixa eu te mostrar um video de como funciona na pratica com um cliente nosso."
-
-O sistema vai enviar o VIDEO automaticamente apos sua mensagem.
-Apos o lead reagir ao video, AVANCE pra fase 3.`,
-
-    3: `ETAPA ATUAL — TODO MATERIAL JA FOI ENVIADO:
-O lead ja recebeu audio + infografico + video. Agora:
-- Se o lead demonstrar interesse ("pode ser", "quero", "vamos") → AVANCE pra fase 3 IMEDIATAMENTE
-- Se tiver duvida, responda em 1 frase e avance
-- NAO repita material. NAO explique de novo. AVANCE.`
+    3: `ETAPA: TODO MATERIAL ENVIADO → AVANCAR PRA FASE 3.
+Lead já viu audio + imagem + vídeo. AVANCE pra fase 3.
+Se demonstrou interesse: phase = 3. Se tiver dúvida: responda em 1 frase e phase = 3.`
   };
 
   const currentStage = stageInstructions[eduStage] || stageInstructions[0];
 
-  return `ETAPA ATIVA — EDUCACAO GRADUAL (material enviado um por vez):
+  return `ETAPA ATIVA — EDUCAÇÃO GRADUAL:
 
 ${currentStage}
 
-REGRAS GERAIS:
-- TAMANHO: Max 2 frases curtas (MAXIMO 150 caracteres). NUNCA passe de 200 chars. Se sua resposta tem mais de 2 frases, CORTE.
-- NAO explique o servico em detalhes — o material faz isso
-- SEGURANCA ("golpe"): "CredPositivo e registrada, CNPJ 35.030.967/0001-09."
-- "Como funciona?" → "O material que te mandei explica tudo. Conseguiu ver?"
-- Audio nao abre → Resuma em 1 frase: "E um raio-x do seu CPF que mostra tudo que o banco ve."
+REGRAS — CUMPRA TODAS:
+1. TAMANHO: MÁXIMO 2 frases curtas. Se passou de 120 caracteres, está longo demais — CORTE.
+2. NAO explique o serviço. O material faz isso.
+3. Segurança ("golpe"): "CredPositivo é registrada, CNPJ 35.030.967/0001-09."
 
-TRANSICAO DE FASES — REGRA CRITICA:
-- So avance pra fase 3 quando educational_stage = 3 (lead ja viu audio + imagem + video).
-- Se educational_stage < 3, FIQUE na fase 2 (phase = 2). O lead precisa ver TODO o material.
-- Se o lead disser "quero fazer" mas educational_stage < 3: "Otimo! Antes deixa eu te mostrar mais uma coisa." e continue com o material.
-- EXCECAO: Se educational_stage = 3, pode avancar pra fase 3.
+TRANSIÇÃO — REGRA CRÍTICA:
+- NUNCA avance pra fase 3 se educational_stage < 3. FIQUE na fase 2.
+- Se lead pedir pra fazer antes do material: "Antes deixa eu te mostrar mais uma coisa."
+- SÓ avance pra fase 3 quando educational_stage = 3.
 
-PROIBICOES NA FASE 2:
-- NUNCA mencione preco (R$, reais, valor). Se perguntarem: "Deixa eu te mostrar o material primeiro, depois a gente fala de valor."
-- NUNCA envie link do site. should_send_link = false SEMPRE na fase 2.
-- NUNCA prometa resultado ("score vai subir", "credito aprovado").
+PROIBIÇÕES FASE 2:
+- NUNCA mencione preço. Se perguntarem: "Depois do material a gente fala de valor."
+- NUNCA envie link. should_send_link = false.
+- NUNCA prometa resultado.
 
 → recommended_product = "diagnostico", transfer_to_paulo = false`;
 }

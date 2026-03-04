@@ -218,8 +218,10 @@ async function simulateScenario(scenario) {
     if (/\bIA\b(?=\s|$)/.test(responseText)) issues.push('IDENTITY_LEAK:ia_sigla');
 
     // MENU_MISSING: first message MUST show the menu (unless returning lead)
+    // Normalize accents for comparison (AI may add accents to menu text)
+    const normalizedResponse = responseText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     if (i === 0 && state.phase === 0 && !scenario.initialState) {
-      if (!/Qual dessas opcoes/i.test(responseText) && !/1 - Diagnostico/i.test(responseText)) {
+      if (!/qual dessas opcoes/i.test(normalizedResponse) && !/1 - diagnostico/i.test(normalizedResponse)) {
         issues.push('MENU_MISSING');
       }
     }
