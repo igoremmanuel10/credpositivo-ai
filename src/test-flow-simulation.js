@@ -8,7 +8,7 @@ import { buildSystemPrompt } from './ai/system-prompt.js';
 import { config } from './config.js';
 import Anthropic from '@anthropic-ai/sdk';
 
-const client = new Anthropic({ apiKey: config.ai.apiKey });
+const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
 const SCENARIOS = [
   {
