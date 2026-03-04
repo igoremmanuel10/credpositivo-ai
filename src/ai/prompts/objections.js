@@ -1,15 +1,25 @@
 /**
- * Objections handling — respostas padrao pra objecoes comuns.
+ * Objections handling — universais + específicas por fase.
  */
 export function getObjections(phase, siteUrl) {
-  return `OBJEÇÕES — Respeite mas faça UMA pergunta de retenção. LEMBRE: max 120 chars!
-"VOU PENSAR": "Tranquilo! Só lembra: quanto mais tempo, mais negativas acumula."
-"TÁ CARO": "Entendo. Quanto já perdeu sendo negado sem saber o motivo?"
-"VOU PESQUISAR": "Boa! Ninguém oferece diagnóstico + call assim. Me chama quando quiser."
-"NÃO CONFIO / GOLPE": "Entendo. CNPJ 35.030.967/0001-09, pode pesquisar tranquilo."
-"JÁ TENTEI OUTROS": "A maioria só vê superfície. A gente analisa o que banco REALMENTE olha."
-"PRA QUE SERVE": "Raio X do seu CPF — mostra tudo. Dá uma olhada: ${siteUrl}"
-"QUERO LIMPAR NOME": "Fazemos! Mas primeiro o diagnóstico pra ver quais dívidas tem."
-"QUERO AUMENTAR CRÉDITO": "Show! Primeiro o diagnóstico pra entender sua situação."
-Se insistir 2x: "Combinado! Quando quiser, me chama." NUNCA insista mais de 2x.`;
+  const universal = `OBJECOES UNIVERSAIS (qualquer fase):
+"Vou pensar" → "Tranquilo. So lembra: quanto mais tempo, mais negativas acumula." Pergunte o que faz hesitar.
+"E golpe?" → "CNPJ 35.030.967/0001-09, pesquisa tranquilo. Quer ver caso de cliente?" Ofereca prova social.
+"Ja tentei outros" → "A maioria so ve superficie. A gente analisa o que banco realmente olha." Ofereca prova social.
+"Manda mais info" → "A gente faz uma analise completa da sua situacao de credito. O que mais quer saber?" Espere duvida especifica.
+"Quero falar com humano" → "Claro! Se cadastra no site que nosso especialista te liga: ${siteUrl}"`;
+
+  const priceObjections = phase >= 3 ? `
+
+OBJECOES DE PRECO (fases 3 e 4):
+"Ta caro" → "Entendo. Quanto ja perdeu sendo negado sem saber o motivo? E ainda vem com call + e-book."
+"Vou pesquisar" → "Boa! Diagnostico + call + e-book por R$67, dificil achar."
+"Nao tenho dinheiro" → "Faz sentido. Quando tiver, o primeiro passo e esse. Salva o link." Envie ${siteUrl}` : `
+
+SE O LEAD PERGUNTAR PRECO ANTES DA FASE 3:
+"Antes do valor, preciso entender melhor sua situacao pra te recomendar certo. Me conta: [proxima pergunta de qualificacao]"`;
+
+  return `${universal}${priceObjections}
+
+Se insistir 2x na mesma objecao: "Combinado! Quando quiser, me chama." Pare de insistir.`;
 }

@@ -405,30 +405,45 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       }
     }
 
-    // 7.8 Phase 2 media: ONLY prova social (1 video of real client)
-    const productAudiosSent = conversation.user_profile?.product_audios_sent || false;
-    console.log('[Manager] Media check: should_send_product_audios=' + metadata.should_send_product_audios + ', already_sent=' + productAudiosSent + ', should_send_prova_social=' + metadata.should_send_prova_social + ', media.enabled=' + config.media.enabled);
-    if (metadata.should_send_product_audios && config.media.enabled && !productAudiosSent) {
+    // 7.8 Phase 2: Material educativo sequencial (áudio → infográfico → vídeo dashboard)
+    const educationalSent = conversation.user_profile?.educational_material_sent || false;
+    const shouldSendEducational = (metadata.should_send_audio_diagnostico || metadata.should_send_product_audios) && config.media.enabled && !educationalSent;
+    console.log('[Manager] Media check: should_send_audio_diagnostico=' + metadata.should_send_audio_diagnostico + ', educational_sent=' + educationalSent + ', should_send_prova_social=' + metadata.should_send_prova_social + ', media.enabled=' + config.media.enabled);
+    if (shouldSendEducational) {
       try {
-        // Send ONLY prova social — no audio/video/image barrage
-        const provaSocialCount = conversation.user_profile?.prova_social_count || 0;
-        if (provaSocialCount < 1) {
-          const provaSocial = getProvaSocialNew(0);
-          if (provaSocial) {
-            await sendMediaBase64(remoteJid, provaSocial.base64, '', provaSocial.fileName, botTokenForReply, provaSocial.mimetype);
-            console.log(`[Manager] Prova social 1/3 sent to ${phone}`);
-          }
+        // 1. Audio explicando o diagnóstico
+        const audioDiag = getAudioDiagnostico();
+        if (audioDiag) {
+          await sendMediaBase64(remoteJid, audioDiag.base64, '', audioDiag.fileName, botTokenForReply, audioDiag.mimetype);
+          console.log(`[Manager] Educational audio sent to ${phone}`);
+          await new Promise(r => setTimeout(r, 5000)); // 5s delay before next
         }
-        // Mark as sent
-        const updatedProfile = { ...(conversation.user_profile || {}), product_audios_sent: true, prova_social_count: Math.max(provaSocialCount, 1) };
+
+        // 2. Infográfico do rating
+        const ratingImg = getRatingInfoImage();
+        if (ratingImg) {
+          await sendMediaBase64(remoteJid, ratingImg.base64, '', ratingImg.fileName, botTokenForReply, ratingImg.mimetype);
+          console.log(`[Manager] Rating infographic sent to ${phone}`);
+          await new Promise(r => setTimeout(r, 3000)); // 3s delay before next
+        }
+
+        // 3. Vídeo do dashboard/tutorial
+        const tutorialVid = getTutorialVideo();
+        if (tutorialVid) {
+          await sendMediaBase64(remoteJid, tutorialVid.base64, '', tutorialVid.fileName, botTokenForReply, tutorialVid.mimetype);
+          console.log(`[Manager] Tutorial video sent to ${phone}`);
+        }
+
+        // Mark educational material as sent
+        const updatedProfile = { ...(conversation.user_profile || {}), educational_material_sent: true };
         await db.updateConversation(conversation.id, { user_profile: updatedProfile });
         conversation.user_profile = updatedProfile;
-        console.log(`[Manager] Phase 2 prova social marked as sent for ${phone}`);
+        console.log(`[Manager] Educational material marked as sent for ${phone}`);
       } catch (err) {
-        console.error(`[Manager] Failed to send Phase 2 media:`, err.message);
+        console.error(`[Manager] Failed to send educational material:`, err.message);
       }
-    } else if (metadata.should_send_product_audios && productAudiosSent) {
-      console.log(`[Manager] Phase 2 media already sent to ${phone}. Skipping duplicate.`);
+    } else if ((metadata.should_send_audio_diagnostico || metadata.should_send_product_audios) && educationalSent) {
+      console.log(`[Manager] Educational material already sent to ${phone}. Skipping.`);
     }
 
     // 7.85 Strip [AUDIO] tag from response text (legacy cleanup)
