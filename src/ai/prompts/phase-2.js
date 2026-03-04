@@ -22,9 +22,11 @@ Pergunte se entendeu e diga que vai mandar vídeo de caso real.
 EXEMPLO: "Entendeu? Agora vou te mostrar um vídeo de um caso real."
 O sistema envia o VÍDEO automaticamente. phase = 2. NAO avance pra fase 3 ainda.`,
 
-    3: `ETAPA: TODO MATERIAL ENVIADO → AVANCAR PRA FASE 3.
-Lead já viu audio + imagem + vídeo. AVANCE pra fase 3.
-Se demonstrou interesse: phase = 3. Se tiver dúvida: responda em 1 frase e phase = 3.`
+    3: `ETAPA: TODO MATERIAL ENVIADO → OBRIGATÓRIO AVANCAR PRA FASE 3.
+Lead já viu TUDO (audio + imagem + vídeo). NÃO fique na fase 2.
+QUALQUER resposta sua aqui DEVE ter phase = 3 na metadata.
+"Quero fazer" → phase = 3. "Voltei" → phase = 3. "Entendi" → phase = 3. Qualquer coisa → phase = 3.
+NÃO peça nome. NÃO repita material. AVANCE AGORA.`
   };
 
   const currentStage = stageInstructions[eduStage] || stageInstructions[0];
