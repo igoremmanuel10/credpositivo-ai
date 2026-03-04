@@ -74,16 +74,20 @@ async function callClaude(systemPrompt, messages) {
 }
 
 function parseMetadata(text) {
-  // Extract JSON metadata from AI response
-  const jsonMatch = text.match(/\{[\s\S]*?"phase"[\s\S]*?\}/);
-  if (jsonMatch) {
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch {
-      return null;
-    }
+  // Use same extraction logic as the real system (claude.js extractMetadata)
+  let metadataMatch = text.match(/\[METADATA\]([\s\S]*?)\[\/METADATA\]/);
+  if (!metadataMatch) {
+    metadataMatch = text.match(/\[METADATA\]([\s\S]*)$/);
   }
-  return null;
+  if (!metadataMatch) return { data: null, cleanText: text };
+
+  const cleanText = text.replace(/\[METADATA\][\s\S]*?\[\/METADATA\]/, '').replace(/\[METADATA\][\s\S]*$/, '').trim();
+  try {
+    const data = JSON.parse(metadataMatch[1].trim());
+    return { data, cleanText };
+  } catch {
+    return { data: null, cleanText };
+  }
 }
 
 async function simulateScenario(scenario) {
@@ -117,9 +121,12 @@ async function simulateScenario(scenario) {
       break;
     }
 
-    // Parse metadata from response
-    const metadata = parseMetadata(fullResponse);
-    const responseText = fullResponse.replace(/\{[\s\S]*?"phase"[\s\S]*?\}/, '').trim();
+    // Parse metadata from response (same format as real system)
+    const { data: metadata, cleanText: responseText } = parseMetadata(fullResponse);
+
+    if (!metadata) {
+      console.log(`  [WARN] No metadata parsed from response!`);
+    }
 
     // Determine educational material dispatch
     const effectivePhase = metadata?.phase ?? state.phase;
@@ -150,7 +157,7 @@ async function simulateScenario(scenario) {
     console.log(`\n  [MSG ${i + 1}] Lead: "${userMsg}"`);
     console.log(`  [AI] (${charCount} chars): ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
     console.log(`  [STATE] phase: ${state.phase}→${effectivePhase} | edu: ${eduStage}→${newEduStage} | media: ${mediaAction}`);
-    if (metadata) console.log(`  [META] phase=${metadata.phase} link=${metadata.should_send_link} product=${metadata.recommended_product}`);
+    if (metadata) console.log(`  [META] phase=${metadata.phase} link=${metadata.should_send_link} product=${metadata.recommended_product} audios=${metadata.should_send_product_audios}`);
     if (issues.length > 0) console.log(`  [ISSUE] ${issues.join(' | ')}`);
 
     // Update state
