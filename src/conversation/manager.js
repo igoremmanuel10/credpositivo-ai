@@ -412,8 +412,14 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     if (autoDispatchEducational && !aiRequestedEducational) {
       console.log(`[Manager] AUTO-DISPATCH: Lead ${phone} in phase ${conversation.phase}→${metadata.phase}, educational not sent. Forcing dispatch.`);
     }
-    const shouldSendEducational = (aiRequestedEducational || autoDispatchEducational) && config.media.enabled && !educationalSent;
-    console.log('[Manager] Media check: ai_requested=' + aiRequestedEducational + ', auto_dispatch=' + autoDispatchEducational + ', educational_sent=' + educationalSent + ', media.enabled=' + config.media.enabled);
+    // HARD BLOCK: Never send educational material in phase 0-1 (menu must come first)
+    const effectivePhase = metadata.phase ?? conversation.phase;
+    const phaseAllowsEducational = effectivePhase >= 2;
+    const shouldSendEducational = (aiRequestedEducational || autoDispatchEducational) && config.media.enabled && !educationalSent && phaseAllowsEducational;
+    if ((aiRequestedEducational || autoDispatchEducational) && !phaseAllowsEducational) {
+      console.log(`[Manager] BLOCKED educational material: phase ${effectivePhase} < 2. Must qualify first.`);
+    }
+    console.log('[Manager] Media check: ai_requested=' + aiRequestedEducational + ', auto_dispatch=' + autoDispatchEducational + ', phase=' + effectivePhase + ', educational_sent=' + educationalSent + ', media.enabled=' + config.media.enabled);
 
     // 7.85 Strip [AUDIO] tag from response text (legacy cleanup)
     const hasAudioTag = responseText.includes('[AUDIO]');
