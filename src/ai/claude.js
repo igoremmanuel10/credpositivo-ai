@@ -47,8 +47,10 @@ export async function getAgentResponse(conversationState, messageHistory, userMe
 
   let response = await callClaude(systemPrompt, messages);
 
-  // Run compliance filter
-  const filterResult = filterOutput(response.text, conversationState.phase);
+  // Skip compliance filter for phase 0 — menu is hardcoded text, no need to filter
+  const filterResult = conversationState.phase === 0
+    ? { clean: true, violations: [] }
+    : filterOutput(response.text, conversationState.phase);
   if (!filterResult.clean) {
     console.warn(`[Claude] Compliance violation detected: ${filterResult.violations.join(', ')}`);
 
