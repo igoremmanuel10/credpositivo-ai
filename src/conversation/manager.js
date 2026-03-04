@@ -492,6 +492,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
               const nudgeText = nudgeMessages[newStage];
               if (nudgeText) {
                 await sendMessages(remoteJid, nudgeText, botTokenForReply);
+                await db.addMessage(convId, 'agent', nudgeText, freshConv.phase);
                 console.log(`[Manager] Edu nudge sent to ${phone} (stage ${newStage}, no response in 5min)`);
               }
             }
