@@ -232,19 +232,9 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       const botPhone = Object.entries(config.sdr.phoneToPersona).find(([, p]) => p === persona)?.[0] || '';
       conversation = await db.createConversation(phone, pushName || null, persona, botPhone);
       console.log(`[Manager] New conversation created for ${phone} (persona: ${persona})`);
-      // Phase 0-1: Audio de apresentação do Augusto (11s)
-      if (persona === 'augusto' && config.media.enabled) {
-        try {
-          const welcomeAudio = getAudioApresentacao();
-          if (welcomeAudio) {
-            await sendMediaBase64(remoteJid, welcomeAudio.base64, '', welcomeAudio.fileName, botTokenForReply, welcomeAudio.mimetype);
-            console.log(`[Manager] Welcome audio sent to ${phone} (new conversation)`);
-            await new Promise(r => setTimeout(r, 12000)); // 12s delay for lead to listen
-          }
-        } catch (err) {
-          console.error(`[Manager] Failed to send welcome audio:`, err.message);
-        }
-      }
+      // Welcome audio DISABLED: menu must be the first thing the lead sees.
+      // Audio was confusing because it arrived before the menu text.
+      // Educational audio is now sent only in phase 2 (staged materials).
       // CRM: Sync new lead to Krayin (non-blocking)
       syncLeadToKrayin(conversation, pushName, persona).catch(err => {
         console.error('[CRM] Failed to sync new lead:', err.message);

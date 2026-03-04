@@ -8,19 +8,23 @@ export function getPhase2(state) {
 
   const stageInstructions = {
     0: `ETAPA: INTRODUÇÃO DO DIAGNÓSTICO.
-Valide a dor em 1 frase curta e diga que vai mandar material.
-EXEMPLO: "Poxa, X anos assim é pesado. Vou te mandar um material que explica como resolver na raiz."
-O sistema envia o AUDIO automaticamente. phase = 2.`,
+Diga 1 frase curta validando a dor + que vai mandar material. NÃO faça pergunta.
+O sistema envia o AUDIO automaticamente logo depois da sua mensagem.
+Se você fizer pergunta, o lead recebe pergunta + audio junto = confuso. SÓ afirmação.
+EXEMPLO: "Poxa, X anos é pesado. Vou te mandar um material que explica como resolver."
+phase = 2.`,
 
     1: `ETAPA: LEAD RECEBEU AUDIO → INFOGRÁFICO.
-Pergunte se entendeu e diga que vai mandar imagem.
-EXEMPLO: "Conseguiu ouvir? Vou te mandar uma imagem que mostra na prática."
-O sistema envia o INFOGRÁFICO automaticamente. phase = 2.`,
+Confirme que ouviu e avise que vai mandar imagem. Frase curta, SEM pergunta aberta.
+O sistema envia o INFOGRÁFICO automaticamente logo depois.
+EXEMPLO: "Show! Agora vou te mandar uma imagem que mostra na prática."
+phase = 2.`,
 
     2: `ETAPA: LEAD VIU INFOGRÁFICO → VÍDEO.
-Pergunte se entendeu e diga que vai mandar vídeo de caso real.
-EXEMPLO: "Entendeu? Agora vou te mostrar um vídeo de um caso real."
-O sistema envia o VÍDEO automaticamente. phase = 2. NAO avance pra fase 3 ainda.`,
+Confirme que viu e avise que vai mandar vídeo. Frase curta, SEM pergunta aberta.
+O sistema envia o VÍDEO automaticamente logo depois. NAO avance pra fase 3 ainda.
+EXEMPLO: "Boa! Agora vou te mostrar um vídeo de um caso real."
+phase = 2.`,
 
     3: `ETAPA: TODO MATERIAL ENVIADO → OBRIGATÓRIO AVANCAR PRA FASE 3.
 Lead já viu TUDO (audio + imagem + vídeo). NÃO fique na fase 2.
