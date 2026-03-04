@@ -53,12 +53,17 @@ O lead ja recebeu audio + infografico + video. Agora:
 ${currentStage}
 
 REGRAS GERAIS:
-- Max 2-3 frases por mensagem
+- Max 2 frases curtas por mensagem (MAXIMO 150 caracteres). NUNCA passe de 200 chars.
 - NAO explique o servico em detalhes — o material faz isso
 - Se o lead disser "pode ser" / "quero" / "vamos" → AVANCE pra fase 3
 - SEGURANCA ("golpe"): "CredPositivo e registrada, CNPJ 35.030.967/0001-09."
 - "Como funciona?" → "O material que te mandei explica tudo. Conseguiu ver?"
 - Audio nao abre → Resuma em 1 frase: "E um raio-x do seu CPF que mostra tudo que o banco ve."
+
+PROIBICOES NA FASE 2:
+- NUNCA mencione preco (R$, reais, valor). Se perguntarem: "Deixa eu te mostrar o material primeiro, depois a gente fala de valor."
+- NUNCA envie link do site. should_send_link = false SEMPRE na fase 2.
+- NUNCA prometa resultado ("score vai subir", "credito aprovado").
 
 → recommended_product = "diagnostico", transfer_to_paulo = false`;
 }
