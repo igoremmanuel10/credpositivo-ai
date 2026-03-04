@@ -279,6 +279,22 @@ async function simulateScenario(scenario) {
     conversationHistory.push({ role: 'assistant', content: responseText });
   }
 
+  // FLOW STUCK: Check if flow progressed as expected
+  const finalPhase = state.phase;
+  const finalEdu = state.user_profile?.educational_stage || 0;
+  const msgCount = scenario.messages.length;
+
+  // For scenarios with 5+ messages starting from phase 0, flow should reach at least phase 2
+  if (!scenario.initialState && msgCount >= 5 && finalPhase <= 1) {
+    totalIssues++;
+    console.log(`\n  !! FLOW_STUCK: ${msgCount} messages but still in phase ${finalPhase} (expected at least phase 2)`);
+  }
+  // For scenarios with 7+ messages, should reach phase 3
+  if (!scenario.initialState && msgCount >= 7 && finalPhase <= 2 && scenario.messages.some(m => /quero fazer|vou fazer|manda o link/i.test(m))) {
+    totalIssues++;
+    console.log(`\n  !! FLOW_STUCK: ${msgCount} messages with purchase intent but only phase ${finalPhase}`);
+  }
+
   const verdict = totalIssues === 0 ? 'PASS' : `${totalIssues} ISSUES`;
   console.log(`\n  [RESULT] ${verdict} | phase=${state.phase} edu=${state.user_profile?.educational_stage || 0} product=${state.recommended_product || '-'} name=${state.name || '-'}`);
   return totalIssues;
