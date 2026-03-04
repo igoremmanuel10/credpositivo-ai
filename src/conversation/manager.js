@@ -412,8 +412,11 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // Stage 2: infographic sent, waiting for reaction
     // Stage 3: video sent, all done
     const phaseAllowsEducational = effectivePhase >= 2 && conversation.phase >= 2;
-    const shouldAdvanceEdu = phaseAllowsEducational && eduStage < 3 && config.media.enabled;
-    console.log('[Manager] Edu stage: ' + eduStage + ', phase=' + effectivePhase + ', should_advance=' + shouldAdvanceEdu);
+    // At edu_stage 0, only dispatch audio if AI actually introduced the diagnostic
+    // (AI text must mention "audio" or "diagnostico" — prevents dispatch during qualification)
+    const aiIntroducedDiagnostic = eduStage > 0 || /audio|diagnostico|raio.?x/i.test(responseText);
+    const shouldAdvanceEdu = phaseAllowsEducational && eduStage < 3 && aiIntroducedDiagnostic && config.media.enabled;
+    console.log('[Manager] Edu stage: ' + eduStage + ', phase=' + effectivePhase + ', aiIntro=' + aiIntroducedDiagnostic + ', should_advance=' + shouldAdvanceEdu);
 
     // 7.85 Strip [AUDIO] tag from response text (legacy cleanup)
     const hasAudioTag = responseText.includes('[AUDIO]');
