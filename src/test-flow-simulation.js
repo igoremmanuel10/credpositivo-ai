@@ -184,14 +184,55 @@ async function simulateScenario(scenario) {
       else if (eduStage === 2) { mediaAction = 'VIDEO'; newEduStage = 3; }
     }
 
-    // Check for issues
+    // Check for issues — STRICT checker
     const issues = [];
     const charCount = responseText.length;
-    if (charCount > 300 && state.phase > 1) issues.push(`TEXTAO(${charCount})`);
+
+    // TEXTAO: max 250 for menu (phase 0 first msg), max 200 for everything else
+    const isMenuMsg = state.phase === 0 && i === 0;
+    const maxChars = isMenuMsg ? 250 : 200;
+    if (charCount > maxChars) issues.push(`TEXTAO(${charCount}>${maxChars})`);
+
+    // LINK_CEDO: no link before phase 3
     if (effectivePhase <= 2 && /credpositivo\.com/i.test(responseText)) issues.push('LINK_CEDO');
-    if (effectivePhase <= 2 && /R\$\d+/i.test(responseText)) issues.push('PRECO_CEDO');
-    if (/R\$97/i.test(responseText)) issues.push('PRECO_ERRADO');
-    if (/fico.{0,5}disposi|qualquer coisa me chama|boa sorte/i.test(responseText)) issues.push('FRASE_PROIBIDA');
+
+    // PRECO_CEDO: no price before phase 3
+    if (effectivePhase <= 2 && /R\$\s*\d/i.test(responseText)) issues.push('PRECO_CEDO');
+    if (effectivePhase <= 2 && /\d+\s*reais/i.test(responseText)) issues.push('PRECO_CEDO');
+
+    // PRECO_ERRADO: R$97 is always wrong
+    if (/R\$\s*97/i.test(responseText)) issues.push('PRECO_ERRADO');
+
+    // FRASE_PROIBIDA: forbidden phrases
+    if (/fico.{0,10}disposi/i.test(responseText)) issues.push('FRASE_PROIBIDA:disposicao');
+    if (/qualquer (coisa|d[uú]vida).{0,10}(me )?(chama|fala)/i.test(responseText)) issues.push('FRASE_PROIBIDA:qualquer_coisa');
+    if (/boa sorte/i.test(responseText)) issues.push('FRASE_PROIBIDA:boa_sorte');
+    if (/espero ter ajudado/i.test(responseText)) issues.push('FRASE_PROIBIDA:espero');
+    if (/fico feliz/i.test(responseText)) issues.push('FRASE_PROIBIDA:fico_feliz');
+    if (/imagino como/i.test(responseText)) issues.push('FRASE_PROIBIDA:imagino');
+
+    // IDENTITY_LEAK: never mention robot/AI/chatbot
+    if (/\brob[oô]\b/i.test(responseText)) issues.push('IDENTITY_LEAK:robo');
+    if (/\bchatbot\b/i.test(responseText)) issues.push('IDENTITY_LEAK:chatbot');
+    if (/\bintelig[eê]ncia artificial\b/i.test(responseText)) issues.push('IDENTITY_LEAK:ia');
+    if (/\bIA\b(?=\s|$)/.test(responseText)) issues.push('IDENTITY_LEAK:ia_sigla');
+
+    // MENU_MISSING: first message MUST show the menu (unless returning lead)
+    if (i === 0 && state.phase === 0 && !scenario.initialState) {
+      if (!/Qual dessas opcoes/i.test(responseText) && !/1 - Diagnostico/i.test(responseText)) {
+        issues.push('MENU_MISSING');
+      }
+    }
+
+    // PHASE_JUMP: can't skip from phase 1 to 3 (must go through 2 for education)
+    if (state.phase <= 1 && effectivePhase >= 3) issues.push('PHASE_JUMP:1→3');
+
+    // PROMISE: never promise results
+    if (/score vai (subir|aumentar)/i.test(responseText)) issues.push('PROMISE:score');
+    if (/garantimos/i.test(responseText)) issues.push('PROMISE:garantia');
+    if (/cr[eé]dito aprovado/i.test(responseText)) issues.push('PROMISE:aprovacao');
+
+    // TAG_VAZOU: metadata or tags leaked into response
     if (/\[(?!METADATA).*?\]/i.test(responseText) && responseText.length > 5) issues.push('TAG_VAZOU');
     if (!metadata) issues.push('SEM_METADATA');
     totalIssues += issues.length;
