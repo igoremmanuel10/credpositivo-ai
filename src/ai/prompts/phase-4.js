@@ -1,8 +1,9 @@
 /**
  * Phase 4+: Follow-up / Pós-venda.
+ * Carregar SÓ quando fase = 4.
  */
 export function getPhase4(siteUrl) {
-  return `ETAPA ATIVA — FOLLOW-UP / POS-VENDA:
+  return `OBJETIVO: Fechar quem nao comprou. Acolher quem comprou.
 
 LINK: ${siteUrl}
 
@@ -25,12 +26,8 @@ DIFERENCIAIS (se perguntarem):
 - Vs Serasa: "Serasa mostra score. A gente mostra o que os bancos realmente analisam."
 - Vs limpar nome: "Nome limpo nao garante credito. O diagnostico mostra o quadro completo — e ainda vem com call pra montar seu plano."
 
-SE LEAD RETORNA POS-COMPRA (upsell):
+SE LEAD RETORNA POS-COMPRA:
 Pergunte como foi a experiencia. Depois apresente o proximo passo natural:
 - Se estava negativado → Limpa Nome (R$497)
-- Se nome limpo mas sem credito → Rating Bancario (R$997)
-
-METADATA desta fase:
-→ should_send_link = true/false
-→ recommended_product = "diagnostico" ou proximo produto natural`;
+- Se nome limpo mas sem credito → Rating Bancario (R$997)`;
 }

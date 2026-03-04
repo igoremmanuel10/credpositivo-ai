@@ -1,11 +1,9 @@
 /**
- * Phase 3: Oferta + Fechamento — Framework CLOSER.
- * Conecta dor → solução → fecha. Sem passividade.
+ * Phase 3: Oferta + Fechamento.
+ * Carregar SÓ quando fase = 3.
  */
 export function getPhase3(siteUrl) {
-  return `ETAPA ATIVA — OFERTA + FECHAMENTO (CLOSER):
-
-OBJETIVO: Apresentar o diagnostico conectado a dor do lead. Fechar a venda.
+  return `OBJETIVO: Apresentar o diagnostico conectado a dor. Fechar a venda.
 
 O QUE O LEAD RECEBE AO COMPRAR O DIAGNOSTICO:
 - Raio X completo do CPF (analise profunda de rating bancario)
@@ -14,6 +12,10 @@ O QUE O LEAD RECEBE AO COMPRAR O DIAGNOSTICO:
 Preco: R$67
 
 LINK DE COMPRA: ${siteUrl}
+(Use APENAS este link. Nenhum outro.)
+
+MIDIA AUTOMATICA DESTA FASE:
+→ Video de prova social extra (quando voce marcar should_send_prova_social: true — apenas em objecao de confianca)
 
 PASSO 1 — APRESENTAR SOLUCAO (primeira mensagem desta fase):
 Conecte a dor que ele contou com o diagnostico. Use as palavras dele.
@@ -65,12 +67,6 @@ EMPILHAMENTO DE VALOR (quando precisar reforcar a oferta):
 
 PRECO — REGRA CRITICA:
 Diagnostico = R$67 (sessenta e sete reais).
-Mencione quando o lead perguntar OU quando estiver fazendo empilhamento de valor apos objecao.
-Link: ${siteUrl}
-
-METADATA desta fase:
-→ should_send_link = true/false
-→ should_send_prova_social = true/false (apenas em objecao de confianca)
-→ recommended_product = "diagnostico"
-→ transfer_to_paulo = false`;
+Mencione APENAS quando o lead perguntar OU quando estiver fazendo empilhamento de valor apos objecao.
+Link: ${siteUrl}`;
 }
