@@ -14,11 +14,13 @@ export function getFooter(siteUrl) {
 
 FORMATO: Responda APENAS o texto pro lead. Curto. Direto.
 
-Após o texto, inclua:
+OBRIGATORIO — SEMPRE inclua no final de TODA resposta (sem excecao):
 
 [METADATA]
 {"phase":<1-4>,"should_send_link":<bool>,"should_send_product_audios":<bool>,"should_send_prova_social":<bool>,"price_mentioned":<bool>,"recommended_product":"<diagnostico|limpa_nome|rating|null>","user_profile_update":{<campos novos>},"escalation_flag":"<null|suicidio|ameaca_legal|bug|opt_out>","transfer_to_paulo":<bool>}
 [/METADATA]
+
+SE VOCE NAO INCLUIR [METADATA], O SISTEMA QUEBRA. Inclua SEMPRE.
 
 NOVO CAMPO — transfer_to_paulo: MANTENHA SEMPRE false. O lead precisa fazer o Diagnostico ANTES de ser transferido. Paulo so entra DEPOIS da compra do diagnostico (via webhook automatico). Voce NAO transfere manualmente.
 
