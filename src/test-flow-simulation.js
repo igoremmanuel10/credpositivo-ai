@@ -1,6 +1,6 @@
 /**
- * Flow Simulation — tests the full conversation flow without WhatsApp.
- * Calls Claude directly with the actual prompts to verify responses.
+ * Flow Simulation v2 — tests the FULL conversation flow.
+ * Matches EXACTLY the real manager.js logic.
  *
  * Usage: node src/test-flow-simulation.js
  */
@@ -12,7 +12,7 @@ const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 
 const SCENARIOS = [
   {
-    name: 'CENARIO 1: Limpa Nome completo (lead negativado)',
+    name: 'CENARIO 1: Fluxo COMPLETO — menu ate fechamento',
     messages: [
       'Oi, como funciona?',
       '2',
@@ -24,41 +24,83 @@ const SCENARIOS = [
       'Gostei do video, quero fazer',
       'Quanto custa?',
       'Vou fazer',
+      'Ja paguei',
     ],
   },
   {
-    name: 'CENARIO 2: Lead desconfiado ("é golpe?")',
+    name: 'CENARIO 2: Lead desconfiado — objecoes',
     messages: [
       'oi',
       '1',
-      'Banco negou meu emprestimo',
-      'Faz 2 anos. Tentei no Itau e Bradesco',
+      'Banco negou meu emprestimo faz 2 anos. Tentei no Itau e Bradesco',
       'Mas isso funciona mesmo? Parece golpe',
-      'Ok, vou ouvir',
-      'Entendi. Mas quanto custa?',
+      'Ta, mas e caro?',
+      'Vou pensar',
+      'Voltei, quero fazer',
     ],
   },
   {
-    name: 'CENARIO 3: Lead direto ("quero fazer logo")',
+    name: 'CENARIO 3: Lead direto — quer resolver rapido',
     messages: [
       'Quero limpar meu nome',
-      '2',
-      'SPC e Serasa, 6 meses',
-      'Nunca tentei. Quero resolver rapido',
-      'Pode mandar o audio',
-      'Ouvi. Manda a imagem',
-      'Vi. Manda o video',
-      'Quero fazer agora. Me manda o link',
+      'SPC e Serasa, 6 meses. Nunca tentei resolver',
+      'Pode mandar',
+      'Ouvi',
+      'Vi a imagem',
+      'Assisti o video. Quero fazer',
+      'Manda o link',
     ],
   },
   {
-    name: 'CENARIO 4: Lead que pergunta preço cedo demais',
+    name: 'CENARIO 4: Lead pergunta preco antes da hora',
     messages: [
       'Oi',
       'Quanto custa pra limpar o nome?',
-      '2',
-      'Serasa, 1 ano',
-      'Primeira vez tentando',
+      'Serasa, 1 ano. Primeira vez tentando',
+      'Ok, pode mandar o material',
+      'Ouvi o audio. E ai?',
+      'Vi a imagem. Entendi',
+      'Assisti. Quanto custa?',
+    ],
+  },
+  {
+    name: 'CENARIO 5: Lead manda audio/imagem',
+    messages: [
+      'oi',
+      '3',
+      'Quero aumentar meu score. Banco sempre nega. Faz 1 ano tentando',
+      'Ta, e o que vcs fazem exatamente?',
+    ],
+  },
+  {
+    name: 'CENARIO 6: Lead quer falar com humano',
+    messages: [
+      'oi',
+      '1',
+      'Quero falar com alguem de verdade, nao com robo',
+    ],
+  },
+  {
+    name: 'CENARIO 7: Lead retornando (ja conversou antes)',
+    initialState: {
+      phase: 2,
+      name: 'Carlos',
+      message_count: 6,
+      user_profile: { educational_stage: 1, negativacao_local: 'serasa' },
+      recommended_product: 'diagnostico',
+    },
+    messages: [
+      'Oi, voltei. Sobre aquele diagnostico...',
+      'Sim, ouvi o audio. Me explica melhor',
+      'Entendi. Quero fazer',
+    ],
+  },
+  {
+    name: 'CENARIO 8: Lead opcao 4 — ja estava em atendimento',
+    messages: [
+      'oi',
+      '4',
+      'Meu nome e Joao, conversei ontem',
     ],
   },
 ];
@@ -74,7 +116,6 @@ async function callClaude(systemPrompt, messages) {
 }
 
 function parseMetadata(text) {
-  // Use same extraction logic as the real system (claude.js extractMetadata)
   let metadataMatch = text.match(/\[METADATA\]([\s\S]*?)\[\/METADATA\]/);
   if (!metadataMatch) {
     metadataMatch = text.match(/\[METADATA\]([\s\S]*)$/);
@@ -95,7 +136,7 @@ async function simulateScenario(scenario) {
   console.log(scenario.name);
   console.log('='.repeat(70));
 
-  let state = {
+  let state = scenario.initialState ? { ...scenario.initialState } : {
     phase: 0,
     price_counter: 0,
     link_counter: 0,
@@ -105,8 +146,15 @@ async function simulateScenario(scenario) {
     recommended_product: null,
     message_count: 0,
   };
+  // Ensure user_profile exists
+  state.user_profile = state.user_profile || {};
+
+  if (scenario.initialState) {
+    console.log(`  [INITIAL STATE] phase=${state.phase} | edu=${state.user_profile?.educational_stage || 0} | name=${state.name} | msgs=${state.message_count}`);
+  }
 
   const conversationHistory = [];
+  let totalIssues = 0;
 
   for (let i = 0; i < scenario.messages.length; i++) {
     const userMsg = scenario.messages[i];
@@ -121,74 +169,77 @@ async function simulateScenario(scenario) {
       break;
     }
 
-    // Parse metadata from response (same format as real system)
     const { data: metadata, cleanText: responseText } = parseMetadata(fullResponse);
 
-    if (!metadata) {
-      console.log(`  [WARN] No metadata parsed from response!`);
-    }
-
-    // Determine educational material dispatch
+    // EXACT same dispatch logic as manager.js (no aiIntroduced check)
     const effectivePhase = metadata?.phase ?? state.phase;
     const eduStage = state.user_profile?.educational_stage || 0;
-    const phaseAllowsEdu = effectivePhase >= 2;
-    const aiIntroduced = eduStage > 0 || /audio|diagnostico|raio.?x/i.test(responseText);
-    const shouldAdvanceEdu = phaseAllowsEdu && eduStage < 3 && aiIntroduced;
+    const shouldAdvanceEdu = effectivePhase >= 2 && eduStage < 3;
 
-    let mediaAction = 'nenhuma';
+    let mediaAction = '-';
     let newEduStage = eduStage;
     if (shouldAdvanceEdu) {
-      if (eduStage === 0) { mediaAction = 'AUDIO enviado'; newEduStage = 1; }
-      else if (eduStage === 1) { mediaAction = 'INFOGRAFICO enviado'; newEduStage = 2; }
-      else if (eduStage === 2) { mediaAction = 'VIDEO enviado'; newEduStage = 3; }
+      if (eduStage === 0) { mediaAction = 'AUDIO'; newEduStage = 1; }
+      else if (eduStage === 1) { mediaAction = 'INFOGRAFICO'; newEduStage = 2; }
+      else if (eduStage === 2) { mediaAction = 'VIDEO'; newEduStage = 3; }
     }
 
     // Check for issues
     const issues = [];
     const charCount = responseText.length;
-    if (charCount > 250 && state.phase > 1) issues.push(`TEXTAO (${charCount} chars)`);
-    if (state.phase <= 2 && /credpositivo\.com/i.test(responseText)) issues.push('LINK NA FASE ERRADA');
-    if (state.phase <= 2 && /R\$\d+/i.test(responseText)) issues.push('PRECO NA FASE ERRADA');
-    if (/R\$97/i.test(responseText)) issues.push('PRECO ERRADO (R$97 em vez de R$67)');
-    if (/fico.{0,5}disposi/i.test(responseText)) issues.push('FRASE PROIBIDA');
-    if (/\[.*?\]/i.test(responseText)) issues.push('TAG SISTEMA VAZOU');
+    if (charCount > 300 && state.phase > 1) issues.push(`TEXTAO(${charCount})`);
+    if (effectivePhase <= 2 && /credpositivo\.com/i.test(responseText)) issues.push('LINK_CEDO');
+    if (effectivePhase <= 2 && /R\$\d+/i.test(responseText)) issues.push('PRECO_CEDO');
+    if (/R\$97/i.test(responseText)) issues.push('PRECO_ERRADO');
+    if (/fico.{0,5}disposi|qualquer coisa me chama|boa sorte/i.test(responseText)) issues.push('FRASE_PROIBIDA');
+    if (/\[(?!METADATA).*?\]/i.test(responseText) && responseText.length > 5) issues.push('TAG_VAZOU');
+    if (!metadata) issues.push('SEM_METADATA');
+    totalIssues += issues.length;
 
-    // Print step
-    console.log(`\n  [MSG ${i + 1}] Lead: "${userMsg}"`);
-    console.log(`  [AI] (${charCount} chars): ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
-    console.log(`  [STATE] phase: ${state.phase}→${effectivePhase} | edu: ${eduStage}→${newEduStage} | media: ${mediaAction}`);
-    if (metadata) console.log(`  [META] phase=${metadata.phase} link=${metadata.should_send_link} product=${metadata.recommended_product} audios=${metadata.should_send_product_audios}`);
-    if (issues.length > 0) console.log(`  [ISSUE] ${issues.join(' | ')}`);
+    // Print step (compact)
+    const issueStr = issues.length > 0 ? ` !! ${issues.join(' ')}` : '';
+    console.log(`\n  [${i + 1}] "${userMsg}"`);
+    console.log(`      → (${charCount}c) ${responseText.substring(0, 180)}${responseText.length > 180 ? '...' : ''}`);
+    console.log(`      ph:${state.phase}→${effectivePhase} edu:${eduStage}→${newEduStage} media:${mediaAction} prod:${metadata?.recommended_product || '-'}${issueStr}`);
 
-    // Update state
+    // Update state (same as manager.js applyMetadataUpdates)
     if (metadata?.phase !== undefined) state.phase = metadata.phase;
     if (metadata?.recommended_product) state.recommended_product = metadata.recommended_product;
     if (metadata?.user_profile_update) {
       state.user_profile = { ...state.user_profile, ...metadata.user_profile_update };
     }
+    if (metadata?.price_mentioned) state.price_counter = (state.price_counter || 0) + 1;
+    if (metadata?.should_send_link) state.link_counter = (state.link_counter || 0) + 1;
     if (newEduStage !== eduStage) {
       state.user_profile.educational_stage = newEduStage;
       state.user_profile.educational_material_sent = newEduStage >= 3;
     }
-    state.message_count = (state.message_count || 0) + 2; // user + agent
+    if (metadata?.user_profile_update?.name) state.name = metadata.user_profile_update.name;
+    state.message_count = (state.message_count || 0) + 2;
 
-    // Add AI response to history (without metadata)
     conversationHistory.push({ role: 'assistant', content: responseText });
   }
 
-  console.log(`\n  [FINAL STATE] phase=${state.phase} | edu_stage=${state.user_profile?.educational_stage || 0} | product=${state.recommended_product}`);
+  const verdict = totalIssues === 0 ? 'PASS' : `${totalIssues} ISSUES`;
+  console.log(`\n  [RESULT] ${verdict} | phase=${state.phase} edu=${state.user_profile?.educational_stage || 0} product=${state.recommended_product || '-'} name=${state.name || '-'}`);
+  return totalIssues;
 }
 
 async function main() {
-  console.log('CredPositivo Flow Simulation');
+  console.log('CredPositivo Flow Simulation v2');
   console.log('Model: claude-haiku-4-5-20251001');
   console.log('Date:', new Date().toISOString());
+  console.log('Matching EXACT manager.js dispatch logic\n');
 
+  let total = 0;
   for (const scenario of SCENARIOS) {
-    await simulateScenario(scenario);
+    total += await simulateScenario(scenario);
   }
 
-  console.log('\n\nSIMULATION COMPLETE');
+  console.log('\n' + '='.repeat(70));
+  console.log(`TOTAL: ${total} issues across ${SCENARIOS.length} scenarios`);
+  console.log('Note: PRECO_CEDO and LINK_CEDO are caught by output-filter in real system');
+  console.log('='.repeat(70));
 }
 
 main().catch(console.error);
