@@ -472,6 +472,33 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
         await db.updateConversation(conversation.id, { user_profile: updatedProfile });
         conversation.user_profile = updatedProfile;
         console.log(`[Manager] Educational stage updated: ${eduStage}→${newStage} for ${phone}`);
+
+        // Schedule nudge: if lead doesn't respond in 5 min, send a follow-up
+        const nudgeDelay = 5 * 60 * 1000; // 5 minutes
+        const convId = conversation.id;
+        const currentMsgCount = conversation.message_count || 0;
+        setTimeout(async () => {
+          try {
+            const freshConv = await db.getConversation(convId);
+            if (!freshConv) return;
+            const freshMsgCount = freshConv.message_count || 0;
+            // Only nudge if no new messages since we sent the material
+            if (freshMsgCount <= currentMsgCount + 1) {
+              const nudgeMessages = {
+                1: 'Conseguiu ouvir o audio? Se tiver alguma duvida, me fala.',
+                2: 'Conseguiu ver a imagem? Qualquer duvida me fala aqui.',
+                3: 'Conseguiu assistir o video? Me conta o que achou.'
+              };
+              const nudgeText = nudgeMessages[newStage];
+              if (nudgeText) {
+                await sendMessages(remoteJid, nudgeText, botTokenForReply);
+                console.log(`[Manager] Edu nudge sent to ${phone} (stage ${newStage}, no response in 5min)`);
+              }
+            }
+          } catch (nudgeErr) {
+            console.error(`[Manager] Edu nudge error:`, nudgeErr.message);
+          }
+        }, nudgeDelay);
       } catch (err) {
         console.error(`[Manager] Failed to send educational material:`, err.message);
       }

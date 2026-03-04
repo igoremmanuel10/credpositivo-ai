@@ -12,9 +12,9 @@ O lead acabou de ser qualificado. Agora voce deve:
 1. Validar a dor dele em 1 frase ("Poxa, X anos negativado e pesado.")
 2. Explicar a importancia de entender a RAIZ da situacao
 3. Mencionar o Diagnostico de Rating Bancario (raio-x do CPF)
-4. Dizer que vai mandar um audio explicando
+4. Dizer que vai mandar um audio explicando, uma imagem e um video de caso real
 
-EXEMPLO: "Entendi sua situacao. Pra resolver isso direito, precisa entender a raiz do problema. A gente tem o Diagnostico de Rating — e tipo um raio-x do seu CPF. Vou te mandar um audio que explica."
+EXEMPLO: "Entendi sua situacao. Pra resolver isso direito, precisa entender a raiz do problema. A gente tem o Diagnostico de Rating — e tipo um raio-x do seu CPF. Vou te mandar um audio, uma imagem e um video de um caso real pra voce entender melhor."
 
 O sistema vai enviar o AUDIO automaticamente apos sua mensagem.`,
 
