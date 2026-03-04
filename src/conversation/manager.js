@@ -404,21 +404,39 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       }
     }
 
-    // 7.8 Phase 2: Material educativo sequencial (áudio → infográfico → vídeo dashboard)
+    // 7.8 Calculate educational material flags (sending happens AFTER text)
     const educationalSent = conversation.user_profile?.educational_material_sent || false;
     const aiRequestedEducational = metadata.should_send_audio_diagnostico || metadata.should_send_product_audios;
     // AUTO-DISPATCH: If lead was already in phase 2+ and material not sent, auto-dispatch
-    // conversation.phase = phase BEFORE this message, metadata.phase = phase AFTER
-    // First message entering phase 2: conversation.phase=1, skip (let AI ask qualifying question)
-    // Second message in phase 2: conversation.phase=2, auto-dispatch material
     const autoDispatchEducational = !educationalSent && conversation.phase >= 2 && (metadata.phase ?? conversation.phase) >= 2;
     if (autoDispatchEducational && !aiRequestedEducational) {
       console.log(`[Manager] AUTO-DISPATCH: Lead ${phone} in phase ${conversation.phase}→${metadata.phase}, educational not sent. Forcing dispatch.`);
     }
     const shouldSendEducational = (aiRequestedEducational || autoDispatchEducational) && config.media.enabled && !educationalSent;
     console.log('[Manager] Media check: ai_requested=' + aiRequestedEducational + ', auto_dispatch=' + autoDispatchEducational + ', educational_sent=' + educationalSent + ', media.enabled=' + config.media.enabled);
+
+    // 7.85 Strip [AUDIO] tag from response text (legacy cleanup)
+    const hasAudioTag = responseText.includes('[AUDIO]');
+    const cleanedResponseText = responseText.replace(/\[AUDIO\]/g, '').trim();
+
+    // 7.9 Fix any incorrect/shortened site links before sending
+    let fixedResponseText = sanitizeForWhatsApp(fixSiteLinks(cleanedResponseText), phone);
+
+    // 8. Human-like delay: wait 8-15s before sending (avoids robotic feel)
+    const minDelay = 8000;
+    const maxDelay = 15000;
+    const humanDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    console.log(`[Manager] Human delay: ${(humanDelay / 1000).toFixed(1)}s before sending to ${phone}`);
+    await new Promise(r => setTimeout(r, humanDelay));
+
+    // 8.1 Send TEXT response FIRST via WhatsApp
+    let messageIds = await sendMessages(remoteJid, fixedResponseText, botTokenForReply);
+
+    // 8.2 THEN send educational material (text arrives first, then media follows)
     if (shouldSendEducational) {
       try {
+        await new Promise(r => setTimeout(r, 3000)); // 3s gap after text
+
         // 1. Audio explicando o diagnóstico
         const audioDiag = getAudioDiagnostico();
         if (audioDiag) {
@@ -453,23 +471,6 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     } else if ((metadata.should_send_audio_diagnostico || metadata.should_send_product_audios) && educationalSent) {
       console.log(`[Manager] Educational material already sent to ${phone}. Skipping.`);
     }
-
-    // 7.85 Strip [AUDIO] tag from response text (legacy cleanup)
-    const hasAudioTag = responseText.includes('[AUDIO]');
-    const cleanedResponseText = responseText.replace(/\[AUDIO\]/g, '').trim();
-
-    // 7.9 Fix any incorrect/shortened site links before sending
-    let fixedResponseText = sanitizeForWhatsApp(fixSiteLinks(cleanedResponseText), phone);
-
-    // 8. Human-like delay: wait 8-15s before sending (avoids robotic feel)
-    const minDelay = 8000;
-    const maxDelay = 15000;
-    const humanDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-    console.log(`[Manager] Human delay: ${(humanDelay / 1000).toFixed(1)}s before sending to ${phone}`);
-    await new Promise(r => setTimeout(r, humanDelay));
-
-    // 8.1 Send response via WhatsApp — single message (no splitting)
-    let messageIds = await sendMessages(remoteJid, fixedResponseText, botTokenForReply);
 
     // 8.5 Phase 3: Send prova social on objection (AI sets should_send_prova_social)
     if (metadata.should_send_prova_social && config.media.enabled) {
