@@ -3,6 +3,8 @@ import { db } from '../db/client.js';
 import { handleFollowup } from './manager.js';
 import { config, isBusinessHours, msUntilNextBusinessHour } from '../config.js';
 import { cache } from '../db/redis.js';
+import { sendMessages } from '../quepasa/client.js';
+import { shouldSendNudge } from '../flow/media-rules.js';
 
 /**
  * Start the follow-up scheduler.
@@ -42,6 +44,7 @@ export function startFollowupScheduler() {
     }
 
     try {
+      await processNudges();
       await processTimeouts();
       await processPendingFollowups();
     } catch (err) {
@@ -51,6 +54,97 @@ export function startFollowupScheduler() {
 
   console.log('[Followup Scheduler] ATIVADO (every 5 minutes, business hours only: 8h-20h BRT)');
   console.log('[Followup Scheduler] Sequencia: 5 follow-ups (24h, 48h, 72h, 5d, 7d) com audio pre-gravado no FU1');
+}
+
+/**
+ * Process pending nudges from Redis.
+ * Scans all nudge:* keys, checks if ready to fire, sends the message.
+ * Nudges are lightweight follow-ups scheduled 5-8 min after educational material
+ * or prova social to check if the lead consumed the content.
+ *
+ * Data structure per nudge key:
+ *   { type, scheduledAt, conversationId, nudgeText, remoteJid, botToken, phase }
+ */
+async function processNudges() {
+  const ADMIN_PHONES = ['5511932145806', '557191234115', '557187700120'];
+
+  let nudgeKeys;
+  try {
+    nudgeKeys = await cache.getNudgeKeys();
+  } catch (err) {
+    console.error('[Nudge] Failed to scan Redis keys:', err.message);
+    return;
+  }
+
+  if (!nudgeKeys || nudgeKeys.length === 0) return;
+
+  let processed = 0;
+  let skipped = 0;
+
+  for (const key of nudgeKeys) {
+    // Extract phone from key pattern "nudge:{phone}"
+    const phone = key.replace('nudge:', '');
+    if (!phone) continue;
+
+    // Skip admin phones
+    if (ADMIN_PHONES.some(p => phone.includes(p) || p.includes(phone))) {
+      skipped++;
+      continue;
+    }
+
+    try {
+      // shouldSendNudge checks scheduledAt and auto-deletes the key on consumption
+      const nudge = await shouldSendNudge(phone);
+      if (!nudge) {
+        skipped++; // not ready yet (TTL hasn't expired or scheduledAt in future)
+        continue;
+      }
+
+      const { nudgeText, remoteJid, botToken, conversationId, type } = nudge;
+
+      // Validate we have the minimum data to send
+      if (!nudgeText || !remoteJid || !botToken) {
+        console.warn(`[Nudge] Incomplete data for ${phone}, skipping. type=${type}`);
+        continue;
+      }
+
+      // OPT-OUT check: don't nudge opted-out leads
+      const conv = await db.getConversation(phone);
+      if (conv && conv.opted_out) {
+        console.log(`[Nudge] BLOCKED ${type} for ${phone} — lead opted out.`);
+        continue;
+      }
+
+      // ANTI-SPAM: Skip if last message is already from agent
+      if (conversationId) {
+        const recentMessages = await db.getMessages(conversationId);
+        if (recentMessages.length > 0) {
+          const lastMsg = recentMessages[recentMessages.length - 1];
+          if (lastMsg.role === 'agent') {
+            console.log(`[Nudge] BLOCKED ${type} for ${phone} — last message already from agent.`);
+            continue;
+          }
+        }
+      }
+
+      // Send the nudge text via WhatsApp
+      await sendMessages(remoteJid, [nudgeText], botToken);
+      processed++;
+
+      console.log(`[Nudge] Sent ${type} nudge to ${phone}: "${nudgeText.substring(0, 50)}..."`);
+
+      // Save as agent message in DB
+      if (conversationId) {
+        await db.saveMessage(conversationId, 'agent', nudgeText);
+      }
+    } catch (err) {
+      console.error(`[Nudge] Error processing nudge for ${phone}:`, err.message);
+    }
+  }
+
+  if (processed > 0 || nudgeKeys.length > 5) {
+    console.log(`[Nudge] Cycle complete: ${processed} sent, ${skipped} skipped, ${nudgeKeys.length} total keys`);
+  }
 }
 
 /**

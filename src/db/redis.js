@@ -159,6 +159,14 @@ export const cache = {
     return redis.keys("vapi_scheduled:*");
   },
 
+  /**
+   * Get all pending nudge keys (nudge:*).
+   * Returns array of full keys like ["nudge:5511999999999"].
+   */
+  async getNudgeKeys() {
+    return redis.keys("nudge:*");
+  },
+
   // --- Bot-to-bot loop detection ---
 
   /**

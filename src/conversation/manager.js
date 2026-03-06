@@ -4,7 +4,7 @@ import { sendMessages, sendMedia } from '../quepasa/client.js';
 import { findOrCreateContact, findOrCreateConversation, getInboxForPhone, sendOutgoingMessage, updateContactAttributes, setConversationLabels, buildLeadAttributes, buildPhaseLabels } from '../chatwoot/client.js';
 import { getAgentResponse } from '../ai/claude.js';
 import { applyMetadataUpdates } from './state.js';
-import { getMediaForPhase, getProductAudios, getFollowupAudio, getProvaSocial, getDiagnosticoVideo, getAudioApresentacao, getAudioDiagnostico, getTutorialVideo, getRatingInfoImage, getProvaSocialNew } from '../media/assets.js';
+import { getAudioApresentacao, getAudioDiagnostico, getTutorialVideo, getRatingInfoImage, getProvaSocialNew, getProvaSocial, getFollowupAudio } from '../media/assets.js';
 import { sendMediaBase64 } from '../quepasa/client.js';
 import { fixSiteLinks, sanitizeForWhatsApp } from '../ai/output-filter.js';
 import { createCheckout } from '../payment/mercadopago.js';
@@ -14,17 +14,19 @@ import { captureError } from '../monitoring/sentry.js';
 import { assignVariants, getPromptOverride } from '../ab/manager.js';
 import crypto from 'crypto';
 import { syncLeadToKrayin, syncPhaseChange, syncDealLost } from '../crm/sync.js';
-
 import { handleVoiceCallTrigger } from '../voice/call-handler.js';
 import { generateManagerReport } from '../manager/luan.js';
 import { sendAlexReportNow } from '../devops/alex.js';
 
+// === STATE MACHINE & MEDIA RULES (deterministic flow control) ===
+import { evaluateTransition, detectQualificationPoints, detectIntent, validateTransition, getPhaseConfig } from '../flow/machine.js';
+import { getEducationalAction, getProvaSocialAction, recordProvaSocialSent, getPaymentLinkAction, scheduleNudge, cancelNudge, MEDIA_CONFIG } from '../flow/media-rules.js';
+
 // === PAYMENT LINK: Generate personalized MP checkout link ===
 const PRODUCT_PRICES = { diagnostico: 67, limpa_nome: 497, rating: 997 };
 
-async function generatePaymentLink(conversation, metadata) {
+async function generatePaymentLink(conversation, product) {
   try {
-    const product = metadata.recommended_product || conversation.recommended_product;
     if (!product || !PRODUCT_PRICES[product]) {
       console.log('[PaymentLink] No valid product for checkout:', product);
       return null;
@@ -69,8 +71,6 @@ function replaceSiteUrlWithPaymentLink(text, paymentUrl, siteUrl) {
 const phoneTokenMap = new Map();
 // In-memory map: phone → persona (detected from bot token at webhook time)
 const phonePersonaMap = new Map();
-// In-memory map: phone → nudge timer (auto-cleared on response or fire)
-const nudgeTimers = new Map();
 
 // Varied captions for prova social (rotated by conversation id or attempt)
 const PROVA_SOCIAL_CAPTIONS = [
@@ -88,13 +88,6 @@ function getProvaSocialCaption(seed = 0) {
 /**
  * Handle an incoming WhatsApp message.
  * Uses debounce to group consecutive messages before processing.
- *
- * @param {string} phone - Normalized phone number (for DB key)
- * @param {string} remoteJid - Raw JID from webhook (for sending back via Evolution)
- * @param {string} text - Message content
- * @param {string} pushName - WhatsApp display name
- * @param {string|null} botTokenForReply - Bot token to use for replies (multi-number support)
- * @param {string} botPhone - Bot phone number that received the message (for persona detection)
  */
 export async function handleIncomingMessage(phone, remoteJid, text, pushName, botTokenForReply = null, botPhone = '') {
   // Store token mapping for this phone (for use in debounced processing)
@@ -141,15 +134,18 @@ export async function handleIncomingMessage(phone, remoteJid, text, pushName, bo
 
 /**
  * Process all buffered messages after debounce window expires.
- * Groups consecutive messages into a single Claude call.
+ *
+ * Pipeline:
+ * 1. Load conversation, save incoming message
+ * 2. STATE MACHINE: detect intent, evaluate qualification, determine phase transition
+ * 3. LLM: generate conversational text (phase/media decisions already made)
+ * 4. MEDIA RULES: send educational material, prova social, payment links
+ * 5. Save, forward to Chatwoot, update state, sync CRM
  */
 async function processBufferedMessages(phone, remoteJid, pushName) {
   // Retrieve the stored token and persona for this phone
   const botTokenForReply = phoneTokenMap.get(phone) || null;
   const persona = phonePersonaMap.get(phone) || 'augusto';
-
-  // Cooldown removed — debounce (3s) + OpenAI latency (~3-5s) already prevent
-  // rapid-fire responses. Cooldown was causing messages to be silently dropped.
 
   // Re-check hourly limit
   const hourlyCount = await cache.getHourlyMessageCount(phone);
@@ -222,7 +218,9 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
   }
 
   try {
-    // 1. Load or create conversation
+    // ════════════════════════════════════════════════════════════════
+    // STEP 1: Load or create conversation
+    // ════════════════════════════════════════════════════════════════
     let conversation = await cache.getConversation(phone);
     if (!conversation) {
       conversation = await db.getConversation(phone);
@@ -232,10 +230,6 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       const botPhone = Object.entries(config.sdr.phoneToPersona).find(([, p]) => p === persona)?.[0] || '';
       conversation = await db.createConversation(phone, pushName || null, persona, botPhone);
       console.log(`[Manager] New conversation created for ${phone} (persona: ${persona})`);
-      // Welcome audio DISABLED: menu must be the first thing the lead sees.
-      // Audio was confusing because it arrived before the menu text.
-      // Educational audio is now sent only in phase 2 (staged materials).
-      // CRM: Sync new lead to Krayin (non-blocking)
       syncLeadToKrayin(conversation, pushName, persona).catch(err => {
         console.error('[CRM] Failed to sync new lead:', err.message);
       });
@@ -260,24 +254,20 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // Cancel any pending followups since user responded
     await db.cancelFollowups(conversation.id);
 
-    // Cancel any pending nudge timer since user responded
-    if (nudgeTimers.has(phone)) {
-      clearTimeout(nudgeTimers.get(phone));
-      nudgeTimers.delete(phone);
-      console.log(`[Manager] Nudge cancelled for ${phone} (lead responded)`);
-    }
+    // Cancel any pending nudge (Redis-persisted) since user responded
+    await cancelNudge(phone);
 
-    // 2. Save incoming message (combined)
+    // Save incoming message
     await db.addMessage(conversation.id, 'user', combinedText, conversation.phase);
 
-    // 3. Load message history (last 12 messages — saves ~40% tokens vs 20)
+    // Load message history (last 12 messages — saves ~40% tokens vs 20)
     const messages = await db.getMessages(conversation.id, 12);
     const totalMessages = await db.getMessageCount(conversation.id);
 
     // BOT-LOOP PROTECTION: Max messages per conversation
     const maxConversationMessages = config.limits.maxConversationMessages || 200;
     if (totalMessages > maxConversationMessages) {
-      console.warn(`[Manager] CONVERSATION LIMIT reached for ${phone}: ${totalMessages}/${maxConversationMessages} messages. Auto-pausing (not responding).`);
+      console.warn(`[Manager] CONVERSATION LIMIT reached for ${phone}: ${totalMessages}/${maxConversationMessages} messages. Auto-pausing.`);
       return;
     }
 
@@ -290,78 +280,110 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       });
     }
 
-    // 4. Build state for Claude
+    // ════════════════════════════════════════════════════════════════
+    // STEP 2: STATE MACHINE — Deterministic flow decisions BEFORE LLM
+    // ════════════════════════════════════════════════════════════════
+    const intent = detectIntent(combinedText);
+    const qualification = detectQualificationPoints(combinedText, conversation.user_profile || {});
+    const transition = evaluateTransition(conversation, combinedText);
+    const phaseConfig = getPhaseConfig(conversation.phase);
+
+    console.log(`[Machine] phone=${phone} phase=${conversation.phase} intent=${intent.type} qual=${qualification.points}/3 advance=${transition.shouldAdvance}→${transition.nextPhase} reason=${transition.reason}`);
+
+    // Apply phase transition BEFORE calling LLM (so LLM gets correct phase context)
+    let effectivePhase = conversation.phase;
+    if (transition.shouldAdvance) {
+      effectivePhase = transition.nextPhase;
+      console.log(`[Machine] Phase transition: ${conversation.phase} → ${effectivePhase} (${transition.reason})`);
+    }
+
+    // Enrich user_profile with qualification data detected by regex
+    const profileUpdatesFromMachine = {};
+    if (qualification.detected.onde_negativado && !conversation.user_profile?.onde_negativado) {
+      profileUpdatesFromMachine.onde_negativado = true;
+    }
+    if (qualification.detected.tempo_situacao && !conversation.user_profile?.tempo_situacao) {
+      profileUpdatesFromMachine.tempo_situacao = true;
+    }
+    if (qualification.detected.tentou_banco && !conversation.user_profile?.tentou_banco) {
+      profileUpdatesFromMachine.tentou_banco = true;
+    }
+
+    // Determine media actions BEFORE LLM (so we can inform LLM what's about to happen)
+    const eduAction = getEducationalAction({ ...conversation, phase: effectivePhase });
+    const provaSocialAction = await getProvaSocialAction({ ...conversation, phase: effectivePhase }, intent.type);
+    const paymentLinkAction = getPaymentLinkAction({ ...conversation, phase: effectivePhase }, intent.type);
+
+    // ════════════════════════════════════════════════════════════════
+    // STEP 3: Build state for LLM and get conversational response
+    // ════════════════════════════════════════════════════════════════
     const state = {
-      phase: conversation.phase,
+      phase: effectivePhase, // LLM sees the phase AFTER machine transition
       price_counter: conversation.price_counter,
       link_counter: conversation.link_counter,
       ebook_sent: conversation.ebook_sent,
       name: conversation.name || pushName || null,
-      user_profile: conversation.user_profile || {},
+      user_profile: { ...(conversation.user_profile || {}), ...profileUpdatesFromMachine },
       recommended_product: conversation.recommended_product,
       message_count: conversation.message_count || 0,
     };
 
-    // 4.5. A/B test variant assignment
+    // A/B test variant assignment
     const activePersona = conversation.persona || persona;
     let abOverrides = {};
     try {
       const assignments = await assignVariants(conversation.id, activePersona);
-      // Resolve prompt overrides for assigned variants
       for (const target of Object.keys(assignments)) {
         const override = await getPromptOverride(assignments, target);
         if (override) abOverrides[target] = override;
       }
     } catch (err) {
-      // A/B tests are non-critical — don't block conversation
       console.warn('[Manager] A/B test assignment failed (non-critical):', err.message);
     }
 
-    // 5. Get AI response (use persona from conversation or detected from bot token)
+    // Get AI response — LLM generates ONLY conversational text
     let responseText, metadata;
     try {
       ({ text: responseText, metadata } = await getAgentResponse(state, messages, combinedText, activePersona, abOverrides));
     } catch (aiErr) {
       console.error(`[Manager] AI completely failed for ${phone} (${aiErr.status || aiErr.message}). Sending emergency response.`);
-      // Emergency static response — lead NEVER goes unanswered
       const emergencyResponses = {
         0: 'Opa, tudo bem? Aqui e o Augusto da CredPositivo. Me conta, o que voce ta buscando resolver?',
         1: 'Desculpa a demora! Me conta mais sobre a sua situacao pra eu te ajudar melhor.',
         2: 'Opa, desculpa a demora! Estava verificando aqui. Me conta, o que mais te preocupa na sua situacao?',
         3: 'Desculpa a demora! Estou aqui pra te ajudar. Ficou alguma duvida sobre o diagnostico?',
       };
-      responseText = emergencyResponses[conversation.phase] || emergencyResponses[0];
-      metadata = { phase: conversation.phase };
-      captureError(aiErr, { module: 'manager', action: 'emergency_response', extra: { phone, phase: conversation.phase } });
+      responseText = emergencyResponses[effectivePhase] || emergencyResponses[0];
+      metadata = {};
+      captureError(aiErr, { module: 'manager', action: 'emergency_response', extra: { phone, phase: effectivePhase } });
     }
 
     // FORCE MENU: If phase 0 and AI didn't send the menu, inject it
     const MENU_TEXT = 'Opa, seja bem-vindo(a) ao CredPositivo! Me chamo Augusto, estou aqui pra te ajudar.\n\nQual dessas opções abaixo você está buscando?\n1 - Diagnóstico de Rating\n2 - Limpa Nome\n3 - Rating Bancário\n4 - Já estava em atendimento';
-    if (conversation.phase === 0 && conversation.message_count <= 1) {
+    if (effectivePhase === 0 && (conversation.message_count || 0) <= 1) {
       const normalized = (responseText || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
       if (!normalized.includes('qual dessas opcoes') && !normalized.includes('1 - diagnostico')) {
         console.warn(`[Manager] AI skipped menu for ${phone}. Forcing menu text.`);
         responseText = MENU_TEXT;
-        metadata = { phase: 0, should_send_link: false, should_send_product_audios: false, recommended_product: null, transfer_to_paulo: false };
+        metadata = {};
       }
     }
 
     // DEFAULT METADATA: If AI forgot metadata, provide defaults
     if (!metadata || Object.keys(metadata).length === 0) {
-      console.warn(`[Manager] AI returned no metadata for ${phone}. Using defaults.`);
-      metadata = { phase: conversation.phase };
+      metadata = {};
     }
-
-    // DEBUG: Phase transition and metadata tracking
-    console.log(`[Manager] Phase transition: ${conversation.phase} → ${metadata.phase ?? 'no change'} | metadata keys: ${Object.keys(metadata).join(',')}`);
 
     if (!responseText) {
       console.error(`[Manager] Empty response from Claude for ${phone}`);
       return;
     }
 
-    // 6. Check if lead wants to opt out — validate before trusting GPT
-    if (metadata.escalation_flag === 'opt_out') {
+    // ════════════════════════════════════════════════════════════════
+    // STEP 4: Validate opt-out (keyword match, not LLM opinion)
+    // ════════════════════════════════════════════════════════════════
+    const isOptOut = intent.type === 'opt_out' || metadata.escalation_flag === 'opt_out';
+    if (isOptOut) {
       const optOutPhrases = [
         'nao quero mais', 'não quero mais',
         'para de me', 'pare de me', 'para com isso',
@@ -374,199 +396,142 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
         'para de mandar', 'pare de mandar',
         'stop',
       ];
-      const normalizedMsg = combinedText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      const isRealOptOut = optOutPhrases.some(phrase => normalizedMsg.includes(phrase));
+      const normalizedOptOut = combinedText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const isRealOptOut = optOutPhrases.some(phrase => normalizedOptOut.includes(phrase));
 
       if (isRealOptOut) {
         await db.updateConversation(conversation.id, { opted_out: true });
         await db.cancelFollowups(conversation.id);
         console.log(`[Manager] Lead ${phone} opted out (confirmed by keyword match). Follow-ups cancelled.`);
-        // CRM: Mark lead as lost
         syncDealLost(phone, 'opt_out').catch(() => {});
       } else {
-        console.warn(`[Manager] GPT flagged opt_out for ${phone} but message "${combinedText.substring(0, 80)}" has no opt-out keyword. IGNORING flag.`);
+        console.warn(`[Manager] opt_out flagged for ${phone} but message "${combinedText.substring(0, 80)}" has no opt-out keyword. IGNORING.`);
       }
     }
 
-    // 7. Send ebook if flagged
-    if (metadata.should_send_ebook && !conversation.ebook_sent && config.site.ebookUrl) {
-      await sendDocument(
-        remoteJid,
-        config.site.ebookUrl,
-        'Guia Completo do Mercado de Crédito no Brasil',
-        'guia-credito-brasil.pdf'
-      );
-    }
-
-    // 7.5 Send phase-specific media (before text response)
-    const newPhase = metadata.phase ?? conversation.phase;
-    if (config.media.enabled) {
-      const media = getMediaForPhase(newPhase, { previousPhase: conversation.phase });
-      if (media && media.url) {
-        try {
-          await sendMedia(remoteJid, media.url, media.caption || '', botTokenForReply);
-          console.log(`[Manager] Sent phase media for phase ${newPhase}: ${media.url}`);
-        } catch (err) {
-          console.error(`[Manager] Failed to send phase media:`, err.message);
-        }
-      }
-    }
-
-    // 7.8 Staged educational material (one piece per message, not all at once)
-    const effectivePhase = metadata.phase ?? conversation.phase;
-    const eduStage = conversation.user_profile?.educational_stage || 0;
-    // Stage 0: nothing sent yet
-    // Stage 1: audio sent, waiting for reaction
-    // Stage 2: infographic sent, waiting for reaction
-    // Stage 3: video sent, all done
-    const phaseAllowsEducational = effectivePhase >= 2;
-    const shouldAdvanceEdu = phaseAllowsEducational && eduStage < 3 && config.media.enabled;
-    console.log('[Manager] Edu stage: ' + eduStage + ', phase=' + effectivePhase + ', should_advance=' + shouldAdvanceEdu);
-
-    // 7.85 Strip [AUDIO] tag from response text (legacy cleanup)
-    const hasAudioTag = responseText.includes('[AUDIO]');
+    // ════════════════════════════════════════════════════════════════
+    // STEP 5: Clean response text and apply human delay
+    // ════════════════════════════════════════════════════════════════
+    // Strip [AUDIO] tag (legacy cleanup)
     const cleanedResponseText = responseText.replace(/\[AUDIO\]/g, '').trim();
-
-    // 7.9 Fix any incorrect/shortened site links before sending
     let fixedResponseText = sanitizeForWhatsApp(fixSiteLinks(cleanedResponseText), phone);
 
-    // 8. Human-like delay: wait 8-15s before sending (avoids robotic feel)
+    // Human-like delay: wait 8-15s before sending (avoids robotic feel)
     const minDelay = 8000;
     const maxDelay = 15000;
     const humanDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
     console.log(`[Manager] Human delay: ${(humanDelay / 1000).toFixed(1)}s before sending to ${phone}`);
     await new Promise(r => setTimeout(r, humanDelay));
 
-    // 8.1 Send TEXT response FIRST via WhatsApp
+    // ════════════════════════════════════════════════════════════════
+    // STEP 6: Send text response via WhatsApp
+    // ════════════════════════════════════════════════════════════════
     let messageIds = await sendMessages(remoteJid, fixedResponseText, botTokenForReply);
 
-    // 8.2 STAGED educational material: one piece per message, with conversation between each
-    if (shouldAdvanceEdu) {
-      try {
-        await new Promise(r => setTimeout(r, 3000)); // 3s gap after text
-        let newStage = eduStage;
+    // ════════════════════════════════════════════════════════════════
+    // STEP 7: MEDIA RULES — Deterministic media dispatch
+    // ════════════════════════════════════════════════════════════════
 
-        if (eduStage === 0) {
-          // Stage 0→1: Send ONLY the audio
-          const audioDiag = getAudioDiagnostico();
-          if (audioDiag) {
-            await sendMediaBase64(remoteJid, audioDiag.base64, '', audioDiag.fileName, botTokenForReply, audioDiag.mimetype);
-            console.log(`[Manager] Edu stage 0→1: Audio sent to ${phone}`);
-          }
-          newStage = 1;
-        } else if (eduStage === 1) {
-          // Stage 1→2: Send ONLY the infographic
-          const ratingImg = getRatingInfoImage();
-          if (ratingImg) {
-            await sendMediaBase64(remoteJid, ratingImg.base64, '', ratingImg.fileName, botTokenForReply, ratingImg.mimetype);
-            console.log(`[Manager] Edu stage 1→2: Infographic sent to ${phone}`);
-          }
-          newStage = 2;
-        } else if (eduStage === 2) {
-          // Stage 2→3: Send video tutorial
-          const tutorialVid = getTutorialVideo();
-          if (tutorialVid) {
-            await sendMediaBase64(remoteJid, tutorialVid.base64, '', tutorialVid.fileName, botTokenForReply, tutorialVid.mimetype);
-            console.log(`[Manager] Edu stage 2→3: Video sent to ${phone}`);
-          }
-          newStage = 3;
+    // 7a. Educational material (phase 2+, one per message)
+    if (eduAction) {
+      try {
+        await new Promise(r => setTimeout(r, eduAction.delayAfterText)); // 3s gap after text
+        let mediaAsset = null;
+        const newStage = eduAction.newStage;
+
+        if (eduAction.asset === 'audio_diagnostico') {
+          mediaAsset = getAudioDiagnostico();
+        } else if (eduAction.asset === 'rating_info_image') {
+          mediaAsset = getRatingInfoImage();
+        } else if (eduAction.asset === 'tutorial_video') {
+          mediaAsset = getTutorialVideo();
         }
 
-        // Update stage in user_profile
-        const updatedProfile = { ...(conversation.user_profile || {}), educational_stage: newStage, educational_material_sent: newStage >= 3 };
+        if (mediaAsset) {
+          await sendMediaBase64(remoteJid, mediaAsset.base64, '', mediaAsset.fileName, botTokenForReply, mediaAsset.mimetype);
+          console.log(`[Manager] Edu stage ${eduAction.newStage - 1}→${newStage}: ${eduAction.asset} sent to ${phone}`);
+        }
+
+        // Update educational_stage in user_profile
+        const updatedProfile = {
+          ...(conversation.user_profile || {}),
+          ...profileUpdatesFromMachine,
+          educational_stage: newStage,
+          educational_material_sent: newStage >= 3,
+        };
         await db.updateConversation(conversation.id, { user_profile: updatedProfile });
         conversation.user_profile = updatedProfile;
-        console.log(`[Manager] Educational stage updated: ${eduStage}→${newStage} for ${phone}`);
+        console.log(`[Manager] Educational stage updated: ${eduAction.newStage - 1}→${newStage} for ${phone}`);
 
-        // Schedule nudge: if lead doesn't respond in 5 min, send a follow-up
-        const nudgeDelay = 5 * 60 * 1000; // 5 minutes
-        const convId = conversation.id;
-        const currentMsgCount = conversation.message_count || 0;
-        setTimeout(async () => {
-          try {
-            const freshConv = await db.getConversation(convId);
-            if (!freshConv) return;
-            const freshMsgCount = freshConv.message_count || 0;
-            // Only nudge if no new messages since we sent the material
-            if (freshMsgCount <= currentMsgCount + 1) {
-              const nudgeMessages = {
-                1: 'Conseguiu ouvir o audio? Se tiver alguma duvida, me fala.',
-                2: 'Conseguiu ver a imagem? Qualquer duvida me fala aqui.',
-                3: 'Conseguiu assistir o video? Me conta o que achou.'
-              };
-              const nudgeText = nudgeMessages[newStage];
-              if (nudgeText) {
-                await sendMessages(remoteJid, nudgeText, botTokenForReply);
-                await db.addMessage(convId, 'agent', nudgeText, freshConv.phase);
-                console.log(`[Manager] Edu nudge sent to ${phone} (stage ${newStage}, no response in 5min)`);
-              }
-            }
-          } catch (nudgeErr) {
-            console.error(`[Manager] Edu nudge error:`, nudgeErr.message);
-          }
-        }, nudgeDelay);
+        // Schedule nudge via Redis (survives restarts, unlike setTimeout)
+        await scheduleNudge(phone, 'educational', eduAction.nudgeDelay, {
+          conversationId: conversation.id,
+          nudgeText: eduAction.nudgeText,
+          remoteJid,
+          botToken: botTokenForReply,
+          phase: effectivePhase,
+        });
+        console.log(`[Manager] Edu nudge scheduled for ${phone} in ${eduAction.nudgeDelay / 1000}s`);
       } catch (err) {
         console.error(`[Manager] Failed to send educational material:`, err.message);
       }
     }
 
-    // 8.5 Phase 3: Send prova social on objection (AI sets should_send_prova_social)
-    if (metadata.should_send_prova_social && config.media.enabled) {
+    // 7b. Prova social (phase 3+, on trust objection)
+    if (provaSocialAction) {
       try {
-        const provaSocialCount = conversation.user_profile?.prova_social_count || 0;
-        if (provaSocialCount < 3) {
-          const provaSocial = getProvaSocialNew(provaSocialCount);
-          if (provaSocial) {
-            await new Promise(r => setTimeout(r, 2000));
-            await sendMediaBase64(remoteJid, provaSocial.base64, '', provaSocial.fileName, botTokenForReply, provaSocial.mimetype);
-            console.log(`[Manager] Prova social ${provaSocialCount + 1}/3 sent to ${phone}`);
-            // Track how many provas sociais were sent
-            const updatedProfile = { ...(conversation.user_profile || {}), prova_social_count: provaSocialCount + 1 };
-            await db.updateConversation(conversation.id, { user_profile: updatedProfile });
-            conversation.user_profile = updatedProfile;
-          }
-        } else {
-          console.log(`[Manager] All 3 provas sociais already sent to ${phone}. Skipping.`);
+        const provaSocial = getProvaSocialNew(provaSocialAction.assetIndex);
+        if (provaSocial) {
+          await new Promise(r => setTimeout(r, 2000));
+          await sendMediaBase64(remoteJid, provaSocial.base64, '', provaSocial.fileName, botTokenForReply, provaSocial.mimetype);
+          console.log(`[Manager] Prova social ${provaSocialAction.assetIndex + 1} sent to ${phone}`);
+
+          // Track prova social count + daily cooldown
+          const provaSocialCount = (conversation.user_profile?.prova_social_count || 0) + 1;
+          const updatedProfile = { ...(conversation.user_profile || {}), ...profileUpdatesFromMachine, prova_social_count: provaSocialCount };
+          await db.updateConversation(conversation.id, { user_profile: updatedProfile });
+          conversation.user_profile = updatedProfile;
+          await recordProvaSocialSent(phone);
+
+          // Schedule nudge via Redis
+          await scheduleNudge(phone, 'prova_social', provaSocialAction.nudgeDelay, {
+            conversationId: conversation.id,
+            nudgeText: provaSocialAction.nudgeText,
+            remoteJid,
+            botToken: botTokenForReply,
+            phase: effectivePhase,
+          });
+          console.log(`[Manager] Prova social nudge scheduled for ${phone} in ${provaSocialAction.nudgeDelay / 1000}s`);
         }
       } catch (err) {
         console.error(`[Manager] Failed to send prova social:`, err.message);
       }
-
-      // Schedule nudge if lead doesn't react to prova social (5-8 min)
-      const nudgeDelay = 300000 + Math.floor(Math.random() * 180000);
-      if (nudgeTimers.has(phone)) {
-        clearTimeout(nudgeTimers.get(phone));
-      }
-      const nudgeTimer = setTimeout(async () => {
-        try {
-          nudgeTimers.delete(phone);
-          const recentMsgs = await db.getMessages(conversation.id, 2);
-          const lastMsg = recentMsgs[recentMsgs.length - 1];
-          if (lastMsg && lastMsg.role === 'agent') {
-            const nudgeText = 'Conseguiu ver?';
-            await sendMessages(remoteJid, nudgeText, botTokenForReply);
-            await db.addMessage(conversation.id, 'agent', nudgeText, newPhase);
-            await cache.incrementHourlyMessageCount(phone);
-            console.log(`[Manager] Nudge sent to ${phone} after ${nudgeDelay/1000}s (no response after prova social)`);
-          }
-        } catch (err) {
-          console.error(`[Manager] Nudge failed for ${phone}:`, err.message);
-        }
-      }, nudgeDelay);
-      nudgeTimers.set(phone, nudgeTimer);
-      console.log(`[Manager] Nudge scheduled for ${phone} in ${nudgeDelay/1000}s`);
     }
 
-    // 9. Save agent message
-    await db.addMessage(
-      conversation.id,
-      'agent',
-      fixedResponseText,
-      newPhase,
-      messageIds
-    );
+    // 7c. Payment link (phase 3, on interest intent)
+    if (paymentLinkAction) {
+      try {
+        const paymentUrl = await generatePaymentLink(conversation, paymentLinkAction.product);
+        if (paymentUrl) {
+          await new Promise(r => setTimeout(r, 2000));
+          await sendMessages(remoteJid, paymentUrl, botTokenForReply);
+          console.log(`[Manager] Payment link sent to ${phone}: ${paymentLinkAction.product} R$${paymentLinkAction.price}`);
+          // Save as agent message
+          await db.addMessage(conversation.id, 'agent', paymentUrl, effectivePhase);
+        }
+      } catch (err) {
+        console.error(`[Manager] Failed to send payment link:`, err.message);
+      }
+    }
 
-    // 9.5 Forward agent response to Chatwoot (route to correct inbox based on persona)
+    // ════════════════════════════════════════════════════════════════
+    // STEP 8: Save agent message
+    // ════════════════════════════════════════════════════════════════
+    await db.addMessage(conversation.id, 'agent', fixedResponseText, effectivePhase, messageIds);
+
+    // ════════════════════════════════════════════════════════════════
+    // STEP 9: Forward to Chatwoot
+    // ════════════════════════════════════════════════════════════════
     try {
       const cwBotPhone = conversation.bot_phone || '';
       const cwInboxId = getInboxForPhone(cwBotPhone);
@@ -578,8 +543,6 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
           await sendOutgoingMessage(cwConv.id, fixedResponseText);
           console.log(`[Bridge] Agent response forwarded to Chatwoot conversation ${cwConv.id} (inbox ${cwInboxId})`);
 
-          // Sync lead qualification to Chatwoot
-          const effectivePhase = metadata.phase ?? conversation.phase;
           const effectiveProfile = metadata.user_profile_update
             ? { ...conversation.user_profile, ...metadata.user_profile_update }
             : conversation.user_profile;
@@ -597,24 +560,51 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       console.error("[Bridge] Failed to forward agent response to Chatwoot:", err.message);
     }
 
-    // 10. Apply state updates
-    const updates = applyMetadataUpdates(state, metadata);
+    // ════════════════════════════════════════════════════════════════
+    // STEP 10: Apply state updates (machine + LLM metadata)
+    // ════════════════════════════════════════════════════════════════
+
+    // Build safe metadata: ONLY accept user_profile_update, recommended_product,
+    // price_mentioned, escalation_flag from LLM. Phase comes from the state machine.
+    const safeMetadata = {
+      phase: effectivePhase,  // from state machine, NOT from LLM
+      price_mentioned: metadata.price_mentioned || false,
+      recommended_product: metadata.recommended_product || null,
+      user_profile_update: {
+        ...(metadata.user_profile_update || {}),
+        ...profileUpdatesFromMachine,
+      },
+    };
+
+    // Apply payment link counter increment from media rules
+    if (paymentLinkAction) {
+      safeMetadata.should_send_link = true;
+    }
+
+    const updates = applyMetadataUpdates(
+      {
+        phase: conversation.phase,
+        price_counter: conversation.price_counter,
+        link_counter: conversation.link_counter,
+        ebook_sent: conversation.ebook_sent,
+        user_profile: conversation.user_profile || {},
+        recommended_product: conversation.recommended_product,
+      },
+      safeMetadata,
+    );
     if (Object.keys(updates).length > 0) {
       await db.updateConversation(conversation.id, updates);
       Object.assign(conversation, updates);
     }
 
-    // 10.5 TRANSFER TO PAULO: If Augusto flagged transfer, change persona to paulo
+    // Transfer to Paulo (if LLM flags it — kept as manual override)
     if (metadata.transfer_to_paulo && (conversation.persona || 'augusto') === 'augusto') {
       console.log(`[Manager] TRANSFER TO PAULO triggered for ${phone} (product: ${metadata.recommended_product || conversation.recommended_product})`);
       await db.updateConversation(conversation.id, { persona: 'paulo' });
       conversation.persona = 'paulo';
-      // Clear persona cache so next message uses Paulo's prompt
       phonePersonaMap.set(phone, 'paulo');
-      // Update cache immediately
       await cache.setConversation(phone, conversation);
 
-      // Chatwoot: Update labels to reflect Paulo as owner
       try {
         const cwBotPhone = conversation.bot_phone || '';
         const cwInboxId = getInboxForPhone(cwBotPhone);
@@ -623,7 +613,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
         if (cwContactId) {
           const cwConv = await findOrCreateConversation(cwContactId, `whatsapp_${phone}`, cwInboxId);
           if (cwConv.id) {
-            const transferLabels = buildPhaseLabels(metadata.phase ?? conversation.phase, 'paulo');
+            const transferLabels = buildPhaseLabels(effectivePhase, 'paulo');
             transferLabels.push('transfer_to_paulo');
             await setConversationLabels(cwConv.id, transferLabels);
           }
@@ -633,35 +623,39 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       }
     }
 
-    // 10.6 CRM: Sync phase change to Krayin (non-blocking)
-    if (metadata.phase !== undefined && metadata.phase !== conversation.phase) {
-      syncPhaseChange(phone, metadata.phase, {
+    // CRM: Sync phase change to Krayin
+    if (transition.shouldAdvance) {
+      syncPhaseChange(phone, effectivePhase, {
         recommended_product: metadata.recommended_product || conversation.recommended_product,
       }).catch(err => {
         console.error('[CRM] Failed to sync phase change:', err.message);
       });
     }
 
-    // 11. Cache updated conversation
+    // Cache updated conversation
     await cache.setConversation(phone, conversation);
 
-    // 12. Set cooldown
+    // Set cooldown
     await cache.setLastResponseTime(phone);
 
-    // 13. Increment hourly counter
+    // Increment hourly counter
     const newHourlyCount = await cache.incrementHourlyMessageCount(phone);
     console.log(`[Manager] Hourly count for ${phone}: ${newHourlyCount}/${maxPerHour}`);
 
-    // 14. Check escalation
+    // Check escalation
     if (metadata.escalation_flag && metadata.escalation_flag !== 'opt_out') {
       console.warn(`[ESCALATION] ${metadata.escalation_flag} flagged for ${phone}`);
     }
 
-    console.log(`[Manager] Response sent to ${remoteJid} (phase: ${newPhase})`);
+    console.log(`[Manager] Response sent to ${remoteJid} (phase: ${effectivePhase}, intent: ${intent.type}, transition: ${transition.reason})`);
   } finally {
     await cache.releaseProcessingLock(phone);
   }
 }
+
+// ════════════════════════════════════════════════════════════════
+// FOLLOW-UP HANDLER
+// ════════════════════════════════════════════════════════════════
 
 /**
  * Handle a follow-up trigger (timeout, webhook).
@@ -701,12 +695,11 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
         await sendMediaBase64(target, audioData.base64, '', audioData.fileName, token, audioData.mimetype);
         await db.addMessage(conversation.id, 'agent', `[Audio follow-up 24h - ${persona}]`, conversation.phase);
         console.log(`[Followup] Pre-recorded audio sent for ${persona} to ${conversation.phone}`);
-        // Send complementary text after audio (3s delay)
         await new Promise(r => setTimeout(r, 3000));
-        const produto = conversation.user_profile?.produto || 'cr\u00e9dito';
+        const produto = conversation.user_profile?.produto || 'crédito';
         const banco = conversation.user_profile?.tentou_banco || '';
         const bancoRef = banco ? ` no ${banco}` : '';
-        const fuText = `Mandei esse \u00e1udio pra te explicar melhor. Sobre a nega\u00e7\u00e3o${bancoRef} \u2014 o diagn\u00f3stico mostra exatamente o que t\u00e1 travando seu ${produto}. D\u00e1 uma olhada: ${config.site.url}`;
+        const fuText = `Mandei esse áudio pra te explicar melhor. Sobre a negação${bancoRef} — o diagnóstico mostra exatamente o que tá travando seu ${produto}. Dá uma olhada: ${config.site.url}`;
         await sendMessages(target, fuText, token);
         await db.addMessage(conversation.id, 'agent', fuText, conversation.phase);
         console.log(`[Followup] Audio + text sent to ${conversation.phone}`);
@@ -738,7 +731,6 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
         return;
       } else {
         console.warn(`[Followup] VAPI call skipped/failed for ${conversation.phone}. Falling back to prova social.`);
-        // Fall through to social proof
         const provaSocial = getProvaSocial(persona, conversation.id);
         if (provaSocial) {
           const caption = getProvaSocialCaption(conversation.id + 10);
@@ -749,7 +741,6 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
       }
     } catch (err) {
       console.error(`[Followup] VAPI outbound call error:`, err.message);
-      // Fall through to text
     }
   }
 
@@ -762,12 +753,11 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
         await sendMediaBase64(target, provaSocial.base64, caption, provaSocial.fileName, token, provaSocial.mimetype);
         await db.addMessage(conversation.id, 'agent', `[Prova social - ${provaSocial.fileName}] ${caption}`, conversation.phase);
         console.log(`[Followup] Prova social sent: ${provaSocial.fileName} to ${conversation.phone}`);
-        // Send contextual follow-up text after media (3s delay)
         await new Promise(r => setTimeout(r, 3000));
         const name = conversation.name || 'amigo';
         const socialTexts = [
-          `${name}, esse cliente tava na mesma situa\u00e7\u00e3o que voc\u00ea. Fez o diagn\u00f3stico e em 2 meses conseguiu destravar. Se quiser ver como funciona: ${config.site.url}`,
-          `${name}, resultados assim s\u00e3o comuns pra quem entende o que os bancos realmente veem. Quer fazer o seu? ${config.site.url}`,
+          `${name}, esse cliente tava na mesma situação que você. Fez o diagnóstico e em 2 meses conseguiu destravar. Se quiser ver como funciona: ${config.site.url}`,
+          `${name}, resultados assim são comuns pra quem entende o que os bancos realmente veem. Quer fazer o seu? ${config.site.url}`,
         ];
         const socialText = socialTexts[(conversation.id + attempt) % socialTexts.length];
         await sendMessages(target, socialText, token);
@@ -819,55 +809,51 @@ export async function handleFollowup(conversation, eventType, usePreRecordedAudi
   await sendMessages(target, fixedText, token);
   await db.addMessage(conversation.id, 'agent', fixedText, conversation.phase);
 
-  const updates = applyMetadataUpdates(state, metadata);
-  if (Object.keys(updates).length > 0) {
-    await db.updateConversation(conversation.id, updates);
+  // Only accept safe metadata from follow-up LLM responses
+  const safeFollowupMetadata = {
+    phase: conversation.phase, // never change phase from follow-up
+    price_mentioned: metadata.price_mentioned || false,
+    recommended_product: metadata.recommended_product || null,
+    user_profile_update: metadata.user_profile_update || {},
+  };
+  const followupUpdates = applyMetadataUpdates(state, safeFollowupMetadata);
+  if (Object.keys(followupUpdates).length > 0) {
+    await db.updateConversation(conversation.id, followupUpdates);
   }
 
   console.log(`[Followup] ${eventType} attempt ${attempt} (${format.type}) sent to ${target}`);
 }
 
+// ════════════════════════════════════════════════════════════════
+// FOLLOW-UP PROMPTS & AUDIO SCRIPTS
+// ════════════════════════════════════════════════════════════════
 
-
-
-
-/**
- * Get audio script for TTS-based follow-up.
- * Uses persona-specific scripts inspired by proven sales audio frameworks.
- */
 function getAudioScript(eventType, conversation) {
   const name = conversation.name || 'amigo';
   const persona = conversation.persona || 'augusto';
   const personaName = persona === 'paulo' ? 'Paulo' : 'Augusto';
-  const product = conversation.recommended_product;
 
   const scripts = {
-    // FOLLOW-UP: Lead esfriou (24h+)
     consultation_timeout: {
       augusto: `Oi ${name}, tudo bem? Aqui é o ${personaName} da CredPositivo. Tô te mandando esse áudio rapidinho porque sei que o dia a dia é corrido. Só queria saber se você tá bem e se ainda precisa daquela ajuda com sua situação de crédito. A nossa análise é gratuita e sem compromisso nenhum. Quando puder, me dá um retorno que eu tô aqui pra te ajudar, beleza?`,
       paulo: `Fala ${name}, tudo certo? Aqui é o ${personaName} da CredPositivo. Gravei esse áudio só pra saber como você tá. Sei que a gente tava conversando sobre sua situação financeira e quero te dizer que continuo aqui disponível. Sem pressão nenhuma, viu? Quando tiver um minutinho, me chama que a gente resolve isso juntos.`,
     },
-    // REATIVAÇÃO: Lead sumiu (+7 dias)
     reengagement: {
       augusto: `Oi ${name}, aqui é o ${personaName} da CredPositivo de novo. Faz uns dias que a gente conversou e quero te dizer que tá tudo bem, sem pressão. Só tô te mandando esse áudio porque realmente acredito que posso te ajudar. A gente já ajudou muita gente na mesma situação. Quando você tiver um tempinho, me chama aqui que a gente retoma de onde parou, tá bom?`,
       paulo: `E aí ${name}, tudo certo contigo? Aqui é o ${personaName} da CredPositivo. Faz um tempinho que a gente conversou e eu queria saber se mudou alguma coisa na sua situação. Se ainda precisar de ajuda, saiba que tô aqui. Sem compromisso, é só me chamar.`,
     },
-    // PÓS-COMPRA
     purchase_completed: {
       augusto: `${name}, aqui é o ${personaName} da CredPositivo. Parabéns pela sua decisão! Quero que saiba que nossa equipe já tá trabalhando no seu caso. Se tiver qualquer dúvida, qualquer coisa mesmo, pode me chamar aqui que eu te ajudo na hora, combinado?`,
       paulo: `Fala ${name}, ${personaName} aqui. Passando pra te dar parabéns pela decisão. A equipe já tá cuidando de tudo pra você. Qualquer dúvida, é só chamar que eu tô aqui!`,
     },
-    // PROVA SOCIAL: Lead na fase de educação
     social_proof: {
       augusto: `${name}, deixa eu te contar uma coisa rápida. Essa semana mesmo a gente ajudou um cliente que tava com o nome sujo há 3 anos. Em menos de 15 dias ele já tava com o score subindo e as dívidas negociadas. O processo é simples e eu te guio em tudo. Posso te explicar como funciona?`,
       paulo: `${name}, deixa eu compartilhar contigo. Só no último mês a gente ajudou dezenas de pessoas a limpar o nome e melhorar o score. Tem cliente nosso que já conseguiu até financiamento depois do processo. Isso é real e pode ser sua história também. Vamos conversar?`,
     },
-    // URGÊNCIA: Lead quente que não converteu
     urgency: {
       augusto: `${name}, olha só, tô te mandando esse áudio porque surgiu uma condição especial essa semana pra negociação de dívidas. Os descontos tão muito bons e não sei até quando vai durar. Se você tiver interesse, me responde aqui que eu já puxo tudo pra você aproveitar, beleza?`,
       paulo: `${name}, ${personaName} aqui. Preciso te falar uma coisa importante: tô vendo aqui umas condições de negociação muito boas que apareceram agora. Descontos que raramente acontecem. Se você tem dívidas pra resolver, esse é o momento. Me responde aqui que eu te passo tudo certinho.`,
     },
-    // CHECKOUT ABANDONADO
     purchase_abandoned: {
       augusto: `Oi ${name}, percebi que você começou o processo mas não finalizou. Pode ter sido algum problema técnico, acontece bastante. Se precisar de alguma ajuda pra concluir ou se ficou alguma dúvida, me fala que eu resolvo rapidinho pra você.`,
       paulo: `Fala ${name}, ${personaName} aqui. Vi que você começou a cadastrar mas parou. Sem problema nenhum! Se teve alguma dificuldade ou dúvida, me chama que eu te guio passo a passo.`,
@@ -886,10 +872,10 @@ function buildFollowupPrompt(eventType, conversation, attempt = 1, persona = 'au
   const name = conversation.name || 'amigo';
 
   if (['consultation_timeout', 'social_proof', 'urgency'].includes(eventType)) {
-    const produto = conversation.user_profile?.produto || 'cr\u00e9dito';
+    const produto = conversation.user_profile?.produto || 'crédito';
     const banco = conversation.user_profile?.tentou_banco || '';
-    const bancoRef = banco ? ` a nega\u00e7\u00e3o do ${banco}` : ' a situa\u00e7\u00e3o do seu cr\u00e9dito';
-    const siteUrl = '${config.site.url}';
+    const bancoRef = banco ? ` a negação do ${banco}` : ' a situação do seu crédito';
+    const siteUrl = config.site.url;
 
     const augustoPrompts = {
       2: `[SISTEMA: Follow-up #2 (48h). ${name} nao respondeu. Mande UMA mensagem referenciando o CASO DELE: ele quer ${produto} e teve${bancoRef}. Aborde de angulo diferente: "Tava pensando no seu caso..." ou "Sabe o que mais trava ${produto}?". INCLUA o link ${siteUrl} no final. NAO mencione preco. Maximo 3 linhas.]`,
@@ -926,5 +912,3 @@ function buildFollowupPrompt(eventType, conversation, attempt = 1, persona = 'au
 
   return legacyPrompts[eventType] || `[SISTEMA: Follow-up necessario para ${eventType}. Attempt ${attempt}. Seja breve e humano.]`;
 }
-
-// validateAgentResponse() removed — all sanitization now in sanitizeForWhatsApp() (output-filter.js)

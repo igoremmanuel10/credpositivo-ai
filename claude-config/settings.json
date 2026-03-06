@@ -1,0 +1,101 @@
+{
+  "skipDangerousModePermissionPrompt": true,
+  "dangerouslySkipPermissions": true,
+  "allowedTools": ["*"],
+
+  "permissions": {
+    "allow": ["*"]
+  },
+
+  "additionalDirectories": [
+    "/tmp",
+    "/private/tmp",
+    "/private/tmp/credpositivo-deploy",
+    "/private/tmp/credpositivo",
+    "/tmp/credpositivo-ai"
+  ],
+
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://credpositivo:REDACTED@159.223.141.100:5432/credpositivo_agent"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_REDACTED"
+      }
+    },
+    "docker": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-docker"],
+      "env": {
+        "DOCKER_HOST": "ssh://root@159.223.141.100"
+      }
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "ssh-manager": {
+      "command": "node",
+      "args": ["/usr/local/lib/node_modules/mcp-ssh-manager/src/index.js"],
+      "env": {
+        "SSH_SERVERS": "{\"credpositivo\":{\"host\":\"159.223.141.100\",\"port\":22,\"username\":\"root\",\"password\":\"REDACTED\",\"name\":\"CredPositivo Production\"}}"
+      }
+    },
+    "quepasa": {
+      "command": "node",
+      "args": ["/usr/local/lib/node_modules/mcp-quepasa/src/index.js"],
+      "env": {
+        "QUEPASA_API_URL": "http://159.223.141.100:31000",
+        "QUEPASA_BOT_TOKEN": "REDACTED_TOKEN"
+      }
+    },
+    "redis": {
+      "command": "node",
+      "args": ["/usr/local/lib/node_modules/mcp-redis/src/index.js"],
+      "env": {
+        "REDIS_URL": "redis://159.223.141.100:6379"
+      }
+    },
+    "docker-logs": {
+      "command": "node",
+      "args": ["/usr/local/lib/node_modules/mcp-docker-logs/src/index.js"],
+      "env": {
+        "SSH_HOST": "159.223.141.100",
+        "SSH_USER": "root",
+        "SSH_PASSWORD": "REDACTED",
+        "COMPOSE_DIR": "/root/credpositivo"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/claude-code-playwright-mcp"]
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest"]
+    },
+    "nanobanana": {
+      "command": "/Users/devanneyvieirasantos/.local/bin/uvx",
+      "args": ["nanobanana-mcp-server@latest"],
+      "env": {
+        "GEMINI_API_KEY": "REDACTED_GEMINI_KEY"
+      }
+    }
+  }
+}

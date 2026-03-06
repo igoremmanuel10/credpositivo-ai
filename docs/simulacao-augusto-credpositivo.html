@@ -1,0 +1,3061 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulacao Augusto — CredPositivo</title>
+<style>
+  /* =========================================================
+     RESET + BASE
+  ========================================================= */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+
+    /* Light mode */
+    --bg:            #ffffff;
+    --bg-secondary:  #f7f6f3;
+    --bg-hover:      #f1f0ed;
+    --bg-alt:        #f0eef9;
+    --border:        #e8e7e3;
+    --border-light:  #f0efec;
+
+    --text:          #37352f;
+    --text-muted:    #9b9a97;
+    --text-light:    #c7c6c3;
+    --text-accent:   #5542d9;
+
+    --accent:        #5542d9;
+    --accent-light:  #ece9fc;
+    --accent-mid:    #7c6ff5;
+
+    --green-bubble:  #25d366;
+    --green-dark:    #128c7e;
+    --green-light:   #dcf8c6;
+    --gray-bubble:   #f0f0f0;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+  }
+
+  html[data-theme="dark"] {
+    --bg:            #191919;
+    --bg-secondary:  #252525;
+    --bg-hover:      #2f2f2f;
+    --bg-alt:        #231f3a;
+    --border:        #333333;
+    --border-light:  #2a2a2a;
+
+    --text:          #e8e7e4;
+    --text-muted:    #6b6b6b;
+    --text-light:    #4a4a4a;
+    --text-accent:   #8b7ff5;
+
+    --accent:        #7c6ff5;
+    --accent-light:  #2a2445;
+    --accent-mid:    #a096f7;
+
+    --green-bubble:  #1e7e5a;
+    --green-dark:    #0d6644;
+    --green-light:   #1a3d2b;
+    --gray-bubble:   #2e2e2e;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  }
+
+  html {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  /* =========================================================
+     LAYOUT
+  ========================================================= */
+  .layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* =========================================================
+     SIDEBAR
+  ========================================================= */
+  .sidebar {
+    width: 240px;
+    min-width: 240px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 100;
+    transition: transform 0.25s ease;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .sidebar-header {
+    padding: 16px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary);
+    z-index: 1;
+  }
+
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+
+  .sidebar-logo .logo-mark {
+    width: 22px;
+    height: 22px;
+    background: var(--accent);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: white;
+    font-weight: 700;
+    flex-shrink: 0;
+    letter-spacing: 0;
+  }
+
+  .sidebar-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding-left: 30px;
+  }
+
+  .sidebar-nav {
+    padding: 8px 8px 24px;
+  }
+
+  .sidebar-section-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 12px 8px 4px;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s;
+    cursor: pointer;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .sidebar-item:hover { background: var(--bg-hover); color: var(--text); }
+  .sidebar-item.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+
+  .sidebar-item .nav-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .sidebar-item.active .nav-icon { opacity: 1; }
+
+  .sidebar-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+    margin-left: 2px;
+  }
+
+  /* =========================================================
+     MAIN
+  ========================================================= */
+  .main {
+    margin-left: 240px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* =========================================================
+     TOPBAR
+  ========================================================= */
+  .topbar {
+    position: sticky;
+    top: 0;
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    z-index: 50;
+    padding: 0 40px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  html[data-theme="dark"] .topbar {
+    background: rgba(25,25,25,0.88);
+  }
+
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .breadcrumb span { color: var(--text-muted); }
+  .breadcrumb .crumb { color: var(--text); font-weight: 500; }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-theme {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s, color 0.12s;
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  .btn-theme:hover { background: var(--bg-hover); color: var(--text); }
+
+  .badge-ai {
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--accent-light);
+    color: var(--accent);
+    padding: 3px 8px;
+    border-radius: 100px;
+    letter-spacing: 0.02em;
+  }
+
+  /* =========================================================
+     CONTENT
+  ========================================================= */
+  .content {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 40px 120px;
+  }
+
+  /* =========================================================
+     PAGE HEADER
+  ========================================================= */
+  .page-header {
+    margin-bottom: 48px;
+  }
+
+  .page-eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+  }
+
+  .page-title {
+    font-size: clamp(26px, 4vw, 36px);
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    letter-spacing: -0.03em;
+    margin-bottom: 14px;
+  }
+
+  .page-description {
+    font-size: 15.5px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 60ch;
+  }
+
+  .page-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+
+  .meta-item strong { color: var(--text); font-weight: 500; }
+
+  .meta-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+
+  /* =========================================================
+     CALLOUT BOX
+  ========================================================= */
+  .callout {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    margin-bottom: 32px;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+
+  .callout-info {
+    background: var(--accent-light);
+    border: 1px solid rgba(85,66,217,0.15);
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] .callout-info {
+    border-color: rgba(124,111,245,0.2);
+  }
+
+  .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* =========================================================
+     SECTION HEADERS
+  ========================================================= */
+  .section {
+    margin-bottom: 56px;
+    scroll-margin-top: 72px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .icon-purple { background: var(--accent-light); }
+  .icon-green  { background: #e6f9f0; }
+  .icon-orange { background: #fff3e8; }
+  .icon-blue   { background: #e8f2ff; }
+  .icon-red    { background: #ffeaea; }
+
+  html[data-theme="dark"] .icon-green  { background: #1a3028; }
+  html[data-theme="dark"] .icon-orange { background: #2e1f0e; }
+  html[data-theme="dark"] .icon-blue   { background: #0e1e38; }
+  html[data-theme="dark"] .icon-red    { background: #2e0f0f; }
+
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+
+  .section-subtitle {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* =========================================================
+     BODY TEXT
+  ========================================================= */
+  .body-text {
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.65;
+    margin-bottom: 16px;
+  }
+
+  .body-text.muted { color: var(--text-muted); font-size: 14px; }
+
+  /* =========================================================
+     SCENE DESCRIPTION
+  ========================================================= */
+  .scene {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.6;
+    padding: 12px 16px;
+    border-left: 2px solid var(--border);
+    margin-bottom: 20px;
+    background: var(--bg-secondary);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+
+  /* =========================================================
+     AD CARD
+  ========================================================= */
+  .ad-card {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 20px;
+    background: var(--bg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .ad-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ad-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #5542d9, #25d366);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .ad-handle { font-size: 13px; font-weight: 600; color: var(--text); }
+  .ad-label  { font-size: 11px; color: var(--text-muted); }
+
+  .ad-video-thumb {
+    background: linear-gradient(160deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%);
+    height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ad-video-thumb::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 30% 50%, rgba(85,66,217,0.3) 0%, transparent 70%);
+  }
+
+  .play-circle {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .play-triangle {
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 9px 0 9px 16px;
+    border-color: transparent transparent transparent rgba(255,255,255,0.9);
+    margin-left: 3px;
+  }
+
+  .video-label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    position: relative;
+    z-index: 1;
+    font-family: var(--font-mono);
+  }
+
+  .ad-copy {
+    padding: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text);
+  }
+
+  .ad-copy em { font-style: italic; color: var(--text-muted); display: block; margin-bottom: 6px; }
+
+  .ad-cta-bar {
+    padding: 12px 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .ad-cta-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    font-family: var(--font-sans);
+  }
+
+  .ad-meta { font-size: 11px; color: var(--text-light); }
+  .ad-meta span { background: var(--accent-light); color: var(--accent); padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 600; }
+
+  /* =========================================================
+     QUIZ
+  ========================================================= */
+  .quiz-container {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .quiz-topbar {
+    background: var(--accent);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .quiz-topbar-title { font-size: 12.5px; font-weight: 600; color: white; }
+  .quiz-progress-text { font-size: 11px; color: rgba(255,255,255,0.75); }
+
+  .quiz-progress-bar {
+    height: 3px;
+    background: rgba(255,255,255,0.2);
+    position: relative;
+  }
+
+  .quiz-progress-fill {
+    height: 100%;
+    background: white;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .quiz-step {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .quiz-step:last-child { border-bottom: none; }
+
+  .quiz-step-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+
+  .quiz-question {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+
+  .quiz-answer {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+
+  .quiz-answer.selected {
+    background: var(--accent);
+    color: white;
+  }
+
+  .quiz-check { font-size: 12px; }
+
+  .quiz-result {
+    padding: 20px;
+    background: var(--bg-secondary);
+  }
+
+  .quiz-result-badge {
+    display: inline-block;
+    background: #fff0f0;
+    color: #c0392b;
+    border: 1px solid #f5c6c2;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  html[data-theme="dark"] .quiz-result-badge {
+    background: #2e0f0f;
+    color: #f87171;
+    border-color: #4a1a1a;
+  }
+
+  .quiz-result-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 14px; }
+
+  .quiz-form-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    margin-bottom: 8px;
+  }
+
+  .quiz-form-label { font-size: 12px; color: var(--text-muted); width: 70px; flex-shrink: 0; }
+  .quiz-form-value { font-size: 13.5px; color: var(--text); font-weight: 500; }
+
+  .quiz-submit {
+    display: block;
+    width: 100%;
+    margin-top: 14px;
+    padding: 11px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    letter-spacing: 0.01em;
+  }
+
+  .quiz-trigger-note {
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: var(--accent-light);
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .quiz-trigger-note strong { color: var(--accent); }
+
+  /* =========================================================
+     WHATSAPP CHAT
+  ========================================================= */
+  .chat-wrapper {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    margin-bottom: 24px;
+  }
+
+  .chat-header {
+    background: #075e54;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .chat-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .chat-header-info { flex: 1; }
+  .chat-name { font-size: 14px; font-weight: 600; color: white; line-height: 1.2; }
+  .chat-status { font-size: 11px; color: rgba(255,255,255,0.7); }
+
+  .chat-body {
+    background: #e5ddd5;
+    padding: 16px 12px;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  html[data-theme="dark"] .chat-body { background: #1a1a1a; }
+
+  .chat-body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c8b9a7' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+
+  .bubble-row {
+    display: flex;
+    width: 100%;
+    position: relative;
+  }
+
+  .bubble-row.sent     { justify-content: flex-end; }
+  .bubble-row.received { justify-content: flex-start; }
+
+  .bubble {
+    max-width: 72%;
+    padding: 8px 10px 6px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.45;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+    word-break: break-word;
+  }
+
+  .bubble.sent {
+    background: #dcf8c6;
+    color: #1a1a1a;
+    border-bottom-right-radius: 3px;
+  }
+
+  .bubble.received {
+    background: #ffffff;
+    color: #1a1a1a;
+    border-bottom-left-radius: 3px;
+  }
+
+  html[data-theme="dark"] .bubble.sent {
+    background: #1a3d2b;
+    color: #e8e7e4;
+  }
+
+  html[data-theme="dark"] .bubble.received {
+    background: #2e2e2e;
+    color: #e8e7e4;
+  }
+
+  .bubble-time {
+    font-size: 10.5px;
+    color: rgba(0,0,0,0.35);
+    text-align: right;
+    margin-top: 3px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 3px;
+  }
+
+  html[data-theme="dark"] .bubble-time { color: rgba(255,255,255,0.35); }
+
+  .check-icon { color: #53bdeb; font-size: 12px; }
+
+  .bubble-sender-name {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #25d366;
+    margin-bottom: 3px;
+  }
+
+  .chat-date-divider {
+    text-align: center;
+    font-size: 11.5px;
+    color: rgba(0,0,0,0.45);
+    background: rgba(255,255,255,0.7);
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 100px;
+    margin: 8px auto;
+    align-self: center;
+  }
+
+  html[data-theme="dark"] .chat-date-divider {
+    color: rgba(255,255,255,0.5);
+    background: rgba(50,50,50,0.9);
+  }
+
+  /* =========================================================
+     AUDIO PLAYER (inside bubble)
+  ========================================================= */
+  .audio-bubble-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 200px;
+    max-width: 280px;
+    padding-bottom: 2px;
+  }
+
+  .audio-play-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #25d366;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .bubble.received .audio-play-btn { background: #25d366; }
+
+  .audio-play-icon {
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 6px 0 6px 11px;
+    border-color: transparent transparent transparent white;
+    margin-left: 2px;
+  }
+
+  .audio-waveform {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 28px;
+  }
+
+  .wave-bar {
+    background: rgba(0,0,0,0.2);
+    border-radius: 1px;
+    width: 3px;
+    flex-shrink: 0;
+  }
+
+  html[data-theme="dark"] .wave-bar { background: rgba(255,255,255,0.25); }
+
+  .audio-duration {
+    font-size: 11px;
+    color: rgba(0,0,0,0.4);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  html[data-theme="dark"] .audio-duration { color: rgba(255,255,255,0.4); }
+
+  /* =========================================================
+     IMAGE IN CHAT
+  ========================================================= */
+  .img-bubble {
+    max-width: 260px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .img-placeholder {
+    width: 100%;
+    height: 160px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .img-placeholder::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.4) 100%);
+  }
+
+  .img-icon { font-size: 28px; position: relative; z-index: 1; }
+  .img-label { font-size: 11px; color: rgba(255,255,255,0.8); position: relative; z-index: 1; font-weight: 500; }
+
+  /* =========================================================
+     VIDEO IN CHAT
+  ========================================================= */
+  .video-bubble {
+    max-width: 260px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .video-placeholder {
+    width: 100%;
+    height: 160px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .video-placeholder::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 40%, rgba(37,211,102,0.2) 0%, transparent 70%);
+  }
+
+  .video-play-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .video-play-tri {
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 8px 0 8px 14px;
+    border-color: transparent transparent transparent rgba(255,255,255,0.9);
+    margin-left: 3px;
+  }
+
+  .video-info {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+  }
+
+  .video-title { font-size: 11.5px; color: rgba(255,255,255,0.8); font-weight: 500; }
+  .video-dur   { font-size: 10.5px; color: rgba(255,255,255,0.5); }
+
+  /* =========================================================
+     LINK CARD IN CHAT
+  ========================================================= */
+  .link-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    margin-top: 4px;
+    text-decoration: none;
+    display: block;
+    max-width: 280px;
+  }
+
+  .link-card-label  { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .link-card-title  { font-size: 13px; font-weight: 600; color: var(--accent); line-height: 1.3; margin-bottom: 4px; }
+  .link-card-url    { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); word-break: break-all; }
+  .link-card-price  { margin-top: 8px; display: inline-block; background: #25d366; color: white; padding: 3px 10px; border-radius: 4px; font-size: 13px; font-weight: 700; }
+
+  /* =========================================================
+     TIMER DIVIDER (between messages)
+  ========================================================= */
+  .time-divider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0;
+    color: rgba(0,0,0,0.35);
+    font-size: 11.5px;
+  }
+
+  html[data-theme="dark"] .time-divider { color: rgba(255,255,255,0.3); }
+
+  .time-divider::before,
+  .time-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(0,0,0,0.1);
+  }
+
+  html[data-theme="dark"] .time-divider::before,
+  html[data-theme="dark"] .time-divider::after {
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* =========================================================
+     FOLLOW-UP SECTION (alternate bg)
+  ========================================================= */
+  .followup-container {
+    background: var(--bg-alt);
+    border: 1px solid rgba(85,66,217,0.12);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+
+  html[data-theme="dark"] .followup-container {
+    background: #231f3a;
+    border-color: rgba(124,111,245,0.18);
+  }
+
+  .followup-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-light);
+    color: var(--accent);
+    border: 1px solid rgba(85,66,217,0.2);
+    border-radius: 100px;
+    padding: 4px 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    letter-spacing: 0.03em;
+  }
+
+  .followup-day {
+    margin-bottom: 20px;
+  }
+
+  .followup-day-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .followup-day-pill {
+    background: var(--accent);
+    color: white;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .followup-day-type {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  .followup-rules {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+
+  .followup-rules-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 8px;
+  }
+
+  .rules-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+  .rules-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  .rule-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+
+  .call-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-top: 8px;
+  }
+
+  .call-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .call-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e6f9f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+  }
+
+  html[data-theme="dark"] .call-icon { background: #1a3028; }
+
+  .call-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .call-type { font-size: 11.5px; color: var(--text-muted); }
+
+  .call-script {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--text);
+    font-style: italic;
+    border-left: 3px solid #25d366;
+  }
+
+  .call-duration {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* =========================================================
+     FLOWCHART
+  ========================================================= */
+  .flowchart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 8px 0;
+  }
+
+  .flow-node {
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .flow-box {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s;
+    cursor: default;
+  }
+
+  .flow-box:hover { box-shadow: var(--shadow-md); }
+
+  .flow-box.accent {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  .flow-box.success {
+    border-color: #25d366;
+    background: #e6f9f0;
+  }
+
+  html[data-theme="dark"] .flow-box.success {
+    background: #1a3028;
+  }
+
+  .flow-box-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .flow-box-content { flex: 1; }
+
+  .flow-box-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  .flow-box-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+
+  .flow-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+
+  .flow-badge.purple { background: var(--accent-light); color: var(--accent); }
+  .flow-badge.green  { background: #e6f9f0; color: #128c7e; }
+
+  html[data-theme="dark"] .flow-badge.green { background: #1a3028; color: #25d366; }
+
+  .flow-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 36px;
+    position: relative;
+  }
+
+  .flow-arrow-line {
+    width: 2px;
+    flex: 1;
+    background: var(--border);
+  }
+
+  .flow-arrow-head {
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 6px 5px 0 5px;
+    border-color: var(--border) transparent transparent transparent;
+  }
+
+  .flow-branch {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .flow-branch-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .flow-branch-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .flow-sub-items {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 480px;
+    gap: 2px;
+    padding: 0 32px;
+  }
+
+  .flow-sub-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--text);
+  }
+
+  .flow-sub-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .flow-sub-label { font-size: 10.5px; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+
+  /* =========================================================
+     IMPROVEMENTS CARDS
+  ========================================================= */
+  .improvements-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .improvement-card {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+
+  .improvement-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--accent);
+  }
+
+  .improvement-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .improvement-body { flex: 1; }
+
+  .improvement-title {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .improvement-today {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    line-height: 1.45;
+  }
+
+  .improvement-proposal {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.55;
+    padding: 10px 12px;
+    background: var(--accent-light);
+    border-radius: var(--radius-sm);
+    border-left: 2.5px solid var(--accent);
+  }
+
+  .tag-today    { font-size: 10.5px; font-weight: 600; background: var(--bg-secondary); color: var(--text-muted); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); margin-right: 4px; }
+  .tag-proposal { font-size: 10.5px; font-weight: 600; background: var(--accent-light); color: var(--accent); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(85,66,217,0.2); }
+
+  /* =========================================================
+     UTILITY
+  ========================================================= */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 32px 0;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 100px;
+    letter-spacing: 0.02em;
+  }
+
+  .tag-purple { background: var(--accent-light); color: var(--accent); border: 1px solid rgba(85,66,217,0.15); }
+  .tag-green  { background: #e6f9f0; color: #128c7e; border: 1px solid rgba(37,211,102,0.2); }
+  .tag-gray   { background: var(--bg-secondary); color: var(--text-muted); border: 1px solid var(--border); }
+  .tag-orange { background: #fff3e8; color: #d4650a; border: 1px solid rgba(212,101,10,0.2); }
+
+  html[data-theme="dark"] .tag-green  { background: #1a3028; color: #25d366; border-color: rgba(37,211,102,0.15); }
+  html[data-theme="dark"] .tag-orange { background: #2e1f0e; color: #fb923c; border-color: rgba(251,146,60,0.2); }
+
+  .text-accent { color: var(--accent); }
+  .fw-600 { font-weight: 600; }
+  .mb-8 { margin-bottom: 8px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-24 { margin-bottom: 24px; }
+
+  /* =========================================================
+     MOBILE
+  ========================================================= */
+  .mobile-menu-btn {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 200;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    border: none;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: var(--shadow-md);
+    font-family: var(--font-sans);
+  }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 90;
+    backdrop-filter: blur(2px);
+  }
+
+  @media (max-width: 768px) {
+    .sidebar {
+      transform: translateX(-100%);
+    }
+
+    .sidebar.open {
+      transform: translateX(0);
+    }
+
+    .sidebar-overlay.open {
+      display: block;
+    }
+
+    .main { margin-left: 0; }
+
+    .topbar { padding: 0 16px; }
+
+    .content { padding: 28px 16px 80px; }
+
+    .mobile-menu-btn { display: flex; }
+
+    .bubble { max-width: 88%; }
+
+    .followup-container { padding: 20px 16px; }
+
+    .flow-branch { flex-direction: column; }
+    .flow-sub-items { padding: 0 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="logo-mark">CP</div>
+        CredPositivo
+      </div>
+      <div class="sidebar-subtitle">Documentacao Interna</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-title">Visao Geral</div>
+      <a class="sidebar-item active" href="#intro" onclick="setActive(this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="5.5" x2="9" y2="5.5"/><line x1="5" y1="10.5" x2="8" y2="10.5"/></svg>
+        Introducao
+      </a>
+
+      <div class="sidebar-section-title" style="margin-top:8px">Campanha x1 &mdash; Direto WhatsApp</div>
+      <a class="sidebar-item" href="#x1-anuncio" onclick="setActive(this)">
+        <div class="sidebar-dot"></div>
+        Anuncio x1
+      </a>
+      <a class="sidebar-item" href="#x1-conversa" onclick="setActive(this)">
+        <div class="sidebar-dot"></div>
+        Conversa Completa
+      </a>
+
+      <div class="sidebar-section-title" style="margin-top:8px">Campanha Quiz</div>
+      <a class="sidebar-item" href="#etapa1" onclick="setActive(this)">
+        <div class="sidebar-dot"></div>
+        Anuncio Quiz
+      </a>
+      <a class="sidebar-item" href="#etapa2" onclick="setActive(this)">
+        <div class="sidebar-dot"></div>
+        Quiz (30 segundos)
+      </a>
+      <a class="sidebar-item" href="#etapa3" onclick="setActive(this)">
+        <div class="sidebar-dot"></div>
+        Primeiro Contato
+      </a>
+      <a class="sidebar-item" href="#etapa4" onclick="setActive(this)">
+        <div class="sidebar-dot"></div>
+        Qualificacao
+      </a>
+      <a class="sidebar-item" href="#etapa5" onclick="setActive(this)">
+        <div class="sidebar-dot"></div>
+        Educacao
+      </a>
+      <a class="sidebar-item" href="#etapa6" onclick="setActive(this)">
+        <div class="sidebar-dot"></div>
+        Oferta e Fechamento
+      </a>
+      <a class="sidebar-item" href="#etapa7" onclick="setActive(this)">
+        <div class="sidebar-dot"></div>
+        Pos-venda
+      </a>
+
+      <div class="sidebar-section-title" style="margin-top:8px">Cenario Alternativo</div>
+      <a class="sidebar-item" href="#followup" onclick="setActive(this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8a6 6 0 1 1 10.5 4L12 8H8"/><path d="M8 5v3l1.5 1.5"/></svg>
+        Follow-up 7 Dias
+      </a>
+
+      <div class="sidebar-section-title" style="margin-top:8px">Analise</div>
+      <a class="sidebar-item" href="#resumo" onclick="setActive(this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+        Diagrama do Fluxo
+      </a>
+      <a class="sidebar-item" href="#melhorias" onclick="setActive(this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 5.5L8 2 3 5.5v5L8 14l5-3.5V5.5z"/></svg>
+        Melhorias Propostas
+      </a>
+    </nav>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="breadcrumb">
+        <span>CredPositivo</span>
+        <span>/</span>
+        <span>Agentes</span>
+        <span>/</span>
+        <span class="crumb">Augusto &mdash; Simulacao Completa</span>
+      </div>
+      <div class="topbar-actions">
+        <span class="badge-ai">IA</span>
+        <button class="btn-theme" id="themeBtn" onclick="toggleTheme()" title="Alternar tema" aria-label="Alternar tema claro/escuro">
+          <span id="themeIcon">◐</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- PAGE HEADER -->
+      <div class="page-header" id="intro">
+        <div class="page-eyebrow">Documentacao Interna &mdash; Agentes IA</div>
+        <h1 class="page-title">Simulacao: Augusto<br>Fluxo Completo de Vendas</h1>
+        <p class="page-description">
+          Reproducao fiel de toda a jornada do lead Marcos &mdash; do primeiro anuncio ao pos-venda.
+          Duas campanhas: <strong>x1 (direto WhatsApp)</strong> e <strong>Quiz</strong>. Cada etapa e 100% automatizada. Nao existe atendente humano em nenhum momento.
+        </p>
+        <div class="page-meta">
+          <div class="meta-item">
+            <span>Produto</span>
+            <strong>Diagnostico de Credito</strong>
+          </div>
+          <div class="meta-dot"></div>
+          <div class="meta-item">
+            <span>Preco</span>
+            <strong>R$67</strong>
+          </div>
+          <div class="meta-dot"></div>
+          <div class="meta-item">
+            <span>Lead</span>
+            <strong>Marcos, 35 anos</strong>
+          </div>
+          <div class="meta-dot"></div>
+          <div class="meta-item">
+            <span>Data</span>
+            <strong>04/mar/2026</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout callout-info">
+        <span class="callout-icon">&#9432;</span>
+        <div>
+          <strong>Contexto do lead:</strong> Marcos esta negativado no Serasa ha 2 anos. Tentou financiar um carro no Bradesco e foi negado na hora. Clicou em um anuncio no Instagram, fez o quiz e recebeu contato automatico via WhatsApp.
+        </div>
+      </div>
+
+      <!-- ===================================================================
+           CAMPANHA X1 — DIRETO PRO WHATSAPP (SEM QUIZ)
+           =================================================================== -->
+
+      <section class="section" id="x1-anuncio">
+        <div class="section-header">
+          <div class="section-icon icon-green">&#128242;</div>
+          <div>
+            <div class="section-title">Campanha x1 &mdash; Anuncio Direto WhatsApp</div>
+            <div class="section-subtitle">Instagram / Facebook &bull; Click-to-WhatsApp &bull; Sem quiz</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-green">x1</span></div>
+        </div>
+
+        <p class="body-text">
+          Nessa campanha, o lead clica no anuncio e cai direto no WhatsApp do Augusto. Nao passa por quiz, nao preenche formulario. O Augusto recebe a mensagem automatica do anuncio e conduz tudo pelo chat.
+        </p>
+
+        <div class="callout callout-info">
+          <span class="callout-icon">&#128161;</span>
+          <div>
+            <strong>Diferenca do Quiz:</strong> Aqui o Augusto nao tem CPF, nome nem telefone previamente. Ele precisa conquistar a confianca e coletar os dados durante a conversa. O lead chega mais frio, mas o atendimento e instantaneo.
+          </div>
+        </div>
+
+        <!-- Ad Card x1 -->
+        <div class="ad-card">
+          <div class="ad-card-header">
+            <div class="ad-avatar">CP</div>
+            <div>
+              <div class="ad-handle">CredPositivo &bull; <span style="font-weight:400;color:var(--text-muted)">Patrocinado</span></div>
+              <div class="ad-label">Servicos Financeiros</div>
+            </div>
+          </div>
+
+          <div class="ad-video-thumb">
+            <div class="play-circle"><div class="play-triangle"></div></div>
+            <div class="video-label">VIDEO 15s &mdash; Depoimento real</div>
+          </div>
+
+          <div class="ad-copy">
+            <em>&ldquo;O banco negava tudo. Ate que descobri o que eles realmente olham.&rdquo;</em>
+            Fale agora com um especialista em credito pelo WhatsApp. Atendimento imediato e gratuito.
+          </div>
+
+          <div class="ad-cta-bar">
+            <button class="ad-cta-btn" style="background:#25d366">Chamar no WhatsApp</button>
+            <div class="ad-meta"><span>wa.me/5511...</span></div>
+          </div>
+        </div>
+
+        <div class="scene">Marcos clica no botao. Abre o WhatsApp com a mensagem automatica do anuncio.</div>
+      </section>
+
+      <!-- CONVERSA X1 COMPLETA -->
+      <section class="section" id="x1-conversa">
+        <div class="section-header">
+          <div class="section-icon icon-green">&#128172;</div>
+          <div>
+            <div class="section-title">Campanha x1 &mdash; Conversa Completa</div>
+            <div class="section-subtitle">WhatsApp &bull; Lead chega direto do anuncio &bull; Fases 0 a 3</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-green">WhatsApp</span></div>
+        </div>
+
+        <p class="body-text">
+          Marcos clicou no anuncio e caiu direto no WhatsApp. A mensagem automatica do anuncio chega e o Augusto responde em segundos. Toda a conversa abaixo e entre a IA (Augusto) e o lead (Marcos).
+        </p>
+
+        <div class="whatsapp-container">
+
+          <!-- FASE 0 — Boas-vindas -->
+          <div class="wa-divider"><span>Fase 0 &mdash; Boas-vindas</span></div>
+
+          <div class="wa-msg lead">
+            <div class="wa-sender">Marcos</div>
+            <div class="wa-text">Oi, vim pelo anuncio do Instagram sobre credito</div>
+            <div class="wa-time">14:02</div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Opa, seja bem-vindo(a) ao CredPositivo! Me chamo Augusto, estou aqui pra te ajudar.<br><br>Qual dessas opcoes abaixo voce esta buscando?<br>1 - Diagnostico de Rating<br>2 - Limpa Nome<br>3 - Rating Bancario<br>4 - Ja estava em atendimento</div>
+            <div class="wa-time">14:02 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg lead">
+            <div class="wa-sender">Marcos</div>
+            <div class="wa-text">1</div>
+            <div class="wa-time">14:03</div>
+          </div>
+
+          <!-- FASE 1 — Qualificacao -->
+          <div class="wa-divider"><span>Fase 1 &mdash; Qualificacao</span></div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Beleza, Marcos. Me conta: onde voce ta negativado? Serasa, SPC?</div>
+            <div class="wa-time">14:03 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg lead">
+            <div class="wa-sender">Marcos</div>
+            <div class="wa-text">serasa, faz uns 2 anos. tentei financiar um carro no bradesco e negaram</div>
+            <div class="wa-time">14:05</div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Poxa, 2 anos e pesado. Me passa seu CPF que eu consulto aqui ao vivo pra voce.</div>
+            <div class="wa-time">14:05 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <!-- MOMENTO WOW — Consulta CPF ao vivo -->
+          <div class="wa-msg lead">
+            <div class="wa-sender">Marcos</div>
+            <div class="wa-text">123.456.789-00</div>
+            <div class="wa-time">14:06</div>
+          </div>
+
+          <div class="wa-system-msg">
+            <span style="background:#e8f5e9;color:#2e7d32;padding:3px 10px;border-radius:12px;font-size:11px;">&#9889; Sistema: CPF consultado via Apiful &mdash; dados injetados no perfil</span>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Achei aqui, Marcos. CPF localizado, cadastro ativo na Receita. Pra ver negativacoes, score e o que o banco ta vendo, precisa do diagnostico completo. Vou te mandar um material que explica na pratica.</div>
+            <div class="wa-time">14:06 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <!-- FASE 2 — Educacao -->
+          <div class="wa-divider"><span>Fase 2 &mdash; Educacao</span></div>
+
+          <!-- Audio -->
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-audio">
+              <button class="audio-play-btn"><div class="play-icon-small"></div></button>
+              <div class="audio-waves" id="waveX1a"></div>
+              <div class="audio-time">1:30</div>
+            </div>
+            <div class="wa-caption">Audio &mdash; O que e rating bancario e por que limpar o nome nao basta</div>
+            <div class="wa-time">14:05 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-time-gap">5 minutos depois</div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Conseguiu ouvir o audio? Se tiver qualquer duvida e so me chamar!</div>
+            <div class="wa-time">14:10 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg lead">
+            <div class="wa-sender">Marcos</div>
+            <div class="wa-text">ouvi sim, nao sabia disso. entao limpar o nome nao resolve?</div>
+            <div class="wa-time">14:12</div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Exato. Limpar o nome e so o primeiro passo. O banco olha muito mais coisa. Vou te mandar uma imagem que mostra na pratica.</div>
+            <div class="wa-time">14:12 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <!-- Infografico -->
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-image-placeholder">
+              <div class="wa-image-icon">&#128202;</div>
+              <div class="wa-image-label">Infografico &mdash; Os 5 fatores do rating bancario</div>
+            </div>
+            <div class="wa-time">14:12 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-time-gap">5 minutos depois</div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Conseguiu ver a imagem? Qualquer duvida estou aqui!</div>
+            <div class="wa-time">14:17 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg lead">
+            <div class="wa-sender">Marcos</div>
+            <div class="wa-text">caramba, nao fazia ideia que tinha tudo isso</div>
+            <div class="wa-time">14:19</div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Pois e. A maioria das pessoas so foca em limpar o nome e esquece o resto. Vou te mostrar um video de um caso real.</div>
+            <div class="wa-time">14:19 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <!-- Video -->
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-video-placeholder">
+              <div class="play-circle small"><div class="play-triangle small"></div></div>
+              <div class="video-label">VIDEO 3min &mdash; Caso real: antes e depois do diagnostico</div>
+            </div>
+            <div class="wa-time">14:19 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-time-gap">5 minutos depois</div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Conseguiu assistir o video? Me conta o que achou!</div>
+            <div class="wa-time">14:24 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg lead">
+            <div class="wa-sender">Marcos</div>
+            <div class="wa-text">muito bom, da pra entender direitinho. como faco pra fazer esse diagnostico no meu cpf?</div>
+            <div class="wa-time">14:27</div>
+          </div>
+
+          <!-- FASE 3 — Oferta -->
+          <div class="wa-divider"><span>Fase 3 &mdash; Oferta e Fechamento</span></div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Pelo que voce me contou, o primeiro passo e fazer o raio X do seu CPF. Ele mostra exatamente por que o Bradesco negou e o que fazer pra resolver.</div>
+            <div class="wa-time">14:27 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Vou te mandar o acesso aqui. E rapidinho.</div>
+            <div class="wa-time">14:27 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-link-card">
+              <div class="wa-link-label">Diagnostico de Rating</div>
+              <div class="wa-link-title">Raio X Completo do CPF + Call com Especialista</div>
+              <div class="wa-link-url">app.monetizze.com.br/r/BXU1901033</div>
+              <span class="wa-link-price">R$67</span>
+            </div>
+            <div class="wa-time">14:27 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg lead">
+            <div class="wa-sender">Marcos</div>
+            <div class="wa-text">hmm sei nao, ja fui enganado antes com essas coisas de credito</div>
+            <div class="wa-time">14:29</div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Normal desconfiar. Olha esse caso de um cliente nosso que tava na mesma situacao.</div>
+            <div class="wa-time">14:29 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <!-- Prova social -->
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-video-placeholder" style="background: linear-gradient(135deg, #1a3d2b, #0d6644);">
+              <div class="play-circle small"><div class="play-triangle small"></div></div>
+              <div class="video-label">DEPOIMENTO &mdash; Cliente negativado ha 3 anos que conseguiu financiar em 4 meses</div>
+            </div>
+            <div class="wa-time">14:29 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-time-gap">6 minutos depois</div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Conseguiu ver o depoimento? Esse cliente tinha uma situacao parecida com a sua.</div>
+            <div class="wa-time">14:35 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg lead">
+            <div class="wa-sender">Marcos</div>
+            <div class="wa-text">vi sim, parece real. vou fazer entao, manda o link de novo</div>
+            <div class="wa-time">14:37</div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Show! Aqui o link:</div>
+            <div class="wa-time">14:37 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-link-card">
+              <div class="wa-link-label">Diagnostico de Rating</div>
+              <div class="wa-link-title">Raio X Completo do CPF + Call com Especialista</div>
+              <div class="wa-link-url">app.monetizze.com.br/r/BXU1901033</div>
+              <span class="wa-link-price">R$67</span>
+            </div>
+            <div class="wa-time">14:37 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-time-gap">Marcos faz o pagamento &mdash; R$67 via Pix</div>
+
+          <!-- FASE 4 — Pos-venda -->
+          <div class="wa-divider"><span>Fase 4 &mdash; Pos-venda</span></div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Pagamento confirmado, Marcos! Seu diagnostico ja ta sendo preparado. Em ate 48h voce recebe o raio X completo.</div>
+            <div class="wa-time">14:42 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+          <div class="wa-msg agent">
+            <div class="wa-sender">Augusto <span class="wa-badge-ai">IA</span></div>
+            <div class="wa-text">Apos o diagnostico, vou te explicar os proximos passos pra resolver cada ponto que aparecer. Qualquer duvida ate la, e so me chamar aqui.</div>
+            <div class="wa-time">14:42 <span class="wa-checks">&#10003;&#10003;</span></div>
+          </div>
+
+        </div><!-- /whatsapp-container -->
+
+        <div class="callout callout-info" style="margin-top:24px">
+          <span class="callout-icon">&#9201;</span>
+          <div>
+            <strong>Tempo total da conversa x1:</strong> ~40 minutos do primeiro contato ao pagamento. O lead nao saiu do WhatsApp em nenhum momento. Se nao tivesse comprado, entraria no mesmo fluxo de follow-up de 7 dias (veja abaixo).
+          </div>
+        </div>
+      </section>
+
+      <div class="divider"></div>
+
+      <div class="callout callout-info" style="margin:32px 0">
+        <span class="callout-icon">&#128071;</span>
+        <div>
+          <strong>Campanha Quiz:</strong> Abaixo, o mesmo fluxo para leads que chegam via quiz (credpositivo.com/quizz) ao inves de direto no WhatsApp. A diferenca e que o Augusto ja recebe nome, CPF, telefone e email antes de iniciar a conversa.
+        </div>
+      </div>
+
+      <!-- ETAPA 1 -->
+      <section class="section" id="etapa1">
+        <div class="section-header">
+          <div class="section-icon icon-orange">&#128247;</div>
+          <div>
+            <div class="section-title">Etapa 1 &mdash; O Anuncio</div>
+            <div class="section-subtitle">Instagram / Facebook &bull; Canal de entrada</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-orange">Meta Ads</span></div>
+        </div>
+
+        <p class="body-text">
+          Marcos esta scrollando o Instagram. O algoritmo entrega um anuncio direcionado para pessoas com perfil de credito negativo.
+        </p>
+
+        <!-- Ad Card -->
+        <div class="ad-card">
+          <div class="ad-card-header">
+            <div class="ad-avatar">CP</div>
+            <div>
+              <div class="ad-handle">CredPositivo &bull; <span style="font-weight:400;color:var(--text-muted)">Patrocinado</span></div>
+              <div class="ad-label">Servicos Financeiros</div>
+            </div>
+          </div>
+
+          <div class="ad-video-thumb">
+            <div class="play-circle"><div class="play-triangle"></div></div>
+            <div class="video-label">VIDEO 15s &mdash; Depoimento real</div>
+          </div>
+
+          <div class="ad-copy">
+            <em>&ldquo;Eu achava que era so limpar o nome&hellip; Descobri que o problema era outro.&rdquo;</em>
+            Descubra o que o banco ve quando consulta seu CPF &mdash; Quiz gratuito de 30 segundos.
+          </div>
+
+          <div class="ad-cta-bar">
+            <button class="ad-cta-btn">Fazer Quiz Gratuito</button>
+            <div class="ad-meta"><span>credpositivo.com/quizz</span></div>
+          </div>
+        </div>
+
+        <div class="scene">Marcos clica no botao. Abre: credpositivo.com/quizz</div>
+      </section>
+
+      <!-- ETAPA 2 -->
+      <section class="section" id="etapa2">
+        <div class="section-header">
+          <div class="section-icon icon-blue">&#128196;</div>
+          <div>
+            <div class="section-title">Etapa 2 &mdash; O Quiz</div>
+            <div class="section-subtitle">credpositivo.com/quizz &bull; Duracao: 30 segundos</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-purple">Captura de Lead</span></div>
+        </div>
+
+        <p class="body-text">
+          Quiz de 3 perguntas simples. Ao final, coleta nome, CPF, telefone e email. Ao clicar em Enviar, dispara automaticamente o pixel do Facebook e envia os dados ao bot via webhook.
+        </p>
+
+        <div class="quiz-container">
+          <div class="quiz-topbar">
+            <div class="quiz-topbar-title">CredPositivo &mdash; Analise Gratuita do CPF</div>
+            <div class="quiz-progress-text">3 de 3</div>
+          </div>
+          <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:100%"></div></div>
+
+          <div class="quiz-step">
+            <div class="quiz-step-label">Pergunta 1</div>
+            <div class="quiz-question">Voce esta negativado?</div>
+            <div class="quiz-answer selected"><span class="quiz-check">&#10003;</span> Sim</div>
+          </div>
+
+          <div class="quiz-step">
+            <div class="quiz-step-label">Pergunta 2</div>
+            <div class="quiz-question">Ja tentou pedir credito e foi negado?</div>
+            <div class="quiz-answer selected"><span class="quiz-check">&#10003;</span> Sim</div>
+          </div>
+
+          <div class="quiz-step">
+            <div class="quiz-step-label">Pergunta 3</div>
+            <div class="quiz-question">Ha quanto tempo esta com nome sujo?</div>
+            <div class="quiz-answer selected"><span class="quiz-check">&#10003;</span> Mais de 1 ano</div>
+          </div>
+
+          <div class="quiz-result">
+            <div class="quiz-result-badge">Alto risco de credito detectado</div>
+            <div class="quiz-result-title">Seu perfil indica restricoes significativas.<br>Para receber a analise completa, preencha:</div>
+
+            <div class="quiz-form-field"><div class="quiz-form-label">Nome</div><div class="quiz-form-value">Marcos Silva</div></div>
+            <div class="quiz-form-field"><div class="quiz-form-label">CPF</div><div class="quiz-form-value">123.456.789-00</div></div>
+            <div class="quiz-form-field"><div class="quiz-form-label">Telefone</div><div class="quiz-form-value">(11) 99999-8888</div></div>
+            <div class="quiz-form-field"><div class="quiz-form-label">E-mail</div><div class="quiz-form-value">marcos@email.com</div></div>
+
+            <button class="quiz-submit">Receber Analise Gratuita</button>
+          </div>
+        </div>
+
+        <div class="quiz-trigger-note">
+          <strong>O que acontece ao clicar em Enviar:</strong> Pixel do Facebook dispara (evento Lead) &rarr; dados enviados ao bot via webhook &rarr; Augusto recebe o lead e inicia contato no WhatsApp em 5 a 10 segundos.
+        </div>
+      </section>
+
+      <!-- ETAPA 3 -->
+      <section class="section" id="etapa3">
+        <div class="section-header">
+          <div class="section-icon icon-green">&#128172;</div>
+          <div>
+            <div class="section-title">Etapa 3 &mdash; Primeiro Contato</div>
+            <div class="section-subtitle">WhatsApp &bull; 5 a 10 segundos apos o quiz &bull; Fase 0: Boas-vindas</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-green">Instantaneo</span></div>
+        </div>
+
+        <p class="body-text">
+          Augusto inicia a conversa automaticamente. Menu de selecao de produto define o proximo estado da maquina.
+        </p>
+
+        <div class="chat-wrapper">
+          <div class="chat-header">
+            <div class="chat-avatar">A</div>
+            <div class="chat-header-info">
+              <div class="chat-name">Augusto &mdash; CredPositivo</div>
+              <div class="chat-status">online agora</div>
+            </div>
+          </div>
+          <div class="chat-body">
+            <div class="chat-date-divider">Hoje, 14:23</div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Opa, seja bem-vindo(a) ao CredPositivo! Me chamo Augusto, estou aqui pra te ajudar.<br><br>
+                Qual dessas opcoes abaixo voce esta buscando?<br>
+                <strong>1</strong> &mdash; Diagnostico de Rating<br>
+                <strong>2</strong> &mdash; Limpa Nome<br>
+                <strong>3</strong> &mdash; Rating Bancario<br>
+                <strong>4</strong> &mdash; Ja estava em atendimento
+                <div class="bubble-time">14:23</div>
+              </div>
+            </div>
+
+            <div class="bubble-row sent">
+              <div class="bubble sent">
+                1
+                <div class="bubble-time">14:24 <span class="check-icon">&#10003;&#10003;</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="scene">Marcos responde &ldquo;1&rdquo;. O bot identifica a opcao e avanca para a Fase 1 &mdash; Qualificacao.</div>
+      </section>
+
+      <!-- ETAPA 4 -->
+      <section class="section" id="etapa4">
+        <div class="section-header">
+          <div class="section-icon icon-purple">&#128269;</div>
+          <div>
+            <div class="section-title">Etapa 4 &mdash; Qualificacao</div>
+            <div class="section-subtitle">WhatsApp &bull; 2 a 3 mensagens &bull; Fase 1: Entender a dor</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-purple">Fase 1</span></div>
+        </div>
+
+        <p class="body-text">
+          Augusto precisa identificar dois pontos: <strong>onde esta negativado</strong> e <strong>ha quanto tempo</strong>. Com esses dados, personaliza o proximo passo.
+        </p>
+
+        <div class="chat-wrapper">
+          <div class="chat-header">
+            <div class="chat-avatar">A</div>
+            <div class="chat-header-info">
+              <div class="chat-name">Augusto &mdash; CredPositivo</div>
+              <div class="chat-status">online agora</div>
+            </div>
+          </div>
+          <div class="chat-body">
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Beleza, Marcos. Me conta: onde voce ta negativado? Serasa, SPC?
+                <div class="bubble-time">14:25</div>
+              </div>
+            </div>
+
+            <div class="bubble-row sent">
+              <div class="bubble sent">
+                serasa, faz uns 2 anos ja. Tentei financiar um carro no bradesco e negaram na hora
+                <div class="bubble-time">14:26 <span class="check-icon">&#10003;&#10003;</span></div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Poxa, 2 anos e pesado. O quiz ja puxou seu CPF &mdash; deixa eu consultar aqui ao vivo.
+                <div class="bubble-time">14:26</div>
+              </div>
+            </div>
+
+            <!-- MOMENTO WOW — CPF ja veio do quiz -->
+            <div style="text-align:center;padding:6px 0;">
+              <span style="background:#e8f5e9;color:#2e7d32;padding:3px 10px;border-radius:12px;font-size:11px;">&#9889; Sistema: CPF do quiz consultado via Apiful &mdash; dados injetados no perfil</span>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Achei aqui, Marcos. CPF localizado, cadastro ativo na Receita. Pra ver negativacoes, score e o que o Bradesco viu quando negou, precisa do diagnostico completo. Vou te mandar um material que explica.
+                <div class="bubble-time">14:26</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="scene">Augusto detectou os 2 pontos: Serasa + 2 anos. Avanca automaticamente para a Fase 2 &mdash; Educacao.</div>
+      </section>
+
+      <!-- ETAPA 5 -->
+      <section class="section" id="etapa5">
+        <div class="section-header">
+          <div class="section-icon icon-blue">&#127891;</div>
+          <div>
+            <div class="section-title">Etapa 5 &mdash; Educacao</div>
+            <div class="section-subtitle">WhatsApp &bull; 3 materiais em sequencia &bull; Fase 2 &bull; ~15 a 30 min</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-purple">Fase 2</span></div>
+        </div>
+
+        <p class="body-text">
+          Tres materiais enviados em sequencia: audio, infografico e video. Cada um tem um intervalo de 5 minutos antes do check de confirmacao. O objetivo e gerar consciencia do problema antes de apresentar a solucao.
+        </p>
+
+        <div class="chat-wrapper">
+          <div class="chat-header">
+            <div class="chat-avatar">A</div>
+            <div class="chat-header-info">
+              <div class="chat-name">Augusto &mdash; CredPositivo</div>
+              <div class="chat-status">online agora</div>
+            </div>
+          </div>
+          <div class="chat-body">
+
+            <!-- MATERIAL 1: AUDIO -->
+            <div class="chat-date-divider">Material 1 &mdash; Audio</div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                <div class="audio-bubble-inner">
+                  <div class="audio-play-btn"><div class="audio-play-icon"></div></div>
+                  <div class="audio-waveform" id="wave1"></div>
+                  <div class="audio-duration">1:30</div>
+                </div>
+                <div class="bubble-time">14:26</div>
+              </div>
+            </div>
+
+            <div class="time-divider">5 minutos depois</div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Conseguiu ouvir o audio? Se tiver qualquer duvida e so me chamar!
+                <div class="bubble-time">14:31</div>
+              </div>
+            </div>
+
+            <div class="bubble-row sent">
+              <div class="bubble sent">
+                ouvi sim, nao sabia disso. entao limpar o nome nao resolve?
+                <div class="bubble-time">14:32 <span class="check-icon">&#10003;&#10003;</span></div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Exato. Limpar o nome e so o primeiro passo. O banco olha muito mais coisa. Vou te mandar uma imagem que mostra na pratica.
+                <div class="bubble-time">14:32</div>
+              </div>
+            </div>
+
+            <!-- MATERIAL 2: IMAGEM -->
+            <div class="chat-date-divider">Material 2 &mdash; Infografico</div>
+
+            <div class="bubble-row received">
+              <div class="bubble received" style="padding:6px 6px 6px;">
+                <div class="img-bubble">
+                  <div class="img-placeholder" style="background: linear-gradient(135deg, #5542d9 0%, #25d366 100%);">
+                    <div class="img-icon">&#128202;</div>
+                    <div class="img-label">5 Fatores do Rating Bancario</div>
+                  </div>
+                </div>
+                <div class="bubble-time" style="padding: 0 4px;">14:32</div>
+              </div>
+            </div>
+
+            <div class="time-divider">5 minutos depois</div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Conseguiu ver a imagem? Qualquer duvida estou aqui!
+                <div class="bubble-time">14:37</div>
+              </div>
+            </div>
+
+            <div class="bubble-row sent">
+              <div class="bubble sent">
+                caramba, nao fazia ideia que tinha tudo isso
+                <div class="bubble-time">14:38 <span class="check-icon">&#10003;&#10003;</span></div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Pois e. A maioria das pessoas so foca em limpar o nome e esquece o resto. Vou te mostrar um video de um caso real.
+                <div class="bubble-time">14:38</div>
+              </div>
+            </div>
+
+            <!-- MATERIAL 3: VIDEO -->
+            <div class="chat-date-divider">Material 3 &mdash; Video</div>
+
+            <div class="bubble-row received">
+              <div class="bubble received" style="padding:6px 6px 6px;">
+                <div class="video-bubble">
+                  <div class="video-placeholder">
+                    <div class="video-play-btn"><div class="video-play-tri"></div></div>
+                    <div class="video-info">
+                      <div class="video-title">Caso Real &mdash; Antes e Depois</div>
+                      <div class="video-dur">3:00</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="bubble-time" style="padding: 0 4px;">14:38</div>
+              </div>
+            </div>
+
+            <div class="time-divider">5 minutos depois</div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Conseguiu assistir o video? Me conta o que achou!
+                <div class="bubble-time">14:43</div>
+              </div>
+            </div>
+
+            <div class="bubble-row sent">
+              <div class="bubble sent">
+                muito bom, da pra entender direitinho. como faco pra fazer esse diagnostico no meu cpf?
+                <div class="bubble-time">14:44 <span class="check-icon">&#10003;&#10003;</span></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="scene">Marcos consumiu os 3 materiais e demonstrou interesse espontaneo (&ldquo;como faco pra fazer o diagnostico&rdquo;). Augusto avanca automaticamente para a Fase 3 &mdash; Oferta.</div>
+      </section>
+
+      <!-- ETAPA 6 -->
+      <section class="section" id="etapa6">
+        <div class="section-header">
+          <div class="section-icon icon-green">&#128176;</div>
+          <div>
+            <div class="section-title">Etapa 6 &mdash; Oferta e Fechamento</div>
+            <div class="section-subtitle">WhatsApp &bull; Link de pagamento + tratamento de objecoes &bull; Fase 3</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-green">Fase 3</span></div>
+        </div>
+
+        <p class="body-text">
+          Augusto apresenta a solucao de forma contextualizada, envia o link de pagamento, trata a objecao de confianca com prova social em video, e fecha a venda.
+        </p>
+
+        <div class="chat-wrapper">
+          <div class="chat-header">
+            <div class="chat-avatar">A</div>
+            <div class="chat-header-info">
+              <div class="chat-name">Augusto &mdash; CredPositivo</div>
+              <div class="chat-status">online agora</div>
+            </div>
+          </div>
+          <div class="chat-body">
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Pelo que voce me contou, o primeiro passo e fazer o raio X do seu CPF. Ele mostra exatamente por que o Bradesco negou e o que fazer pra resolver.
+                <div class="bubble-time">14:45</div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Vou te mandar o acesso aqui. E rapidinho.
+                <div class="bubble-time">14:45</div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                <a class="link-card" href="#" onclick="return false">
+                  <div class="link-card-label">Pagamento Seguro &bull; Monetizze</div>
+                  <div class="link-card-title">Diagnostico Completo do CPF &mdash; CredPositivo</div>
+                  <div class="link-card-url">app.monetizze.com.br/r/BXU1901033</div>
+                  <div class="link-card-price">R$ 67,00</div>
+                </a>
+                <div class="bubble-time">14:45</div>
+              </div>
+            </div>
+
+            <div class="bubble-row sent">
+              <div class="bubble sent">
+                quanto custa isso?
+                <div class="bubble-time">14:46 <span class="check-icon">&#10003;&#10003;</span></div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Sao R$67. Inclui raio X completo do CPF + call com especialista dedicado.
+                <div class="bubble-time">14:46</div>
+              </div>
+            </div>
+
+            <div class="bubble-row sent">
+              <div class="bubble sent">
+                hmm vou pensar, ja fui enganado antes com essas coisas
+                <div class="bubble-time">14:47 <span class="check-icon">&#10003;&#10003;</span></div>
+              </div>
+            </div>
+
+            <!-- Objecao detectada -->
+            <div class="chat-date-divider">Objecao detectada: confianca &rarr; prova social</div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Normal desconfiar. Olha esse caso de um cliente nosso que tava na mesma situacao.
+                <div class="bubble-time">14:47</div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received" style="padding:6px 6px 6px;">
+                <div class="video-bubble">
+                  <div class="video-placeholder" style="background: linear-gradient(135deg, #1a1a2e 0%, #2d1b69 100%);">
+                    <div class="video-play-btn"><div class="video-play-tri"></div></div>
+                    <div class="video-info">
+                      <div class="video-title">Depoimento &mdash; Carlos, negativado 3 anos</div>
+                      <div class="video-dur">2:15</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="bubble-time" style="padding: 0 4px;">14:48</div>
+              </div>
+            </div>
+
+            <div class="time-divider">5 a 8 minutos depois</div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Conseguiu ver o depoimento? Esse cliente tinha uma situacao parecida com a sua.
+                <div class="bubble-time">14:55</div>
+              </div>
+            </div>
+
+            <div class="bubble-row sent">
+              <div class="bubble sent">
+                vi sim, parece real. vou fazer entao, manda o link de novo
+                <div class="bubble-time">14:56 <span class="check-icon">&#10003;&#10003;</span></div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Show! Aqui o link:
+                <div class="bubble-time">14:56</div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                <a class="link-card" href="#" onclick="return false">
+                  <div class="link-card-label">Pagamento Seguro &bull; Monetizze</div>
+                  <div class="link-card-title">Diagnostico Completo do CPF &mdash; CredPositivo</div>
+                  <div class="link-card-url">app.monetizze.com.br/r/BXU1901033</div>
+                  <div class="link-card-price">R$ 67,00</div>
+                </a>
+                <div class="bubble-time">14:56</div>
+              </div>
+            </div>
+
+            <div class="chat-date-divider">Marcos realizou o pagamento &mdash; R$67 via Pix</div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ETAPA 7 -->
+      <section class="section" id="etapa7">
+        <div class="section-header">
+          <div class="section-icon icon-green">&#127881;</div>
+          <div>
+            <div class="section-title">Etapa 7 &mdash; Pos-venda</div>
+            <div class="section-subtitle">WhatsApp &bull; Confirmacao + proximo passo &bull; Fase 4</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-green">Fase 4</span></div>
+        </div>
+
+        <p class="body-text">
+          Apos confirmacao do pagamento via webhook, Augusto envia duas mensagens: confirmacao do pedido e o que acontece a seguir. O lead fica informado e tranquilo.
+        </p>
+
+        <div class="chat-wrapper">
+          <div class="chat-header">
+            <div class="chat-avatar">A</div>
+            <div class="chat-header-info">
+              <div class="chat-name">Augusto &mdash; CredPositivo</div>
+              <div class="chat-status">online agora</div>
+            </div>
+          </div>
+          <div class="chat-body">
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Pagamento confirmado, Marcos! Seu diagnostico ja ta sendo preparado. Em ate 48h voce recebe o raio X completo.
+                <div class="bubble-time">14:58</div>
+              </div>
+            </div>
+
+            <div class="bubble-row received">
+              <div class="bubble received">
+                <div class="bubble-sender-name">Augusto</div>
+                Apos o diagnostico, vou te explicar os proximos passos pra resolver cada ponto que aparecer. Qualquer duvida ate la, e so me chamar aqui.
+                <div class="bubble-time">14:58</div>
+              </div>
+            </div>
+
+            <div class="chat-date-divider">Fim do fluxo principal &mdash; Marcos comprou</div>
+
+          </div>
+        </div>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- FOLLOW-UP -->
+      <section class="section" id="followup">
+        <div class="section-header">
+          <div class="section-icon icon-purple">&#128260;</div>
+          <div>
+            <div class="section-title">Fluxo Alternativo &mdash; Follow-up Automatico</div>
+            <div class="section-subtitle">E se Marcos nao tivesse comprado? &bull; 7 dias &bull; 5 tentativas</div>
+          </div>
+          <div style="margin-left:auto"><span class="tag tag-gray">Cenario B</span></div>
+        </div>
+
+        <p class="body-text">
+          Marcos viu tudo, recebeu o link, mas nao pagou e parou de responder. Augusto inicia a sequencia de follow-up automatico com 5 contatos ao longo de 7 dias.
+        </p>
+
+        <div class="followup-container">
+          <div class="followup-badge">
+            <span>&#128338;</span> Sequencia Automatica de Follow-up
+          </div>
+
+          <div class="followup-rules">
+            <div class="followup-rules-title">Regras do sistema</div>
+            <ul class="rules-list">
+              <li><div class="rule-dot"></div>So envia em horario comercial (seg&ndash;sex 8h&ndash;20h, sab 8h&ndash;14h)</li>
+              <li><div class="rule-dot"></div>Nunca envia no domingo</li>
+              <li><div class="rule-dot"></div>Maximo 1 mensagem por dia</li>
+              <li><div class="rule-dot"></div>Se o lead pedir pra parar, para imediatamente</li>
+              <li><div class="rule-dot"></div>Qualquer resposta do lead reativa a conversa automaticamente</li>
+            </ul>
+          </div>
+
+          <!-- DIA 2 -->
+          <div class="followup-day">
+            <div class="followup-day-header">
+              <div class="followup-day-pill">Dia 2 &mdash; Terca</div>
+              <div class="followup-day-type">Audio</div>
+            </div>
+            <div class="chat-wrapper">
+              <div class="chat-header" style="background:#1a5276">
+                <div class="chat-avatar">A</div>
+                <div class="chat-header-info">
+                  <div class="chat-name">Augusto &mdash; CredPositivo</div>
+                  <div class="chat-status">follow-up automatico</div>
+                </div>
+              </div>
+              <div class="chat-body">
+                <div class="bubble-row received">
+                  <div class="bubble received">
+                    <div class="bubble-sender-name">Augusto</div>
+                    <div class="audio-bubble-inner">
+                      <div class="audio-play-btn"><div class="audio-play-icon"></div></div>
+                      <div class="audio-waveform" id="wave2"></div>
+                      <div class="audio-duration">0:45</div>
+                    </div>
+                    <div class="bubble-time" style="font-size:10px;color:rgba(0,0,0,0.35);">Urgencia: recuperacao de CPF piora com tempo</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DIA 3 -->
+          <div class="followup-day">
+            <div class="followup-day-header">
+              <div class="followup-day-pill">Dia 3 &mdash; Quarta</div>
+              <div class="followup-day-type">Texto &mdash; Novo Angulo</div>
+            </div>
+            <div class="chat-wrapper">
+              <div class="chat-header" style="background:#1a5276">
+                <div class="chat-avatar">A</div>
+                <div class="chat-header-info">
+                  <div class="chat-name">Augusto &mdash; CredPositivo</div>
+                  <div class="chat-status">follow-up automatico</div>
+                </div>
+              </div>
+              <div class="chat-body">
+                <div class="bubble-row received">
+                  <div class="bubble received">
+                    <div class="bubble-sender-name">Augusto</div>
+                    Marcos, uma coisa que esqueci de mencionar: alem do diagnostico, voce recebe uma call individual pra montar seu plano de acao. Quer que eu te mande o link de novo?
+                    <div class="bubble-time">10:15</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DIA 5 -->
+          <div class="followup-day">
+            <div class="followup-day-header">
+              <div class="followup-day-pill">Dia 5 &mdash; Sexta</div>
+              <div class="followup-day-type">Ligacao via IA (VAPI) &mdash; Lead Quente</div>
+            </div>
+            <div class="call-card">
+              <div class="call-header">
+                <div class="call-icon">&#128222;</div>
+                <div>
+                  <div class="call-name">Ligacao automatica &mdash; Augusto (Voz IA)</div>
+                  <div class="call-type">VAPI &bull; Voz natural &bull; Lead atingiu fase de oferta</div>
+                </div>
+              </div>
+              <div class="call-script">
+                &ldquo;Oi Marcos, aqui e o Augusto do CredPositivo. To te ligando porque vi que voce ficou interessado no diagnostico do CPF. Queria saber se ficou alguma duvida ou se posso te ajudar com alguma coisa. Se preferir, me responde la no WhatsApp que eu te mando tudo por la. Valeu!&rdquo;
+              </div>
+              <div class="call-duration">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l1.5 1.5"/></svg>
+                Duracao: 30 a 60 segundos
+              </div>
+            </div>
+          </div>
+
+          <!-- DIA 8 -->
+          <div class="followup-day">
+            <div class="followup-day-header">
+              <div class="followup-day-pill">Dia 8 &mdash; Segunda</div>
+              <div class="followup-day-type">Prova Social (domingo pulado)</div>
+            </div>
+            <div class="chat-wrapper">
+              <div class="chat-header" style="background:#1a5276">
+                <div class="chat-avatar">A</div>
+                <div class="chat-header-info">
+                  <div class="chat-name">Augusto &mdash; CredPositivo</div>
+                  <div class="chat-status">follow-up automatico</div>
+                </div>
+              </div>
+              <div class="chat-body">
+                <div class="bubble-row received">
+                  <div class="bubble received">
+                    <div class="bubble-sender-name">Augusto</div>
+                    Marcos, olha o que esse cliente mandou pra gente depois de fazer o diagnostico:
+                    <div class="bubble-time">09:30</div>
+                  </div>
+                </div>
+                <div class="bubble-row received">
+                  <div class="bubble received" style="padding:6px 6px 6px;">
+                    <div class="video-bubble">
+                      <div class="video-placeholder" style="background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);">
+                        <div class="video-play-btn"><div class="video-play-tri"></div></div>
+                        <div class="video-info">
+                          <div class="video-title">Novo depoimento de cliente</div>
+                          <div class="video-dur">1:45</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="bubble-time" style="padding: 0 4px;">09:30</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DIA 10 -->
+          <div class="followup-day">
+            <div class="followup-day-header">
+              <div class="followup-day-pill">Dia 10 &mdash; Quarta</div>
+              <div class="followup-day-type">Encerramento</div>
+            </div>
+            <div class="chat-wrapper">
+              <div class="chat-header" style="background:#616a6b">
+                <div class="chat-avatar" style="background: linear-gradient(135deg, #616a6b, #808b96);">A</div>
+                <div class="chat-header-info">
+                  <div class="chat-name">Augusto &mdash; CredPositivo</div>
+                  <div class="chat-status">ultima mensagem da sequencia</div>
+                </div>
+              </div>
+              <div class="chat-body">
+                <div class="bubble-row received">
+                  <div class="bubble received">
+                    <div class="bubble-sender-name">Augusto</div>
+                    Marcos, vou encerrar seu atendimento por aqui. Se um dia quiser retomar, e so me mandar um oi que eu te ajudo. Valeu!
+                    <div class="bubble-time">10:00</div>
+                  </div>
+                </div>
+                <div class="chat-date-divider">Fim da sequencia de follow-up</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- RESUMO / FLOWCHART -->
+      <section class="section" id="resumo">
+        <div class="section-header">
+          <div class="section-icon icon-purple">&#128203;</div>
+          <div>
+            <div class="section-title">Diagrama do Fluxo Completo</div>
+            <div class="section-subtitle">Visao macro de toda a jornada do lead</div>
+          </div>
+        </div>
+
+        <div class="flowchart">
+
+          <div class="flow-node">
+            <div class="flow-box">
+              <div class="flow-box-icon">&#128247;</div>
+              <div class="flow-box-content">
+                <div class="flow-box-title">Anuncio Instagram / Facebook</div>
+                <div class="flow-box-desc">Video 15s &bull; Meta Ads</div>
+              </div>
+              <span class="flow-badge purple">Meta Ads</span>
+            </div>
+          </div>
+
+          <div class="flow-arrow"><div class="flow-arrow-line"></div><div class="flow-arrow-head"></div></div>
+
+          <!-- Bifurcacao: x1 vs Quiz -->
+          <div class="flow-branch">
+            <div class="flow-branch-item" style="align-items:flex-end">
+              <div class="flow-branch-label" style="color:#25d366">Campanha x1</div>
+              <div class="flow-box success" style="width:100%">
+                <div class="flow-box-icon">&#128242;</div>
+                <div class="flow-box-content">
+                  <div class="flow-box-title">Direto WhatsApp</div>
+                  <div class="flow-box-desc">Click-to-WhatsApp &bull; Lead cai no chat</div>
+                </div>
+              </div>
+            </div>
+            <div class="flow-branch-item" style="align-items:flex-start">
+              <div class="flow-branch-label" style="color:var(--accent)">Campanha Quiz</div>
+              <div class="flow-box accent" style="width:100%">
+                <div class="flow-box-icon">&#128196;</div>
+                <div class="flow-box-content">
+                  <div class="flow-box-title">Quiz (30s)</div>
+                  <div class="flow-box-desc">Captura CPF, nome, tel, email &bull; Webhook pro bot</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flow-arrow"><div class="flow-arrow-line"></div><div class="flow-arrow-head"></div></div>
+
+          <div class="flow-node">
+            <div class="flow-box">
+              <div class="flow-box-icon">&#128172;</div>
+              <div class="flow-box-content">
+                <div class="flow-box-title">WhatsApp &mdash; Boas-vindas</div>
+                <div class="flow-box-desc">Fase 0 &bull; Menu de produtos &bull; Resposta instantanea</div>
+              </div>
+              <span class="flow-badge green">Instantaneo</span>
+            </div>
+          </div>
+
+          <div class="flow-arrow"><div class="flow-arrow-line"></div><div class="flow-arrow-head"></div></div>
+
+          <div class="flow-node">
+            <div class="flow-box">
+              <div class="flow-box-icon">&#128269;</div>
+              <div class="flow-box-content">
+                <div class="flow-box-title">Qualificacao</div>
+                <div class="flow-box-desc">Fase 1 &bull; Identifica: onde negativado + ha quanto tempo</div>
+              </div>
+              <span class="flow-badge purple">2&ndash;3 msgs</span>
+            </div>
+          </div>
+
+          <div class="flow-arrow"><div class="flow-arrow-line"></div><div class="flow-arrow-head"></div></div>
+
+          <div class="flow-node">
+            <div class="flow-box">
+              <div class="flow-box-icon">&#127891;</div>
+              <div class="flow-box-content">
+                <div class="flow-box-title">Educacao</div>
+                <div class="flow-box-desc">Fase 2 &bull; Audio + Infografico + Video &bull; ~15&ndash;30 min</div>
+              </div>
+              <span class="flow-badge purple">3 materiais</span>
+            </div>
+          </div>
+
+          <div class="flow-arrow"><div class="flow-arrow-line"></div><div class="flow-arrow-head"></div></div>
+
+          <div class="flow-node">
+            <div class="flow-box">
+              <div class="flow-box-icon">&#128176;</div>
+              <div class="flow-box-content">
+                <div class="flow-box-title">Oferta + Fechamento</div>
+                <div class="flow-box-desc">Fase 3 &bull; Link Monetizze &bull; Tratamento de objecoes &bull; Prova social</div>
+              </div>
+              <span class="flow-badge green">R$67</span>
+            </div>
+          </div>
+
+          <div class="flow-arrow"><div class="flow-arrow-line"></div><div class="flow-arrow-head"></div></div>
+
+          <!-- Bifurcacao -->
+          <div class="flow-branch">
+            <div class="flow-branch-item" style="align-items:flex-end">
+              <div class="flow-branch-label" style="color:#25d366">Comprou</div>
+              <div class="flow-box success" style="width:100%">
+                <div class="flow-box-icon">&#127881;</div>
+                <div class="flow-box-content">
+                  <div class="flow-box-title">Pos-venda</div>
+                  <div class="flow-box-desc">Fase 4 &bull; Confirmacao + entrega em 48h</div>
+                </div>
+              </div>
+            </div>
+            <div class="flow-branch-item" style="align-items:flex-start">
+              <div class="flow-branch-label" style="color:var(--accent)">Nao comprou</div>
+              <div class="flow-box accent" style="width:100%">
+                <div class="flow-box-icon">&#128260;</div>
+                <div class="flow-box-content">
+                  <div class="flow-box-title">Follow-up 7 Dias</div>
+                  <div class="flow-box-desc">5 tentativas &bull; Audio, texto, ligacao IA, prova social, encerramento</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flow-arrow"><div class="flow-arrow-line"></div><div class="flow-arrow-head"></div></div>
+
+          <div class="flow-sub-items">
+            <div class="flow-sub-item"><div class="flow-sub-dot"></div>Dia 2 &mdash; Audio (urgencia) <div class="flow-sub-label">Terca</div></div>
+            <div class="flow-sub-item"><div class="flow-sub-dot"></div>Dia 3 &mdash; Texto novo angulo <div class="flow-sub-label">Quarta</div></div>
+            <div class="flow-sub-item"><div class="flow-sub-dot"></div>Dia 5 &mdash; Ligacao IA (VAPI) <div class="flow-sub-label">Sexta</div></div>
+            <div class="flow-sub-item"><div class="flow-sub-dot"></div>Dia 8 &mdash; Prova social <div class="flow-sub-label">Segunda</div></div>
+            <div class="flow-sub-item"><div class="flow-sub-dot"></div>Dia 10 &mdash; Encerramento gentil <div class="flow-sub-label">Quarta</div></div>
+          </div>
+
+        </div>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- MELHORIAS -->
+      <section class="section" id="melhorias">
+        <div class="section-header">
+          <div class="section-icon icon-orange">&#128736;</div>
+          <div>
+            <div class="section-title">Melhorias Propostas</div>
+            <div class="section-subtitle">O que muda do Augusto atual para o proposto</div>
+          </div>
+        </div>
+
+        <p class="body-text">
+          O fluxo acima ja esta implementado. As melhorias a seguir resultam de analise comparativa com os concorrentes. Cada uma adiciona uma camada de conversao sem aumentar o atrito para o lead.
+        </p>
+
+        <div class="improvements-grid">
+
+          <div class="improvement-card" style="border-left:3px solid #22c55e;">
+            <div class="improvement-num" style="background:#22c55e;">1</div>
+            <div class="improvement-body">
+              <div class="improvement-title">Consulta de CPF ao Vivo <span style="background:#22c55e;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;margin-left:8px;">IMPLEMENTADO</span></div>
+              <div class="improvement-today"><span class="tag-today">Antes</span> Quiz coleta o CPF mas nenhum dado era mostrado na conversa.</div>
+              <div class="improvement-proposal">
+                <span class="tag-proposal" style="background:#dcfce7;color:#166534;">Ativo</span> &nbsp;Augusto pede o CPF na Fase 1 (x1) ou recebe do quiz. O sistema consulta a API Apiful ao vivo e injeta os dados no perfil. Augusto responde com: &ldquo;Achei aqui, Marcos. CPF localizado, cadastro ativo na Receita. Pra ver negativacoes e score, precisa do diagnostico completo.&rdquo; Cria o &ldquo;momento wow&rdquo; e empurra pro diagnostico.
+              </div>
+            </div>
+          </div>
+
+          <div class="improvement-card">
+            <div class="improvement-num">2</div>
+            <div class="improvement-body">
+              <div class="improvement-title">Material Personalizado</div>
+              <div class="improvement-today"><span class="tag-today">Hoje</span> Audio, video e imagem sao genericos.</div>
+              <div class="improvement-proposal">
+                <span class="tag-proposal">Proposta</span> &nbsp;Gerar material com o nome do lead e dados especificos. Exemplo: &ldquo;Marcos, seu CPF tem 3 negativacoes no Serasa totalizando R$4.200&rdquo;. Personalizacao aumenta taxa de consumo do material e percepcao de valor.
+              </div>
+            </div>
+          </div>
+
+          <div class="improvement-card">
+            <div class="improvement-num">3</div>
+            <div class="improvement-body">
+              <div class="improvement-title">Urgencia Real (sem ser fake)</div>
+              <div class="improvement-today"><span class="tag-today">Hoje</span> Nao usa urgencia.</div>
+              <div class="improvement-proposal">
+                <span class="tag-proposal">Proposta</span> &nbsp;Mostrar dados reais de quanto o lead ja perdeu: &ldquo;Em 2 anos negativado, voce provavelmente pagou R$X a mais de juros por nao ter credito aprovado.&rdquo; Urgencia baseada em fato real, nao em contagem regressiva falsa.
+              </div>
+            </div>
+          </div>
+
+          <div class="improvement-card">
+            <div class="improvement-num">4</div>
+            <div class="improvement-body">
+              <div class="improvement-title">Reengajamento Pos-Follow-up</div>
+              <div class="improvement-today"><span class="tag-today">Hoje</span> Encerra apos 7&ndash;10 dias. Lead some.</div>
+              <div class="improvement-proposal">
+                <span class="tag-proposal">Proposta</span> &nbsp;Reengajar leads frios apos 30, 60 e 90 dias com conteudo novo: depoimento diferente, dado de mercado relevante ou novidade do produto. Aproveita leads que ja estao quentes mas nao estavam prontos no momento.
+              </div>
+            </div>
+          </div>
+
+          <div class="improvement-card">
+            <div class="improvement-num">5</div>
+            <div class="improvement-body">
+              <div class="improvement-title">Upsell Automatico no Pos-venda</div>
+              <div class="improvement-today"><span class="tag-today">Hoje</span> Fase 4 e simples: confirmacao + prazo.</div>
+              <div class="improvement-proposal">
+                <span class="tag-proposal">Proposta</span> &nbsp;Apos entrega do diagnostico, Augusto apresenta Limpa Nome (R$497) e Rating Bancario (R$997) de forma natural, baseado nos problemas encontrados. Ex: &ldquo;Seu diagnostico mostra X pendencias &mdash; quer que eu te explique como o Limpa Nome resolve isso?&rdquo;
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div><!-- /content -->
+  </main>
+</div><!-- /layout -->
+
+<!-- Mobile menu button -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleSidebar()" aria-label="Menu de navegacao">
+  &#9776;
+</button>
+
+<script>
+  /* =========================================================
+     WAVE GENERATOR
+  ========================================================= */
+  function generateWave(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const count = 26;
+    const bars = [];
+    for (let i = 0; i < count; i++) {
+      const h = Math.floor(Math.random() * 18) + 4;
+      bars.push(`<div class="wave-bar" style="height:${h}px"></div>`);
+    }
+    el.innerHTML = bars.join('');
+  }
+  generateWave('wave1');
+  generateWave('wave2');
+  generateWave('waveX1a');
+
+  /* =========================================================
+     DARK MODE
+  ========================================================= */
+  const html = document.documentElement;
+  const themeBtn = document.getElementById('themeBtn');
+  const themeIcon = document.getElementById('themeIcon');
+
+  const savedTheme = localStorage.getItem('cp-theme');
+  if (savedTheme) {
+    html.setAttribute('data-theme', savedTheme);
+    themeIcon.textContent = savedTheme === 'dark' ? '○' : '◐';
+  }
+
+  function toggleTheme() {
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    const next = isDark ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    themeIcon.textContent = next === 'dark' ? '○' : '◐';
+    localStorage.setItem('cp-theme', next);
+  }
+
+  /* =========================================================
+     SIDEBAR
+  ========================================================= */
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+
+  function toggleSidebar() {
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+  }
+
+  /* =========================================================
+     ACTIVE SIDEBAR NAV
+  ========================================================= */
+  function setActive(el) {
+    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+    if (window.innerWidth <= 768) closeSidebar();
+  }
+
+  /* =========================================================
+     SCROLL SPY
+  ========================================================= */
+  const sections = document.querySelectorAll('.section[id]');
+  const navItems = document.querySelectorAll('.sidebar-item[href]');
+
+  function onScroll() {
+    let current = '';
+    sections.forEach(s => {
+      const top = s.getBoundingClientRect().top;
+      if (top <= 90) current = s.id;
+    });
+    if (!current && sections.length) current = sections[0].id;
+    navItems.forEach(item => {
+      item.classList.remove('active');
+      if (item.getAttribute('href') === '#' + current) {
+        item.classList.add('active');
+      }
+    });
+    // also handle intro
+    if (!current) {
+      document.querySelector('.sidebar-item[href="#intro"]')?.classList.add('active');
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+
+</body>
+</html>

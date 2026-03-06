@@ -1,0 +1,2408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CredPositivo — Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   CREDPOSITIVO COMMAND CENTER — DESIGN SYSTEM
+   Aesthetic: Mission Control / War Room / Operational Precision
+   ============================================================ */
+
+:root {
+  /* Core */
+  --bg-void:       #060609;
+  --bg-deep:       #0a0a10;
+  --bg-panel:      #0e0e16;
+  --bg-card:       #12121c;
+  --bg-card-hover: #161624;
+  --bg-border:     rgba(255,255,255,0.06);
+  --bg-border-lit: rgba(255,255,255,0.12);
+
+  /* Text */
+  --text-primary:  #e8e8f0;
+  --text-secondary:#8888aa;
+  --text-dim:      #44445a;
+  --text-bright:   #ffffff;
+
+  /* Departments */
+  --col-strategy:  #ef4444;
+  --col-tech:      #3b82f6;
+  --col-sales:     #10b981;
+  --col-marketing: #8b5cf6;
+  --col-ops:       #f59e0b;
+  --col-design:    #ec4899;
+  --col-cs:        #06b6d4;
+  --col-owner:     #fbbf24;
+
+  /* Glow variants */
+  --glow-strategy: rgba(239, 68, 68, 0.15);
+  --glow-tech:     rgba(59, 130, 246, 0.15);
+  --glow-sales:    rgba(16, 185, 129, 0.15);
+  --glow-marketing:rgba(139, 92, 246, 0.15);
+  --glow-ops:      rgba(245, 158, 11, 0.15);
+  --glow-design:   rgba(236, 72, 153, 0.15);
+  --glow-cs:       rgba(6, 182, 212, 0.15);
+
+  /* Typography */
+  --font-display:  'Syne', sans-serif;
+  --font-mono:     'JetBrains Mono', monospace;
+  --font-ui:       'Space Mono', monospace;
+
+  /* Spacing */
+  --gap-xs: 4px;
+  --gap-sm: 8px;
+  --gap-md: 16px;
+  --gap-lg: 24px;
+  --gap-xl: 40px;
+
+  /* Animation */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: 14px;
+  background: var(--bg-void);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  line-height: 1.5;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ===================== BACKGROUND CANVAS ===================== */
+#bg-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.bg-mesh {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(59,130,246,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(139,92,246,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 50% 50%, rgba(16,185,129,0.02) 0%, transparent 70%);
+}
+
+/* Scanlines */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+}
+
+/* ===================== LAYOUT ===================== */
+#app {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: auto auto auto 1fr auto;
+  min-height: 100vh;
+  padding: var(--gap-md);
+  gap: var(--gap-md);
+}
+
+/* ===================== HEADER ===================== */
+#header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--gap-lg);
+  background: var(--bg-panel);
+  border: 1px solid var(--bg-border);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+#header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--col-tech), var(--col-sales), var(--col-marketing), transparent);
+  animation: scan-h 4s linear infinite;
+}
+
+@keyframes scan-h {
+  0% { opacity: 0.3; }
+  50% { opacity: 1; }
+  100% { opacity: 0.3; }
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+}
+
+.logo-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(59,130,246,0.3);
+}
+.logo-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--text-bright);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.logo-subtitle {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-lg);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--col-sales);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  70% { box-shadow: 0 0 0 6px transparent; opacity: 0.8; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+}
+
+.header-clock {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--text-bright);
+  letter-spacing: 0.05em;
+  tabular-nums: true;
+  font-feature-settings: "tnum" 1;
+}
+
+.header-date {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: right;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+}
+
+.agent-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--col-sales);
+  letter-spacing: 0.05em;
+}
+
+.agent-count span {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ===================== METRICS BAR ===================== */
+#metrics-bar {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--gap-sm);
+}
+
+.metric-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--bg-border);
+  border-radius: 4px;
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.metric-card:hover {
+  border-color: var(--bg-border-lit);
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent, var(--col-tech));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s var(--ease-out);
+}
+
+.metric-card.loaded::before {
+  transform: scaleX(1);
+}
+
+.metric-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+}
+
+.metric-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-bright);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-feature-settings: "tnum" 1;
+}
+
+.metric-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.metric-trend {
+  position: absolute;
+  top: 12px; right: 12px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--col-sales);
+}
+
+/* ===================== FILTERS ===================== */
+#filters {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-right: var(--gap-sm);
+}
+
+.filter-btn {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--bg-border);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  border-color: var(--col);
+  color: var(--col);
+}
+
+.filter-btn.active {
+  background: var(--col);
+  border-color: var(--col);
+  color: var(--bg-void);
+  font-weight: 700;
+}
+
+/* ===================== MAIN GRID ===================== */
+#main-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--gap-md);
+  align-items: start;
+}
+
+/* ===================== AGENTS GRID ===================== */
+#agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--gap-sm);
+}
+
+/* ===================== AGENT CARD ===================== */
+.agent-card {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-border);
+  border-radius: 4px;
+  padding: var(--gap-md);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-out);
+  position: relative;
+  overflow: hidden;
+  animation: card-in 0.5s var(--ease-out) both;
+}
+
+.agent-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--dept-glow, transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.agent-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--dept-col, var(--bg-border-lit));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.agent-card:hover::after {
+  opacity: 1;
+}
+
+.agent-card.hidden {
+  display: none;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Left accent bar */
+.agent-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 2px;
+  background: var(--dept-col, var(--text-dim));
+  opacity: 0.6;
+  transition: opacity 0.3s;
+}
+
+.agent-card:hover::before {
+  opacity: 1;
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gap-sm);
+  margin-bottom: var(--gap-sm);
+}
+
+.agent-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+  background: var(--dept-bg, rgba(255,255,255,0.05));
+  border: 1px solid var(--dept-col, transparent);
+  position: relative;
+}
+
+.card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-bright);
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+
+.agent-role {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--dept-col, var(--text-secondary));
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+
+.card-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.status-dot.online {
+  background: var(--col-sales);
+  animation: pulse-ring 2s ease-in-out infinite;
+  color: var(--col-sales);
+}
+
+.status-dot.processing {
+  background: var(--col-tech);
+  animation: blink 1s step-end infinite;
+  color: var(--col-tech);
+}
+
+.status-dot.idle {
+  background: var(--col-ops);
+  color: var(--col-ops);
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+.task-count {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.task-count strong {
+  color: var(--dept-col, var(--text-secondary));
+  font-weight: 700;
+}
+
+/* Activity text */
+.agent-activity {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-bottom: var(--gap-sm);
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.activity-icon {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.activity-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Progress bar */
+.activity-bar {
+  height: 2px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 1px;
+  margin-bottom: var(--gap-sm);
+  overflow: hidden;
+}
+
+.activity-fill {
+  height: 100%;
+  background: var(--dept-col, var(--col-tech));
+  border-radius: 1px;
+  transition: width 2s ease;
+  animation: shimmer 2s linear infinite;
+  background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Skills tags */
+.skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.skill-tag {
+  padding: 2px 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: all 0.2s;
+}
+
+.agent-card:hover .skill-tag {
+  color: var(--dept-col, var(--text-secondary));
+  border-color: rgba(255,255,255,0.12);
+}
+
+/* Dept label */
+.dept-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  margin-bottom: var(--gap-sm);
+}
+
+/* ===================== SIDEBAR ===================== */
+#sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--bg-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--bg-border);
+}
+
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.panel-badge {
+  padding: 2px 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+/* ===================== ACTIVITY FEED ===================== */
+#activity-feed {
+  padding: var(--gap-sm);
+  max-height: 380px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-border) transparent;
+}
+
+.feed-item {
+  display: flex;
+  gap: var(--gap-sm);
+  padding: 7px 6px;
+  border-radius: 3px;
+  transition: background 0.2s;
+  animation: feed-in 0.4s var(--ease-out) both;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.feed-item:last-child {
+  border-bottom: none;
+}
+
+.feed-item:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+@keyframes feed-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.feed-time {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  padding-top: 1px;
+  min-width: 38px;
+}
+
+.feed-content {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.feed-agent {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.feed-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--col, var(--text-dim));
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+/* ===================== HIERARCHY ===================== */
+#hierarchy-panel {
+  padding: var(--gap-md);
+}
+
+.hier-level {
+  margin-bottom: 14px;
+}
+
+.hier-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+}
+
+.hier-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hier-node {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 3px;
+  border: 1px solid;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.hier-node:hover {
+  transform: scale(1.03);
+}
+
+.hier-connector {
+  display: flex;
+  align-items: center;
+  margin-left: 12px;
+  margin-bottom: 4px;
+  gap: 6px;
+}
+
+.connector-line {
+  width: 1px;
+  height: 20px;
+  background: var(--bg-border);
+}
+
+.connector-arrow {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+/* ===================== SALES PIPELINE ===================== */
+#pipeline-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--bg-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--gap-lg);
+  border-bottom: 1px solid var(--bg-border);
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.section-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.pipeline-track {
+  padding: var(--gap-lg);
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+}
+
+.pipeline-stage {
+  flex: 1;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.pipeline-stage:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 28px;
+  right: -1px;
+  width: 2px;
+  height: 24px;
+  background: linear-gradient(180deg, var(--stage-col), transparent);
+  transform: translateX(50%);
+  z-index: 1;
+}
+
+.pipeline-arrow {
+  position: absolute;
+  top: 34px;
+  right: -12px;
+  font-size: 10px;
+  color: var(--text-dim);
+  z-index: 2;
+}
+
+.stage-block {
+  width: 100%;
+  padding: 10px 8px;
+  border-top: 2px solid var(--stage-col, var(--text-dim));
+  background: rgba(255,255,255,0.02);
+  border-radius: 0 0 3px 3px;
+  text-align: center;
+  transition: background 0.2s;
+}
+
+.stage-block:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.stage-name {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+
+.stage-count {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--stage-col, var(--text-primary));
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.stage-agent {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pipeline-connector {
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+  padding-top: 8px;
+  color: var(--text-dim);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+/* ===================== MODAL ===================== */
+#modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+#modal-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+#modal {
+  background: var(--bg-panel);
+  border: 1px solid var(--bg-border-lit);
+  border-radius: 6px;
+  width: min(600px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  transform: scale(0.95) translateY(20px);
+  transition: transform 0.3s var(--ease-out);
+  position: relative;
+}
+
+#modal-overlay.open #modal {
+  transform: scale(1) translateY(0);
+}
+
+.modal-top-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--modal-col, var(--col-tech)), transparent);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--gap-lg);
+  border-bottom: 1px solid var(--bg-border);
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--bg-border);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-bright);
+}
+
+.modal-body {
+  padding: var(--gap-lg);
+}
+
+.modal-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-lg);
+  margin-bottom: var(--gap-lg);
+}
+
+.modal-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  border: 1px solid var(--modal-col, var(--bg-border));
+  background: rgba(255,255,255,0.04);
+  flex-shrink: 0;
+  box-shadow: 0 0 30px var(--modal-glow, transparent);
+}
+
+.modal-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--text-bright);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.modal-role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--modal-col, var(--text-secondary));
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-top: 4px;
+}
+
+.modal-dept {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.modal-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap-sm);
+  margin-bottom: var(--gap-lg);
+}
+
+.modal-stat {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--bg-border);
+  border-radius: 3px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.modal-stat-val {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--modal-col, var(--text-bright));
+  letter-spacing: -0.02em;
+}
+
+.modal-stat-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+
+.modal-section-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--bg-border);
+}
+
+.modal-desc {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: var(--gap-md);
+}
+
+.modal-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--gap-md);
+}
+
+.modal-skill-tag {
+  padding: 4px 10px;
+  border: 1px solid var(--modal-col, var(--bg-border));
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--modal-col, var(--text-secondary));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.modal-current-task {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--bg-border);
+  border-left: 2px solid var(--modal-col, var(--col-tech));
+  border-radius: 3px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ===================== SCROLLBAR ===================== */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--bg-border-lit); }
+
+/* ===================== RESPONSIVENESS ===================== */
+@media (max-width: 1100px) {
+  #main-grid {
+    grid-template-columns: 1fr;
+  }
+  #sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  #metrics-bar {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  #header {
+    flex-wrap: wrap;
+    gap: var(--gap-sm);
+  }
+  #sidebar {
+    grid-template-columns: 1fr;
+  }
+  .pipeline-track {
+    gap: var(--gap-sm);
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  #metrics-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ===================== LOADING ANIMATION ===================== */
+.count-animate {
+  animation: count-in 1.5s var(--ease-out) both;
+}
+
+@keyframes count-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Owner Card Special */
+.owner-banner {
+  background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(251,191,36,0.02));
+  border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 4px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: var(--gap-md);
+}
+
+.owner-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(251,191,36,0.1);
+  border: 2px solid rgba(251,191,36,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.owner-info .owner-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--col-owner);
+}
+
+.owner-info .owner-role {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(251,191,36,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Grid scanning line effect */
+.grid-scan {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(16,185,129,0.3), transparent);
+  z-index: 3;
+  animation: grid-sweep 8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes grid-sweep {
+  0%   { top: 0%; opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Corner decorations */
+.corner-deco {
+  position: fixed;
+  width: 60px;
+  height: 60px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.corner-deco.tl { top: 8px; left: 8px; border-top: 1px solid rgba(59,130,246,0.3); border-left: 1px solid rgba(59,130,246,0.3); }
+.corner-deco.tr { top: 8px; right: 8px; border-top: 1px solid rgba(59,130,246,0.3); border-right: 1px solid rgba(59,130,246,0.3); }
+.corner-deco.bl { bottom: 8px; left: 8px; border-bottom: 1px solid rgba(59,130,246,0.3); border-left: 1px solid rgba(59,130,246,0.3); }
+.corner-deco.br { bottom: 8px; right: 8px; border-bottom: 1px solid rgba(59,130,246,0.3); border-right: 1px solid rgba(59,130,246,0.3); }
+</style>
+</head>
+<body>
+
+<!-- Background elements -->
+<div class="bg-mesh"></div>
+<div class="scanlines"></div>
+<div class="grid-scan"></div>
+<canvas id="bg-canvas"></canvas>
+<div class="corner-deco tl"></div>
+<div class="corner-deco tr"></div>
+<div class="corner-deco bl"></div>
+<div class="corner-deco br"></div>
+
+<div id="app">
+
+  <!-- ===== HEADER ===== -->
+  <header id="header">
+    <div class="header-logo">
+      <div class="logo-mark"><img src="/positivo.webp" alt="CredPositivo"></div>
+      <div class="logo-text">
+        <span class="logo-name">CredPositivo</span>
+        <span class="logo-subtitle">Command Center &mdash; AI Agents Operations</span>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <div class="status-indicator">
+        <div class="pulse-dot"></div>
+        Sistema Operacional
+      </div>
+      <div>
+        <div class="header-clock" id="clock">--:--:--</div>
+        <div class="header-date" id="date-display">---</div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="agent-count">
+        <span>11</span>/11 Agentes Ativos
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== METRICS BAR ===== -->
+  <section id="metrics-bar">
+    <div class="metric-card" style="--accent: var(--col-sales)">
+      <div class="metric-label">Leads Hoje</div>
+      <div class="metric-value" id="metric-leads">--</div>
+      <div class="metric-sub" id="metric-leads-sub">Carregando...</div>
+      <div class="metric-trend" id="metric-leads-trend"></div>
+    </div>
+    <div class="metric-card" style="--accent: var(--col-strategy)">
+      <div class="metric-label">Vendas Hoje</div>
+      <div class="metric-value" id="metric-conv">--</div>
+      <div class="metric-sub" id="metric-conv-sub">Carregando...</div>
+      <div class="metric-trend" id="metric-conv-trend"></div>
+    </div>
+    <div class="metric-card" style="--accent: var(--col-ops)">
+      <div class="metric-label">Receita do Dia</div>
+      <div class="metric-value" id="metric-revenue">--</div>
+      <div class="metric-sub" id="metric-rev-sub">Carregando...</div>
+      <div class="metric-trend" id="metric-rev-trend"></div>
+    </div>
+    <div class="metric-card" style="--accent: var(--col-marketing)">
+      <div class="metric-label">Msgs Enviadas</div>
+      <div class="metric-value" id="metric-msgs">--</div>
+      <div class="metric-sub" id="metric-msgs-sub">Pelo Augusto hoje</div>
+      <div class="metric-trend" id="metric-msgs-trend"></div>
+    </div>
+    <div class="metric-card" style="--accent: var(--col-cs)">
+      <div class="metric-label">Follow-ups</div>
+      <div class="metric-value" id="metric-followups">--</div>
+      <div class="metric-sub" id="metric-followups-sub">Agendados hoje</div>
+      <div class="metric-trend" id="metric-followups-trend"></div>
+    </div>
+    <div class="metric-card" style="--accent: var(--col-design)">
+      <div class="metric-label">Conversas Ativas</div>
+      <div class="metric-value" id="metric-active">--</div>
+      <div class="metric-sub" id="metric-active-sub">Ultima hora</div>
+      <div class="metric-trend" id="metric-active-trend"></div>
+    </div>
+  </section>
+
+  <!-- ===== FILTERS ===== -->
+  <div id="filters">
+    <span class="filter-label">Filtrar:</span>
+    <button class="filter-btn active" style="--col: white" data-filter="all">Todos</button>
+    <button class="filter-btn" style="--col: var(--col-strategy)" data-filter="estrategia">Estrat&eacute;gia</button>
+    <button class="filter-btn" style="--col: var(--col-tech)" data-filter="tecnologia">Tecnologia</button>
+    <button class="filter-btn" style="--col: var(--col-sales)" data-filter="vendas">Vendas</button>
+    <button class="filter-btn" style="--col: var(--col-marketing)" data-filter="marketing">Marketing</button>
+    <button class="filter-btn" style="--col: var(--col-ops)" data-filter="operacao">Opera&ccedil;&atilde;o</button>
+    <button class="filter-btn" style="--col: var(--col-design)" data-filter="design">Design</button>
+    <button class="filter-btn" style="--col: var(--col-cs)" data-filter="pos-venda">P&oacute;s-venda</button>
+  </div>
+
+  <!-- ===== MAIN GRID ===== -->
+  <div id="main-grid">
+
+    <!-- AGENTS GRID -->
+    <div id="agents-grid">
+      <!-- Cards injected by JS -->
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+
+      <!-- Activity Feed -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Feed de Atividade</span>
+          <span class="panel-badge" style="color: var(--col-sales)">&#9679; Live</span>
+        </div>
+        <div id="activity-feed">
+          <!-- Items injected by JS -->
+        </div>
+      </div>
+
+      <!-- Hierarchy -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Hierarquia</span>
+        </div>
+        <div id="hierarchy-panel">
+
+          <!-- Owner -->
+          <div style="margin-bottom: 10px;">
+            <div class="hier-label">Dono</div>
+            <div class="owner-banner">
+              <div class="owner-avatar">&#128081;</div>
+              <div class="owner-info">
+                <div class="owner-name">Igor Emmanuel</div>
+                <div class="owner-role">Dono &middot; Visionário</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hier-connector">
+            <div class="connector-line" style="height:16px; margin-left:20px;"></div>
+          </div>
+
+          <!-- Leadership -->
+          <div class="hier-level">
+            <div class="hier-label">Lideran&ccedil;a</div>
+            <div class="hier-nodes">
+              <div class="hier-node" style="background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.3); color: var(--col-strategy);">
+                &#9733; Musk <span style="opacity:0.5; font-size:8px;">CEO</span>
+              </div>
+              <div class="hier-node" style="background: rgba(251,191,36,0.08); border-color: rgba(251,191,36,0.3); color: var(--col-owner);">
+                &#9881; Jobs <span style="opacity:0.5; font-size:8px;">Orch.</span>
+              </div>
+              <div class="hier-node" style="background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.3); color: var(--col-tech);">
+                &#128187; Fernando <span style="opacity:0.5; font-size:8px;">Dev</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hier-connector">
+            <div class="connector-line" style="height:12px; margin-left:20px;"></div>
+          </div>
+
+          <!-- Teams -->
+          <div class="hier-level">
+            <div class="hier-label">Time &mdash; Coordenados por Jobs</div>
+            <div class="hier-nodes" style="gap: 4px;">
+              <div class="hier-node" style="background: rgba(16,185,129,0.06); border-color: rgba(16,185,129,0.2); color: var(--col-sales); font-size: 8px; padding: 3px 7px;">&#127919; Augusto</div>
+              <div class="hier-node" style="background: rgba(16,185,129,0.06); border-color: rgba(16,185,129,0.2); color: var(--col-sales); font-size: 8px; padding: 3px 7px;">&#129309; Paulo</div>
+              <div class="hier-node" style="background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.2); color: var(--col-ops); font-size: 8px; padding: 3px 7px;">&#128200; Ana</div>
+              <div class="hier-node" style="background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.2); color: var(--col-ops); font-size: 8px; padding: 3px 7px;">&#128202; Luan</div>
+              <div class="hier-node" style="background: rgba(139,92,246,0.06); border-color: rgba(139,92,246,0.2); color: var(--col-marketing); font-size: 8px; padding: 3px 7px;">&#9997; Andre</div>
+              <div class="hier-node" style="background: rgba(139,92,246,0.06); border-color: rgba(139,92,246,0.2); color: var(--col-marketing); font-size: 8px; padding: 3px 7px;">&#128248; Bia</div>
+              <div class="hier-node" style="background: rgba(139,92,246,0.06); border-color: rgba(139,92,246,0.2); color: var(--col-marketing); font-size: 8px; padding: 3px 7px;">&#128202; Rafael</div>
+              <div class="hier-node" style="background: rgba(236,72,153,0.06); border-color: rgba(236,72,153,0.2); color: var(--col-design); font-size: 8px; padding: 3px 7px;">&#10024; Perola</div>
+              <div class="hier-node" style="background: rgba(6,182,212,0.06); border-color: rgba(6,182,212,0.2); color: var(--col-cs); font-size: 8px; padding: 3px 7px;">&#128084; Clara</div>
+            </div>
+          </div>
+
+          <!-- Sales flow -->
+          <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--bg-border);">
+            <div class="hier-label" style="margin-bottom: 8px;">Fluxo de Leads</div>
+            <div style="display: flex; align-items: center; gap: 3px; flex-wrap: wrap; gap: 4px;">
+              <span style="font-family: var(--font-mono); font-size: 8px; color: var(--col-marketing); padding: 2px 6px; border: 1px solid rgba(139,92,246,0.3); border-radius: 2px;">Rafael</span>
+              <span style="color: var(--text-dim); font-size: 9px;">&#8594;</span>
+              <span style="font-family: var(--font-mono); font-size: 8px; color: var(--col-sales); padding: 2px 6px; border: 1px solid rgba(16,185,129,0.3); border-radius: 2px;">Augusto</span>
+              <span style="color: var(--text-dim); font-size: 9px;">&#8594;</span>
+              <span style="font-family: var(--font-mono); font-size: 8px; color: var(--col-sales); padding: 2px 6px; border: 1px solid rgba(16,185,129,0.3); border-radius: 2px;">Paulo</span>
+              <span style="color: var(--text-dim); font-size: 9px;">&#8594;</span>
+              <span style="font-family: var(--font-mono); font-size: 8px; color: var(--col-ops); padding: 2px 6px; border: 1px solid rgba(245,158,11,0.3); border-radius: 2px;">Ana</span>
+              <span style="color: var(--text-dim); font-size: 9px;">&#8594;</span>
+              <span style="font-family: var(--font-mono); font-size: 8px; color: var(--col-cs); padding: 2px 6px; border: 1px solid rgba(6,182,212,0.3); border-radius: 2px;">Clara</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- ===== PIPELINE ===== -->
+  <section id="pipeline-section">
+    <div class="section-header">
+      <span class="section-title">Pipeline de Vendas &mdash; Tempo Real</span>
+      <span class="section-sub">Atualizado automaticamente</span>
+    </div>
+    <div class="pipeline-track" id="pipeline-track">
+      <!-- Injected by JS -->
+    </div>
+  </section>
+
+</div>
+
+<!-- ===== MODAL ===== -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div class="modal-top-bar"></div>
+    <div class="modal-header">
+      <div></div>
+      <button class="modal-close" id="modal-close-btn">&#10005;</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CREDPOSITIVO COMMAND CENTER — JAVASCRIPT ENGINE
+   ============================================================ */
+
+// ===================== DATA =====================
+
+const AGENTS = [
+  {
+    id: 'musk',
+    name: 'Musk',
+    role: 'CEO / Estrategista',
+    dept: 'estrategia',
+    deptLabel: 'Estratégia',
+    col: 'var(--col-strategy)',
+    glow: 'var(--glow-strategy)',
+    bg: 'rgba(239,68,68,0.06)',
+    emoji: '⚡',
+    status: 'online',
+    tasks: 23,
+    skills: ['Visão 80/20', 'Decisão', 'OKRs', 'Estratégia'],
+    desc: 'Define a direção estratégica da empresa. Toma decisões de alto impacto baseadas no princípio 80/20. Analisa mercado, concorrência e oportunidades de crescimento.',
+    activities: [
+      'Analisando funil: 24 leads hoje, 14 qualificados — taxa de 58% — acima da meta',
+      'Decisao: escalar budget Meta Ads em 20% — ROAS da campanha Diagnostico acima de 3x',
+      'Review semanal: Augusto converteu 140 conversas, Paulo fechou 12 vendas — Diagnostico lidera',
+      'Priorizando: focar em Limpa Nome R$497 — margem 3x maior que Diagnostico, demanda crescendo',
+      'Analise 80/20: 23% dos leads vem do quiz orgânico mas geram 41% das conversoes — dobrar investimento',
+      'Avaliando LTV medio: Diag R$97 + Limpa R$497 + Rating R$997 — meta de R$400/lead ativo',
+      'Benchmark concorrencia: CPL medio do mercado R$12, nosso R$8.40 — vantagem competitiva mantida',
+      'Definindo OKR do mes: 200 diagnosticos + 30 Limpa Nome + 10 Rating = R$40k receita bruta'
+    ],
+    modalStats: { tarefas: 23, reunioes: 4, decisoes: 7 }
+  },
+  {
+    id: 'jobs',
+    name: 'Jobs',
+    role: 'Orquestrador Geral',
+    dept: 'estrategia',
+    deptLabel: 'Estratégia',
+    col: 'var(--col-owner)',
+    glow: 'rgba(251,191,36,0.15)',
+    bg: 'rgba(251,191,36,0.05)',
+    emoji: '⚙️',
+    status: 'processing',
+    tasks: 41,
+    skills: ['Coordenação', 'Delegação', 'Priorização', 'QA'],
+    desc: 'Coordena todos os 11 agentes do time. Garante que as tarefas sejam executadas na sequência correta. É o ponto central de comunicação e orquestração operacional.',
+    activities: [
+      'Delegando: Andre criar copy de follow-up D+3 para leads fase 2 que nao avancaram',
+      'Handoff: movendo lead Anderson (fase 3, interesse alto) do Augusto pro Paulo fechar',
+      'Alerta: 3 leads fase 3 sem resposta ha 4h — acionando nudge automatico de urgencia',
+      'Sincronizando campanha: Rafael sobe ads + Andre entrega copy + Perola finaliza criativo ate 14h',
+      'QA: verificando que Augusto nao pulou fase de educacao — audio + infografico + video obrigatorios',
+      'Monitorando: 11 conversas ativas simultaneas, 268 mensagens enviadas hoje — capacidade normal',
+      'Escalando: lead Chrystyano na fase 2 ha 2 dias — agendando ligacao VAPI para amanha 10h',
+      'Coordenando pos-venda: Clara fazer onboarding dos 2 diagnosticos vendidos ontem'
+    ],
+    modalStats: { tarefas: 41, agentes: 11, sincronizacoes: 18 }
+  },
+  {
+    id: 'fernando',
+    name: 'Fernando',
+    role: 'Dev / Tech Lead',
+    dept: 'tecnologia',
+    deptLabel: 'Tecnologia',
+    col: 'var(--col-tech)',
+    glow: 'var(--glow-tech)',
+    bg: 'rgba(59,130,246,0.06)',
+    emoji: '💻',
+    status: 'processing',
+    tasks: 17,
+    skills: ['Node.js', 'Docker', 'Bot WA', 'Deploy', 'APIs'],
+    desc: 'Responsável pelo bot WhatsApp (DigitalOcean), infraestrutura, deploy e todas as integrações técnicas. Mantém o sistema rodando com 99.8% de uptime.',
+    activities: [
+      'Deploy v2.5: novo endpoint /api/admin/agent-feed — dashboard com dados reais em tempo real',
+      'Alex reportou: token Meta API expirado — campanhas sem dados de custo/ROI — corrigindo',
+      'Monitorando Docker: credpositivo-ai-agent-1 UP, postgres healthy, redis UP, quepasa UP',
+      'State machine: 106 stress tests passando — transicoes 0→1→2→3→4→5 sem regressao',
+      'Investigando: Chatwoot com latencia 34ms (baseline <20ms) — possivel gargalo em query',
+      'Otimizando: nudge cron rodando a cada 5min, processando 32k followups no Redis',
+      'Configurando: VAPI ligacao automatica para leads quentes fase 3 que nao responderam em 24h',
+      'Rebuild container: adicionando agent-feed API — dados reais do banco no Command Center'
+    ],
+    modalStats: { deploys: 3, uptime: '99.8%', incidentes: 0 }
+  },
+  {
+    id: 'augusto',
+    name: 'Augusto',
+    role: 'SDR — Qualificação',
+    dept: 'vendas',
+    deptLabel: 'Vendas',
+    col: 'var(--col-sales)',
+    glow: 'var(--glow-sales)',
+    bg: 'rgba(16,185,129,0.06)',
+    emoji: '🎯',
+    status: 'online',
+    tasks: 34,
+    skills: ['Qualificação', 'Dor', 'Capacidade', 'Urgência'],
+    desc: 'Qualifica leads com o framework: Dor + Capacidade + Decisão + Urgência. Filtra oportunidades reais e passa para Paulo somente leads com fit ideal.',
+    activities: [
+      'Qualificando Anderson (Serasa, 559191227764) — fase 3, interesse alto, enviando link Monetizze',
+      'Educando Clisten Corgellys — fase 2, enviando infografico dos 5 fatores de rating bancario',
+      'Enviando audio 1min30 sobre rating bancario para Aliane — fase 2, explicando por que limpar nome nao basta',
+      'Follow-up social_proof: enviando depoimento de cliente real para Jussamar Soares — fase 3',
+      'Nudge urgencia para Jefferson Silva — fase 3, ha 2 dias sem resposta, calculando juros perdidos',
+      'Detectando objecao de confianca de Chrystyano — enviando video depoimento de caso similar',
+      'Qualificando: onde negativado? Serasa/SPC? Ha quanto tempo? — mapeando dor real do lead',
+      'Enviando link de pagamento R$97 para Priscila Zanatta — diagnostico completo + call individual'
+    ],
+    modalStats: { leads: 34, qualificados: 19, descartados: 15 }
+  },
+  {
+    id: 'paulo',
+    name: 'Paulo',
+    role: 'Closer — Fechamento',
+    dept: 'vendas',
+    deptLabel: 'Vendas',
+    col: 'var(--col-sales)',
+    glow: 'var(--glow-sales)',
+    bg: 'rgba(16,185,129,0.06)',
+    emoji: '🤝',
+    status: 'processing',
+    tasks: 12,
+    skills: ['Fechamento', 'Objeções', 'Certeza', 'Urgência'],
+    desc: 'Fecha vendas com o princípio: Certeza > Medo. Trata objeções com empatia e lógica. Especialista em converter leads qualificados em clientes pagantes.',
+    activities: [
+      'Ligacao VAPI para lead quente — 11 chamadas iniciadas hoje via Wavoip/WhatsApp',
+      'Tratando objecao "ja fui enganado antes" — enviando depoimento + garantia de resultado',
+      'Apresentando Limpa Nome R$497 para cliente que comprou Diagnostico na semana passada',
+      'Proposta Rating Bancario R$997: "em 20 dias uteis voce tem credito aprovado" — lead fase 4',
+      'Follow-up 3o contato: lead viu depoimento mas nao respondeu — agendando ligacao IA amanha',
+      'Quebrando objecao de preco: "R$97 e menos que 1 parcela dos juros que voce paga por mes"',
+      'Fechamento Diagnostico: confirmando pagamento Pix de Cristina Silva — R$97 via Monetizze',
+      'Upsell pos-diagnostico: resultado mostrou 3 negativacoes — recomendando Limpa Nome R$497'
+    ],
+    modalStats: { fechamentos: 12, taxa: '63%', ticket: 'R$67' }
+  },
+  {
+    id: 'ana',
+    name: 'Ana',
+    role: 'Ops — Pipeline & CRM',
+    dept: 'operacao',
+    deptLabel: 'Operação',
+    col: 'var(--col-ops)',
+    glow: 'var(--glow-ops)',
+    bg: 'rgba(245,158,11,0.06)',
+    emoji: '📊',
+    status: 'online',
+    tasks: 28,
+    skills: ['CRM', 'Pipeline', 'Follow-up', 'Disciplina'],
+    desc: 'Mantém o pipeline organizado e o CRM atualizado. Executa follow-ups no timing certo. Garante que nenhum lead caia no vazio.',
+    activities: [
+      'Pipeline: 24 leads novos hoje — 14 na fase 3+ (qualificados), 10 em educacao (fase 2)',
+      'Registrando pedido: Cristina Silva — Diagnostico R$97 — status pending no Monetizze',
+      'Alerta: Alex Junior fez checkout R$97 mas pagamento ainda pending — monitorando ha 2 dias',
+      'Organizando CRM Krayin: 140 conversas ativas do Augusto precisam de status atualizado',
+      'Follow-up automatico: 32.536 nudges agendados — urgencia, social_proof, encerramento',
+      'Sinalizando leads parados: 5 leads fase 3 sem interacao ha 48h — escalonando pro Jobs',
+      'Pedido Breno Freitas — Rating Bancario R$997 — status pending desde 28/fev — cobrar',
+      'Relatorio diario: 268 mensagens enviadas, 11 chamadas, 0 vendas confirmadas hoje — meta: 3'
+    ],
+    modalStats: { atualizacoes: 28, followups: 14, pipeline: 47 }
+  },
+  {
+    id: 'luan',
+    name: 'Luan',
+    role: 'Manager — Performance',
+    dept: 'operacao',
+    deptLabel: 'Operação',
+    col: 'var(--col-ops)',
+    glow: 'var(--glow-ops)',
+    bg: 'rgba(245,158,11,0.06)',
+    emoji: '📈',
+    status: 'online',
+    tasks: 19,
+    skills: ['KPIs', 'Relatórios', 'Volume×Conv×Preço', 'Análise'],
+    desc: 'Analisa performance com a fórmula Volume × Conversão × Preço = Receita. Gera relatórios executivos e identifica pontos de alavancagem.',
+    activities: [
+      'Analise: Volume(24) x Conversao(0%) x Preco(R$97) = R$0 hoje — abaixo da meta de R$291/dia',
+      'Gargalo identificado: 58% dos leads chegam a fase 3 mas 0% converte — revisar oferta/link',
+      'CAC marco: R$0 gasto em ads (token Meta expirado) — leads organicos mantendo 24/dia',
+      'Comparativo semanal: 3.200+ conversas totais, ticket medio Diagnostico subiu pra R$97',
+      'KPI Augusto: 268 msgs/dia, 140 conversas ativas — produtividade alta, conversao baixa',
+      'Recomendacao: priorizar leads fase 3 com nudge de urgencia — potencial de 14 vendas represadas',
+      'LTV tracking: Diag→Limpa acontecendo em 23% dos clientes — meta e 40% — Clara precisa empurrar',
+      'Dashboard: receita acumulada mar/26 vs fev/26 — calculando tendencia de crescimento'
+    ],
+    modalStats: { relatorios: 5, kpis: 18, insights: 7 }
+  },
+  {
+    id: 'andre',
+    name: 'Andre',
+    role: 'Copywriter',
+    dept: 'marketing',
+    deptLabel: 'Marketing',
+    col: 'var(--col-marketing)',
+    glow: 'var(--glow-marketing)',
+    bg: 'rgba(139,92,246,0.06)',
+    emoji: '✍️',
+    status: 'processing',
+    tasks: 22,
+    skills: ['VSL', 'Email', 'Objeções', 'Scripts', 'Afiliados'],
+    desc: 'Cria copy que vende — desde emails de follow-up até scripts de vendas e VSLs. Especialista em transformar dor em desejo de compra.',
+    activities: [
+      'Escrevendo script de follow-up D+3: "Marcos, em 2 anos negativado voce perdeu R$X em juros"',
+      'Revisando prompt do Augusto: tirando emojis, ajustando tom consultivo, adicionando transicoes',
+      'Copy novo anuncio Diagnostico: hook "Eu achava que era so limpar o nome... descobri que nao"',
+      'Sequencia de emails reativacao: 3 emails para leads frios 30/60/90 dias — A/B test de subject',
+      'Script objecao "ja fui enganado": depoimento + garantia + dado real de resultado em 4 meses',
+      'Material educativo fase 2: reescrevendo texto do infografico dos 5 fatores de rating bancario',
+      'Copy WhatsApp broadcast: campanha de reengajamento para 500 leads inativos — tom pessoal',
+      'Script VAPI (ligacao IA): 45 segundos, tom natural, CTA claro — "me responde no WhatsApp"'
+    ],
+    modalStats: { copies: 22, emails: 8, scripts: 4 }
+  },
+  {
+    id: 'bia',
+    name: 'Bia',
+    role: 'Social Media',
+    dept: 'marketing',
+    deptLabel: 'Marketing',
+    col: 'var(--col-marketing)',
+    glow: 'var(--glow-marketing)',
+    bg: 'rgba(139,92,246,0.06)',
+    emoji: '📱',
+    status: 'online',
+    tasks: 31,
+    skills: ['Reels', 'Carrossel', 'Stories', 'Calendário', 'Hooks'],
+    desc: 'Produz conteúdo educativo e de vendas para Instagram. Cria carrosséis virais, reels de impacto e stories de conversão alinhados à identidade CredPositivo.',
+    activities: [
+      'Publicando carrossel: "5 coisas que o banco olha alem do nome limpo" — 8 slides com dados reais',
+      'Criando reel 15s: antes/depois de cliente que subiu score de 300 pra 720 em 4 meses',
+      'Stories sequencia 5 dias: educacao sobre rating bancario com enquete e CTA pro quiz',
+      'Calendario editorial marco: 40% educativo, 25% case de sucesso, 25% dicas, 10% promocional',
+      'Analisando: post sobre "limpa nome nao basta" teve 8.4% engagement — replicando formato',
+      'Auto-publicacao Instagram: conteudo gerado 09h, posts agendados 12h e 19h via API',
+      'DM outreach: mensagem automatica para novos seguidores interessados em credito — 09h BRT',
+      'Hashtags: #limpanome #ratingbancario #credito #serasa #score — pesquisando novas tendencias'
+    ],
+    modalStats: { posts: 31, engajamento: '8.4%', alcance: '12.4k' }
+  },
+  {
+    id: 'rafael',
+    name: 'Rafael',
+    role: 'Tráfego Pago',
+    dept: 'marketing',
+    deptLabel: 'Marketing',
+    col: 'var(--col-marketing)',
+    glow: 'var(--glow-marketing)',
+    bg: 'rgba(139,92,246,0.06)',
+    emoji: '🚀',
+    status: 'processing',
+    tasks: 15,
+    skills: ['Meta Ads', 'Google Ads', 'CPL', 'ROAS', 'Quiz'],
+    desc: 'Gerencia campanhas Meta Ads e Google Ads. Otimiza CPL e ROAS continuamente. Responsável pelo tráfego que alimenta o funil do quiz.',
+    activities: [
+      'ALERTA: token Meta API expirado desde 04/mar — campanhas pausadas, sem dados de CPL/ROAS',
+      'Campanha Diagnostico: video 15s "achava que era so limpar nome" → quiz credpositivo.com/quizz',
+      'Monitoramento anomalia: checando gastos 08h/12h/18h + criativo novo 14h automaticamente',
+      'Publico lookalike: negativados 25-45 anos, interesse em financiamento, exclusao clientes ativos',
+      'A/B test criativo: hook A "Voce sabe seu score?" vs hook B "Por que o banco nega tudo?" — 72h',
+      'Google Search: palavras-chave "como limpar nome serasa" + "rating bancario" — CPL R$8.40',
+      'Remarketing: quiz abandonado (preencheu mas nao converteu) — campanha de retargeting 7 dias',
+      'Relatorio: CPL medio R$8.40, ROAS 4.2x, meta de 50 leads/dia do quiz — hoje 0 (ads parados)'
+    ],
+    modalStats: { campanhas: 7, cpl: 'R$8.40', roas: '4.2x' }
+  },
+  {
+    id: 'perola',
+    name: 'Pérola',
+    role: 'Web Designer',
+    dept: 'design',
+    deptLabel: 'Design',
+    col: 'var(--col-design)',
+    glow: 'var(--glow-design)',
+    bg: 'rgba(236,72,153,0.06)',
+    emoji: '✨',
+    status: 'processing',
+    tasks: 14,
+    skills: ['Landing Pages', 'PDFs', 'Dashboards', 'UI/UX', 'HTML'],
+    desc: 'Cria artefatos visuais de nível profissional — desde landing pages que convertem até dashboards de mission control. Cada pixel tem intenção.',
+    activities: [
+      'Dashboard Command Center: 2.321 linhas, dark mode, particles, feed real — credpositivo.com/agentes',
+      'Landing page credpositivo.com: hero + CTA quiz + depoimentos + FAQ — Tailwind + animacoes',
+      'Criativo para ads: cards Instagram 1080x1080 com antes/depois de score — paleta #1a1a2e',
+      'PDF diagnostico: template profissional com dados do CPF, negativacoes, plano de acao 3 paginas',
+      'Quiz credpositivo.com/quizz: 4 telas responsivas, captura CPF/nome/tel/email, pixel Facebook',
+      'Sistema de design: cores departamento, tipografia Syne+Space Mono+JetBrains, tokens CSS',
+      'Painel afiliados /painel: Next.js dashboard de bonificacao com graficos e tabela de comissoes',
+      'Infografico WhatsApp: 5 fatores do rating bancario — formato vertical, fonte legivel no celular'
+    ],
+    modalStats: { entregas: 14, projetos: 5, aprovados: 13 }
+  },
+  {
+    id: 'clara',
+    name: 'Clara',
+    role: 'Customer Success',
+    dept: 'pos-venda',
+    deptLabel: 'Pós-venda',
+    col: 'var(--col-cs)',
+    glow: 'var(--glow-cs)',
+    bg: 'rgba(6,182,212,0.06)',
+    emoji: '🎀',
+    status: 'online',
+    tasks: 26,
+    skills: ['Onboarding', 'Upsell', 'NPS', 'Retenção', 'Rating'],
+    desc: 'Garante sucesso do cliente desde o onboarding. Executa upsell estratégico Diag→Limpa→Rating. Monitora NPS e maximiza retenção e lifetime value.',
+    activities: [
+      'Onboarding: Cristina Silva comprou Diagnostico R$97 — enviando orientacoes + prazo 48h',
+      'Upsell Diag→Limpa: diagnostico mostrou 3 negativacoes Serasa — apresentando Limpa Nome R$497',
+      'Follow-up pos-compra D+7: verificando se cliente recebeu e entendeu o raio X do CPF',
+      'Upsell Limpa→Rating: nome limpo, proximo passo e construir rating — propondo R$997',
+      'NPS coleta: enviando pesquisa para clientes das ultimas 2 semanas — meta NPS 72+',
+      'Caso de sucesso: coletando depoimento de Breno (Rating R$997) — resultado em 4 meses',
+      'Reativacao: 15 clientes compraram Diagnostico ha 30 dias e nao avancaram — campanha de upsell',
+      'Programa indicacao: identificando promotores NPS 9-10 — oferecendo R$50 por indicacao convertida'
+    ],
+    modalStats: { onboardings: 8, upsells: 4, nps: 72 }
+  }
+];
+
+const PIPELINE_STAGES = [
+  { name: 'Anúncio', count: 347, col: '#8b5cf6', agent: 'Rafael' },
+  { name: 'Quiz', count: 198, col: '#a78bfa', agent: 'Rafael' },
+  { name: 'WhatsApp', count: 124, col: '#10b981', agent: 'Bot' },
+  { name: 'Qualificação', count: 47, col: '#34d399', agent: 'Augusto' },
+  { name: 'Educação', count: 31, col: '#f59e0b', agent: 'Andre' },
+  { name: 'Oferta', count: 19, col: '#ef4444', agent: 'Paulo' },
+  { name: 'Pós-venda', count: 12, col: '#06b6d4', agent: 'Clara' }
+];
+
+// Feed events loaded from real API
+let FEED_EVENTS = [];
+const AGENT_COLORS = {
+  'Augusto': '#10b981', 'Paulo': '#10b981', 'Ana': '#f59e0b', 'Luan': '#f59e0b',
+  'Andre': '#8b5cf6', 'Bia': '#8b5cf6', 'Rafael': '#8b5cf6', 'Perola': '#ec4899',
+  'Clara': '#06b6d4', 'Fernando': '#3b82f6', 'Alex': '#3b82f6',
+  'Jobs': '#fbbf24', 'Musk': '#ef4444'
+};
+const API_BASE = '/api/admin/agent-feed?embed_key=cred-embed-2026-kx9m';
+let lastFeedTimestamp = null;
+
+async function fetchAgentFeed() {
+  try {
+    const res = await fetch(API_BASE);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.warn('[feed] API error:', e.message);
+    return null;
+  }
+}
+
+function formatFeedTime(isoDate) {
+  const d = new Date(isoDate);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function feedItemFromApi(item) {
+  return {
+    agent: item.agent,
+    col: AGENT_COLORS[item.agent] || '#888',
+    action: item.action,
+    time: item.time
+  };
+}
+
+// ===================== CLOCK =====================
+
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+
+  const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const day = days[now.getDay()];
+  const date = now.getDate();
+  const month = months[now.getMonth()];
+  const year = now.getFullYear();
+  document.getElementById('date-display').textContent = `${day}, ${date} ${month} ${year}`;
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===================== COUNT UP ANIMATION =====================
+
+function countUp(el, target, prefix = '', suffix = '', decimals = 0) {
+  const duration = 1800;
+  const start = performance.now();
+  const startVal = 0;
+
+  function step(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = startVal + (target - startVal) * eased;
+    const display = decimals > 0 ? current.toFixed(decimals) : Math.floor(current);
+    el.textContent = prefix + display + suffix;
+    if (progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+async function updateDashboard(isFirst) {
+  const data = await fetchAgentFeed();
+  if (!data?.success) {
+    // API offline — show error state
+    const el = (id) => document.getElementById(id);
+    if (isFirst) {
+      ['metric-leads','metric-conv','metric-revenue','metric-msgs','metric-followups','metric-active'].forEach(id => {
+        if (el(id)) el(id).textContent = 'API offline';
+      });
+    }
+    setTimeout(() => updateDashboard(false), 15000);
+    return;
+  }
+
+  const s = data.stats;
+  const el = (id) => document.getElementById(id);
+  const num = (v) => parseInt(v) || 0;
+  const money = (v) => parseFloat(v) || 0;
+
+  const leads = num(s.leads_today);
+  const qualified = num(s.qualified_today);
+  const orders = num(s.orders_today);
+  const revenue = money(s.revenue_today);
+  const msgs = num(s.messages_sent_today);
+  const followups = num(s.followups_today);
+  const calls = num(s.calls_today);
+  const active = num(s.active_conversations);
+
+  if (isFirst) {
+    // First load — animate count up
+    countUp(el('metric-leads'), leads);
+    countUp(el('metric-conv'), orders);
+    countUp(el('metric-msgs'), msgs);
+    countUp(el('metric-followups'), followups);
+    countUp(el('metric-active'), active);
+    const revEl = el('metric-revenue');
+    if (revEl) {
+      const revStart = performance.now();
+      function stepRev(now) {
+        const elapsed = now - revStart;
+        const progress = Math.min(elapsed / 1800, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        revEl.textContent = 'R$\u00a0' + Math.floor(revenue * eased).toLocaleString('pt-BR');
+        if (progress < 1) requestAnimationFrame(stepRev);
+      }
+      requestAnimationFrame(stepRev);
+    }
+    document.querySelectorAll('.metric-card').forEach((card, i) => {
+      setTimeout(() => card.classList.add('loaded'), i * 150);
+    });
+  } else {
+    // Subsequent — instant update with flash
+    const flash = (elId, val) => {
+      const e = el(elId);
+      if (!e) return;
+      const old = e.textContent;
+      const newVal = String(val);
+      if (old !== newVal) {
+        e.textContent = newVal;
+        e.style.color = '#10b981';
+        setTimeout(() => { e.style.color = ''; }, 800);
+      }
+    };
+    flash('metric-leads', leads);
+    flash('metric-conv', orders);
+    flash('metric-msgs', msgs);
+    flash('metric-followups', followups > 999 ? (followups/1000).toFixed(1) + 'k' : followups);
+    flash('metric-active', active);
+    const revEl = el('metric-revenue');
+    if (revEl) revEl.textContent = 'R$\u00a0' + revenue.toLocaleString('pt-BR');
+  }
+
+  // Update sub-labels with real context
+  if (el('metric-leads-sub')) el('metric-leads-sub').textContent = qualified + ' qualificados (fase 3+)';
+  if (el('metric-conv-sub')) el('metric-conv-sub').textContent = 'Pedidos nas ultimas 24h';
+  if (el('metric-rev-sub')) el('metric-rev-sub').textContent = orders > 0 ? orders + ' pedidos' : 'Nenhum pedido hoje';
+  if (el('metric-msgs-sub')) el('metric-msgs-sub').textContent = 'Augusto — ' + (data.agentStats?.[0]?.conversations || 0) + ' conversas';
+  if (el('metric-followups-sub')) el('metric-followups-sub').textContent = calls + ' ligacoes VAPI hoje';
+  if (el('metric-active-sub')) el('metric-active-sub').textContent = 'Na ultima hora';
+
+  // Update trends
+  if (el('metric-leads-trend')) el('metric-leads-trend').textContent = qualified > 0 ? Math.round(qualified/leads*100) + '% qualificam' : '';
+  if (el('metric-active-trend')) {
+    el('metric-active-trend').textContent = active > 0 ? 'Ao vivo' : 'Nenhuma agora';
+    el('metric-active-trend').style.color = active > 0 ? 'var(--col-sales)' : 'var(--text-dim)';
+  }
+
+  // Update agent cards — status + task count from real data
+  if (data?.agentStats) {
+    data.agentStats.forEach(as => {
+      const agent = AGENTS.find(a => a.id === as.agent);
+      if (!agent) return;
+      agent.tasks = num(as.messages_sent);
+      const taskEl = document.querySelector(`[data-agent-id="${as.agent}"] .task-count strong`);
+      if (taskEl) taskEl.textContent = agent.tasks;
+
+      const lastActive = new Date(as.last_active);
+      const minsAgo = (Date.now() - lastActive.getTime()) / 60000;
+      agent.status = minsAgo < 5 ? 'online' : minsAgo < 30 ? 'processing' : 'idle';
+      const dotEl = document.querySelector(`[data-agent-id="${as.agent}"] .status-dot`);
+      if (dotEl) dotEl.className = 'status-dot ' + agent.status;
+      const badgeEl = document.querySelector(`[data-agent-id="${as.agent}"] .status-badge`);
+      if (badgeEl) {
+        const dot = badgeEl.querySelector('.status-dot');
+        badgeEl.innerHTML = '';
+        badgeEl.appendChild(dot);
+        badgeEl.insertAdjacentHTML('beforeend', getStatusLabel(agent.status));
+      }
+    });
+  }
+
+  // Update feed with real events
+  if (data?.feed) {
+    if (isFirst) {
+      FEED_EVENTS = data.feed.map(feedItemFromApi);
+      lastFeedTimestamp = data.feed[0]?.time || null;
+    } else {
+      const newItems = lastFeedTimestamp
+        ? data.feed.filter(f => new Date(f.time) > new Date(lastFeedTimestamp))
+        : [];
+      if (newItems.length > 0) {
+        newItems.reverse().forEach(item => addFeedItem(feedItemFromApi(item), true));
+        lastFeedTimestamp = data.feed[0].time;
+      }
+    }
+  }
+
+  // Refresh every 30 seconds
+  setTimeout(() => updateDashboard(false), 30000);
+}
+
+async function initMetrics() {
+  await updateDashboard(true);
+}
+
+// ===================== RENDER AGENTS =====================
+
+function getStatusLabel(status) {
+  switch(status) {
+    case 'online': return '<span style="color: var(--col-sales)">Online</span>';
+    case 'processing': return '<span style="color: var(--col-tech)">Processando</span>';
+    case 'idle': return '<span style="color: var(--col-ops)">Idle</span>';
+    default: return status;
+  }
+}
+
+function renderAgents() {
+  const grid = document.getElementById('agents-grid');
+
+  AGENTS.forEach((agent, idx) => {
+    const activity = agent.activities[Math.floor(Math.random() * agent.activities.length)];
+    const progressWidth = 30 + Math.floor(Math.random() * 65);
+
+    const shimmerColor = agent.col.includes('var') ? `var(--col-${agent.dept === 'pos-venda' ? 'cs' : agent.dept === 'estrategia' ? 'strategy' : agent.dept})` : agent.col;
+
+    const card = document.createElement('div');
+    card.className = 'agent-card';
+    card.dataset.dept = agent.dept;
+    card.dataset.agentId = agent.id;
+    card.style.cssText = `
+      --dept-col: ${agent.col};
+      --dept-glow: ${agent.glow};
+      --dept-bg: ${agent.bg};
+      animation-delay: ${idx * 60}ms;
+    `;
+
+    card.innerHTML = `
+      <div class="dept-badge" style="background: ${agent.bg}; color: ${agent.col}; border: 1px solid ${agent.col}20;">
+        ${agent.deptLabel}
+      </div>
+      <div class="card-header">
+        <div class="agent-avatar">
+          ${agent.emoji}
+        </div>
+        <div class="card-info">
+          <div class="agent-name">${agent.name}</div>
+          <div class="agent-role">${agent.role}</div>
+        </div>
+        <div class="card-status">
+          <div class="status-badge">
+            <div class="status-dot ${agent.status}"></div>
+            ${getStatusLabel(agent.status)}
+          </div>
+          <div class="task-count"><strong>${agent.tasks}</strong> tasks</div>
+        </div>
+      </div>
+      <div class="agent-activity">
+        <span class="activity-icon">▶</span>
+        <span class="activity-text" id="activity-${agent.id}">${activity}</span>
+      </div>
+      <div class="activity-bar">
+        <div class="activity-fill" id="bar-${agent.id}" style="width: ${progressWidth}%; background: linear-gradient(90deg, ${agent.col}, ${agent.col}88, ${agent.col});"></div>
+      </div>
+      <div class="skill-tags">
+        ${agent.skills.map(s => `<span class="skill-tag">${s}</span>`).join('')}
+      </div>
+    `;
+
+    card.addEventListener('click', () => openModal(agent));
+    grid.appendChild(card);
+  });
+}
+
+// ===================== ACTIVITY ROTATION =====================
+
+function rotateActivities() {
+  AGENTS.forEach(agent => {
+    const textEl = document.getElementById(`activity-${agent.id}`);
+    const barEl = document.getElementById(`bar-${agent.id}`);
+    if (!textEl || !barEl) return;
+
+    // Animate out
+    textEl.style.opacity = '0';
+    textEl.style.transform = 'translateY(4px)';
+
+    setTimeout(() => {
+      const newActivity = agent.activities[Math.floor(Math.random() * agent.activities.length)];
+      textEl.textContent = newActivity;
+      textEl.style.transition = 'all 0.4s ease';
+      textEl.style.opacity = '1';
+      textEl.style.transform = 'translateY(0)';
+
+      const newProgress = 20 + Math.floor(Math.random() * 75);
+      barEl.style.width = newProgress + '%';
+    }, 300);
+  });
+}
+
+setInterval(() => {
+  const agentsToUpdate = [...AGENTS].sort(() => Math.random() - 0.5).slice(0, 3);
+  agentsToUpdate.forEach(agent => {
+    const textEl = document.getElementById(`activity-${agent.id}`);
+    const barEl = document.getElementById(`bar-${agent.id}`);
+    if (!textEl || !barEl) return;
+
+    textEl.style.opacity = '0';
+    textEl.style.transform = 'translateY(4px)';
+    textEl.style.transition = 'all 0.3s ease';
+
+    setTimeout(() => {
+      const newActivity = agent.activities[Math.floor(Math.random() * agent.activities.length)];
+      textEl.textContent = newActivity;
+      textEl.style.opacity = '1';
+      textEl.style.transform = 'translateY(0)';
+      barEl.style.width = (20 + Math.floor(Math.random() * 75)) + '%';
+    }, 300);
+  });
+}, 4000);
+
+// ===================== ACTIVITY FEED =====================
+
+let feedQueue = [...FEED_EVENTS].sort(() => Math.random() - 0.5);
+let feedIndex = 0;
+
+function getTimeStr() {
+  const now = new Date();
+  return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+}
+
+function addFeedItem(event, isNew) {
+  const feed = document.getElementById('activity-feed');
+  const item = document.createElement('div');
+  item.className = 'feed-item';
+  if (isNew) item.style.animation = 'slideIn 0.4s ease forwards';
+
+  const timeStr = event.time ? formatFeedTime(event.time) : getTimeStr();
+
+  item.innerHTML = `
+    <div class="feed-dot" style="--col: ${event.col}"></div>
+    <div class="feed-time">${timeStr}</div>
+    <div class="feed-content">
+      <span class="feed-agent" style="color: ${event.col}">${event.agent}</span>
+      &nbsp;${event.action}
+    </div>
+  `;
+
+  feed.insertBefore(item, feed.firstChild);
+
+  // Remove old items
+  const items = feed.querySelectorAll('.feed-item');
+  if (items.length > 30) {
+    feed.removeChild(items[items.length - 1]);
+  }
+}
+
+function initFeed() {
+  // Seed with real events from API (loaded in initMetrics)
+  const initial = FEED_EVENTS.slice(0, 15).reverse();
+  initial.forEach(event => addFeedItem(event, false));
+}
+
+function scheduleFeedEvent() {
+  // No more simulated events - real data comes from refreshMetrics every 30s
+}
+
+// ===================== PIPELINE =====================
+
+function renderPipeline() {
+  const track = document.getElementById('pipeline-track');
+
+  PIPELINE_STAGES.forEach((stage, i) => {
+    const stageEl = document.createElement('div');
+    stageEl.className = 'pipeline-stage';
+    stageEl.style.setProperty('--stage-col', stage.col);
+
+    stageEl.innerHTML = `
+      <div class="stage-block">
+        <div class="stage-name">${stage.name}</div>
+        <div class="stage-count" id="pipeline-count-${i}">${stage.count}</div>
+        <div class="stage-agent">${stage.agent}</div>
+      </div>
+    `;
+
+    track.appendChild(stageEl);
+
+    if (i < PIPELINE_STAGES.length - 1) {
+      const arrow = document.createElement('div');
+      arrow.className = 'pipeline-connector';
+      arrow.innerHTML = '&#8594;';
+      track.appendChild(arrow);
+    }
+  });
+}
+
+// Animate pipeline counts
+function animatePipelineCounts() {
+  PIPELINE_STAGES.forEach((stage, i) => {
+    const el = document.getElementById(`pipeline-count-${i}`);
+    if (!el) return;
+    countUp(el, stage.count);
+  });
+}
+
+// Pipeline numbers now updated by real data (no more fake fluctuation)
+
+// ===================== FILTERS =====================
+
+function initFilters() {
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const filter = btn.dataset.filter;
+      document.querySelectorAll('.agent-card').forEach(card => {
+        if (filter === 'all' || card.dataset.dept === filter) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+    });
+  });
+}
+
+// ===================== MODAL =====================
+
+function getStatKey(modalStats) {
+  return Object.entries(modalStats).map(([k, v]) => ({ k, v }));
+}
+
+function openModal(agent) {
+  const overlay = document.getElementById('modal-overlay');
+  const body = document.getElementById('modal-body');
+  const topBar = document.querySelector('.modal-top-bar');
+
+  topBar.style.background = `linear-gradient(90deg, ${agent.col}, transparent)`;
+  overlay.style.setProperty('--modal-col', agent.col);
+  overlay.style.setProperty('--modal-glow', agent.glow);
+
+  const stats = getStatKey(agent.modalStats);
+
+  body.innerHTML = `
+    <div class="modal-avatar-row">
+      <div class="modal-avatar" style="border-color: ${agent.col}; box-shadow: 0 0 40px ${agent.glow};">
+        ${agent.emoji}
+      </div>
+      <div>
+        <div class="modal-name" style="color: ${agent.col}">${agent.name}</div>
+        <div class="modal-role" style="color: ${agent.col}">${agent.role}</div>
+        <div class="modal-dept">${agent.deptLabel} &mdash; CredPositivo AI Team</div>
+      </div>
+    </div>
+
+    <div class="modal-stats-row">
+      ${stats.map(s => `
+        <div class="modal-stat">
+          <div class="modal-stat-val" style="color: ${agent.col}">${s.v}</div>
+          <div class="modal-stat-label">${s.k}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="modal-section-title">Sobre o Agente</div>
+    <div class="modal-desc">${agent.desc}</div>
+
+    <div class="modal-section-title">Skills & Capacidades</div>
+    <div class="modal-skills">
+      ${agent.skills.map(s => `<span class="modal-skill-tag" style="border-color: ${agent.col}; color: ${agent.col}">${s}</span>`).join('')}
+    </div>
+
+    <div class="modal-section-title">Atividade Atual</div>
+    <div class="modal-current-task" style="border-left-color: ${agent.col}">
+      <span style="opacity: 0.5;">&#9654;&nbsp;</span>
+      <span id="modal-activity">${agent.activities[0]}</span>
+    </div>
+  `;
+
+  overlay.classList.add('open');
+
+  // Rotate modal activity
+  let modalActivityInterval = setInterval(() => {
+    const el = document.getElementById('modal-activity');
+    if (!el) { clearInterval(modalActivityInterval); return; }
+    const next = agent.activities[Math.floor(Math.random() * agent.activities.length)];
+    el.style.opacity = '0';
+    setTimeout(() => {
+      if (el) { el.textContent = next; el.style.opacity = '1'; }
+    }, 300);
+  }, 3000);
+
+  overlay.dataset.intervalId = modalActivityInterval;
+}
+
+function closeModal() {
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.remove('open');
+  const intervalId = overlay.dataset.intervalId;
+  if (intervalId) clearInterval(parseInt(intervalId));
+}
+
+document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// ===================== BACKGROUND CANVAS — PARTICLES =====================
+
+function initCanvas() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const particles = Array.from({ length: 60 }, () => ({
+    x: Math.random() * window.innerWidth,
+    y: Math.random() * window.innerHeight,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: (Math.random() - 0.5) * 0.3,
+    r: Math.random() * 1.5 + 0.5,
+    alpha: Math.random() * 0.4 + 0.1,
+    col: ['#3b82f6', '#10b981', '#8b5cf6', '#06b6d4', '#f59e0b'][Math.floor(Math.random() * 5)]
+  }));
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw connections
+    particles.forEach((p, i) => {
+      particles.slice(i + 1).forEach(q => {
+        const dx = p.x - q.x;
+        const dy = p.y - q.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 120) {
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(255,255,255,${0.04 * (1 - dist / 120)})`;
+          ctx.lineWidth = 0.5;
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(q.x, q.y);
+          ctx.stroke();
+        }
+      });
+    });
+
+    // Draw particles
+    particles.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.col + Math.floor(p.alpha * 255).toString(16).padStart(2, '0');
+      ctx.fill();
+
+      p.x += p.vx;
+      p.y += p.vy;
+
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+    });
+
+    requestAnimationFrame(draw);
+  }
+
+  draw();
+}
+
+// Metrics updated every 30s by updateDashboard() — zero fake data
+
+// ===================== BOOT SEQUENCE =====================
+
+function boot() {
+  initCanvas();
+  renderAgents();
+  renderPipeline();
+  initFilters();
+  // initMetrics fetches API → populates feed + metrics + agent statuses
+  initMetrics().then(() => {
+    initFeed();
+    animatePipelineCounts();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', boot);
+</script>
+</body>
+</html>

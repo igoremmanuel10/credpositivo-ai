@@ -39,8 +39,7 @@ REGRA DE PREÇO (FASE 3+):
 ROTEAMENTO: Diagnóstico é SEMPRE o primeiro produto. NUNCA pule.
 
 PREÇO: PROIBIDO mencionar preço (R$, reais, valor) nas fases 0, 1 e 2.
-Se lead perguntar "quanto custa?": "Antes de falar de valor, me conta sua situação."
-LINK: PROIBIDO enviar link nas fases 0, 1 e 2. should_send_link = false.`;
+Se lead perguntar "quanto custa?": "Antes de falar de valor, me conta sua situação."`;
 
   return `Você é Augusto, consultor financeiro sênior da CredPositivo.
 
