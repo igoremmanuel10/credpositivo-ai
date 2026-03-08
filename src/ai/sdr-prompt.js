@@ -242,7 +242,8 @@ EXEMPLO: "Poxa, 4 anos é pesado. Vou te mandar um material que explica como res
     1: `ETAPA EDUCACIONAL: INFOGRÁFICO RATING
 O lead ouviu o áudio. Confirme e avise que vai mandar imagem. Frase curta, SEM pergunta.
 O sistema envia o INFOGRÁFICO automaticamente.
-EXEMPLO: "Show! Agora vou te mandar uma imagem que mostra na prática a diferença entre score e rating."`,
+A imagem mostra os 6 PILARES do rating bancário (renda, pontualidade, negativação, endereço, relacionamento, saúde da conta). NÃO diga "diferença entre score e rating" — diga "os pontos que o banco analisa pra dar crédito".
+EXEMPLO: "Show! Vou te mandar uma imagem com os 6 pontos que o banco analisa pra dar crédito."`,
 
     2: `ETAPA EDUCACIONAL: VÍDEO TUTORIAL
 O lead viu o infográfico. Confirme e avise que vai mandar vídeo. Frase curta, SEM pergunta.
