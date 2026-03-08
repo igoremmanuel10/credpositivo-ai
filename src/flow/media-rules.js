@@ -13,6 +13,10 @@ import { config } from '../config.js';
 // ============================================================
 
 export const MEDIA_CONFIG = {
+  phase0Audio: {
+    asset: 'audio_apresentacao',
+    delayAfterText: 3000, // 3s between text and audio
+  },
   educational: {
     stages: [
       { asset: 'audio_diagnostico', nudgeText: 'Conseguiu ouvir o áudio? Se tiver qualquer dúvida é só me chamar!', nudgeDelay: 300000 },
@@ -40,7 +44,38 @@ const PRODUCT_PRICES = {
 };
 
 // ============================================================
-// EDUCATIONAL STAGING (Phase 2)
+// PHASE 0 AUDIO (audio_apresentacao — boas-vindas)
+// ============================================================
+
+/**
+ * Determine if the phase 0 presentation audio should be sent.
+ * Sent once after the agent's first response in phase 0.
+ *
+ * @param {object} conversation - { phase, message_count, user_profile }
+ * @returns {{ shouldSend: boolean, asset: string, delayAfterText: number } | null}
+ */
+export function getPhase0AudioAction(conversation) {
+  if (!config.media.enabled) return null;
+
+  const phase = conversation.phase || 0;
+  if (phase !== 0) return null;
+
+  // Only send on first interaction (agent hasn't responded yet or just responded once)
+  const messageCount = conversation.message_count || 0;
+  if (messageCount > 2) return null; // Already past first exchange
+
+  // Check if audio was already sent (avoid duplicate)
+  if (conversation.user_profile?.phase0_audio_sent) return null;
+
+  return {
+    shouldSend: true,
+    asset: MEDIA_CONFIG.phase0Audio.asset,
+    delayAfterText: MEDIA_CONFIG.phase0Audio.delayAfterText,
+  };
+}
+
+// ============================================================
+// EDUCATIONAL STAGING (Phase 1 for Paulo, Phase 2 for Augusto)
 // ============================================================
 
 /**
@@ -57,8 +92,10 @@ export function getEducationalAction(conversation) {
   const userProfile = conversation.user_profile || {};
   const eduStage = userProfile.educational_stage || 0;
 
-  // Only active in phase >= 2 and when there's material left
-  if (phase < 2 || eduStage >= MEDIA_CONFIG.educational.stages.length) {
+  // Active in phase >= 2 (Augusto) or phase >= 1 (Paulo/quiz leads)
+  const persona = conversation.persona || 'augusto';
+  const minPhase = persona === 'paulo' ? 1 : 2;
+  if (phase < minPhase || eduStage >= MEDIA_CONFIG.educational.stages.length) {
     return null;
   }
 

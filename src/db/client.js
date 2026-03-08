@@ -56,7 +56,7 @@ export const db = {
       [conversationId, role, content, phase, evolutionIds ? JSON.stringify(evolutionIds) : null]
     );
     await pool.query(
-      `UPDATE conversations SET last_message_at = NOW() WHERE id = $1`,
+      `UPDATE conversations SET last_message_at = NOW(), message_count = COALESCE(message_count, 0) + 1 WHERE id = $1`,
       [conversationId]
     );
   },

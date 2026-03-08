@@ -56,13 +56,14 @@ const PHASES = {
   },
 };
 
-// Valid transitions: only sequential forward (never skip, never regress)
+// Valid transitions: sequential forward (never regress)
+// Phase 0 can go to 1 (normal) or 2 (quiz leads, pre-qualified)
 const VALID_TRANSITIONS = {
-  0: 1,
-  1: 2,
-  2: 3,
-  3: 4,
-  4: 5,
+  0: [1, 2],
+  1: [2],
+  2: [3],
+  3: [4],
+  4: [5],
 };
 
 // ============================================================
@@ -186,7 +187,9 @@ export function detectIntent(text) {
  */
 export function validateTransition(currentPhase, targetPhase) {
   if (currentPhase === targetPhase) return false; // no-op
-  return VALID_TRANSITIONS[currentPhase] === targetPhase;
+  const allowed = VALID_TRANSITIONS[currentPhase];
+  if (!allowed) return false;
+  return Array.isArray(allowed) ? allowed.includes(targetPhase) : allowed === targetPhase;
 }
 
 /**
@@ -210,6 +213,7 @@ export function getPhaseConfig(phase) {
 export function evaluateTransition(conversation, userMessage) {
   const currentPhase = conversation.phase || 0;
   const userProfile = conversation.user_profile || {};
+  const persona = conversation.persona || 'augusto';
   const noAdvance = { shouldAdvance: false, nextPhase: currentPhase, reason: 'no_condition_met' };
 
   // Phase 5 is terminal
@@ -217,24 +221,36 @@ export function evaluateTransition(conversation, userMessage) {
     return { shouldAdvance: false, nextPhase: 5, reason: 'terminal_phase' };
   }
 
-  const nextPhase = VALID_TRANSITIONS[currentPhase];
-  if (nextPhase === undefined) {
+  const allowedNext = VALID_TRANSITIONS[currentPhase];
+  if (allowedNext === undefined) {
     return noAdvance;
   }
 
+  // Paulo SDR has different phase semantics:
+  // Phase 0=Reception, 1=Education, 2=Offer, 3=Payment, 4=Post-sale+Felipe
+  if (persona === 'paulo') {
+    return evaluatePauloTransition(currentPhase, conversation, userMessage, userProfile, noAdvance);
+  }
+
+  // ── Augusto flow (original) ──
   switch (currentPhase) {
-    // ── Phase 0 → 1: Menu respondido ──
+    // ── Phase 0 → 1 (or 0 → 2 for quiz leads) ──
     case 0: {
-      // Any non-empty response after greeting = menu responded
       const messageCount = conversation.message_count || 0;
       if (messageCount >= 1 && userMessage && userMessage.trim().length > 0) {
+        if (/fiz a an[aá]lise no site|resultado foi/i.test(userMessage)) {
+          return { shouldAdvance: true, nextPhase: 1, reason: 'quiz_lead_prequalified' };
+        }
         return { shouldAdvance: true, nextPhase: 1, reason: 'menu_responded' };
       }
       return noAdvance;
     }
 
-    // ── Phase 1 → 2: Qualification complete (2 of 3 points) ──
+    // ── Phase 1 → 2: Qualification complete (2 of 3 points) or quiz data in profile ──
     case 1: {
+      if (userProfile.quiz_situacao) {
+        return { shouldAdvance: true, nextPhase: 2, reason: 'quiz_lead_prequalified' };
+      }
       const { points } = detectQualificationPoints(userMessage, userProfile);
       if (points >= REQUIRED_QUALIFICATION_POINTS) {
         return { shouldAdvance: true, nextPhase: 2, reason: 'qualification_complete' };
@@ -261,8 +277,57 @@ export function evaluateTransition(conversation, userMessage) {
 
     // ── Phase 4 → 5: Post-sale complete (manual or auto) ──
     case 4: {
-      // Phase 4→5 is rarely automatic; usually the conversation just goes quiet.
-      // Can be triggered manually or by a specific condition in the future.
+      return noAdvance;
+    }
+
+    default:
+      return noAdvance;
+  }
+}
+
+/**
+ * Paulo SDR phase transitions (different from Augusto).
+ * Paulo: 0=Reception → 1=Education → 2=Offer → 3=Payment → 4=Post-sale+Felipe
+ */
+function evaluatePauloTransition(currentPhase, conversation, userMessage, userProfile, noAdvance) {
+  switch (currentPhase) {
+    // ── Phase 0 → 1: Lead responded (reception complete) ──
+    case 0: {
+      const messageCount = conversation.message_count || 0;
+      if (messageCount >= 1 && userMessage && userMessage.trim().length > 0) {
+        return { shouldAdvance: true, nextPhase: 1, reason: 'reception_complete' };
+      }
+      return noAdvance;
+    }
+
+    // ── Phase 1 → 2: Education complete (all 3 materials consumed) ──
+    case 1: {
+      const eduStage = userProfile.educational_stage || 0;
+      if (eduStage >= 3) {
+        return { shouldAdvance: true, nextPhase: 2, reason: 'education_complete' };
+      }
+      return noAdvance;
+    }
+
+    // ── Phase 2 → 3: Lead shows interest (ready for payment link) ──
+    case 2: {
+      const intent = detectIntent(userMessage);
+      if (intent.type === 'interest') {
+        return { shouldAdvance: true, nextPhase: 3, reason: 'interest_shown' };
+      }
+      return noAdvance;
+    }
+
+    // ── Phase 3 → 4: Payment confirmed (webhook Monetizze) ──
+    case 3: {
+      if (conversation.payment_confirmed === true) {
+        return { shouldAdvance: true, nextPhase: 4, reason: 'payment_confirmed' };
+      }
+      return noAdvance;
+    }
+
+    // ── Phase 4 → 5: Post-sale (manual) ──
+    case 4: {
       return noAdvance;
     }
 

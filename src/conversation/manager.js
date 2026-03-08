@@ -20,7 +20,7 @@ import { sendAlexReportNow } from '../devops/alex.js';
 
 // === STATE MACHINE & MEDIA RULES (deterministic flow control) ===
 import { evaluateTransition, detectQualificationPoints, detectIntent, validateTransition, getPhaseConfig } from '../flow/machine.js';
-import { getEducationalAction, getProvaSocialAction, recordProvaSocialSent, getPaymentLinkAction, scheduleNudge, cancelNudge, MEDIA_CONFIG } from '../flow/media-rules.js';
+import { getPhase0AudioAction, getEducationalAction, getProvaSocialAction, recordProvaSocialSent, getPaymentLinkAction, scheduleNudge, cancelNudge, MEDIA_CONFIG } from '../flow/media-rules.js';
 
 // === PAYMENT LINK: Generate personalized MP checkout link ===
 const PRODUCT_PRICES = { diagnostico: 67, limpa_nome: 497, rating: 997 };
@@ -259,6 +259,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
 
     // Save incoming message
     await db.addMessage(conversation.id, 'user', combinedText, conversation.phase);
+    conversation.message_count = (conversation.message_count || 0) + 1;
 
     // Load message history (last 12 messages — saves ~40% tokens vs 20)
     const messages = await db.getMessages(conversation.id, 12);
@@ -310,6 +311,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     }
 
     // Determine media actions BEFORE LLM (so we can inform LLM what's about to happen)
+    const phase0AudioAction = getPhase0AudioAction({ ...conversation, phase: effectivePhase });
     const eduAction = getEducationalAction({ ...conversation, phase: effectivePhase });
     const provaSocialAction = await getProvaSocialAction({ ...conversation, phase: effectivePhase }, intent.type);
     const paymentLinkAction = getPaymentLinkAction({ ...conversation, phase: effectivePhase }, intent.type);
@@ -358,11 +360,12 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       captureError(aiErr, { module: 'manager', action: 'emergency_response', extra: { phone, phase: effectivePhase } });
     }
 
-    // FORCE MENU: If phase 0 and AI didn't send the menu, inject it
-    const MENU_TEXT = 'Opa, seja bem-vindo(a) ao CredPositivo! Me chamo Augusto, estou aqui pra te ajudar.\n\nQual dessas opções abaixo você está buscando?\n1 - Diagnóstico de Rating\n2 - Limpa Nome\n3 - Rating Bancário\n4 - Já estava em atendimento';
-    if (effectivePhase === 0 && (conversation.message_count || 0) <= 1) {
+    // FORCE MENU: If phase 0, first interaction, and AI didn't send the menu (Augusto only)
+    const currentPersona = conversation.persona || 'augusto';
+    if (currentPersona === 'augusto' && effectivePhase === 0 && (conversation.message_count || 0) <= 1) {
+      const MENU_TEXT = 'E ai! Aqui e o Augusto, da CredPositivo. Bora resolver sua situacao.\n\nMe diz, o que ta te travando?\n1 - Meu nome ta sujo e quero limpar\n2 - Nome limpo mas banco nega tudo\n3 - Quero mais limite/credito\n4 - Ja to em atendimento';
       const normalized = (responseText || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-      if (!normalized.includes('qual dessas opcoes') && !normalized.includes('1 - diagnostico')) {
+      if (!normalized.includes('o que ta te travando') && !normalized.includes('1 -')) {
         console.warn(`[Manager] AI skipped menu for ${phone}. Forcing menu text.`);
         responseText = MENU_TEXT;
         metadata = {};
@@ -432,7 +435,30 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // STEP 7: MEDIA RULES — Deterministic media dispatch
     // ════════════════════════════════════════════════════════════════
 
-    // 7a. Educational material (phase 2+, one per message)
+    // 7a. Phase 0 audio (audio_apresentacao — boas-vindas, sent after first text)
+    if (phase0AudioAction) {
+      try {
+        await new Promise(r => setTimeout(r, phase0AudioAction.delayAfterText)); // 3s gap after text
+        const audioAsset = getAudioApresentacao();
+        if (audioAsset) {
+          await sendMediaBase64(remoteJid, audioAsset.base64, '', audioAsset.fileName, botTokenForReply, audioAsset.mimetype);
+          console.log(`[Manager] Phase 0 audio_apresentacao sent to ${phone}`);
+
+          // Mark as sent to avoid duplicate
+          const updatedProfile = {
+            ...(conversation.user_profile || {}),
+            ...profileUpdatesFromMachine,
+            phase0_audio_sent: true,
+          };
+          await db.updateConversation(conversation.id, { user_profile: updatedProfile });
+          conversation.user_profile = updatedProfile;
+        }
+      } catch (err) {
+        console.error(`[Manager] Failed to send phase 0 audio:`, err.message);
+      }
+    }
+
+    // 7b. Educational material (phase 1+ for Paulo, phase 2+ for Augusto)
     if (eduAction) {
       try {
         await new Promise(r => setTimeout(r, eduAction.delayAfterText)); // 3s gap after text
@@ -477,7 +503,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       }
     }
 
-    // 7b. Prova social (phase 3+, on trust objection)
+    // 7c. Prova social (phase 3+, on trust objection)
     if (provaSocialAction) {
       try {
         const provaSocial = getProvaSocialNew(provaSocialAction.assetIndex);
@@ -508,7 +534,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       }
     }
 
-    // 7c. Payment link (phase 3, on interest intent)
+    // 7d. Payment link (phase 3, on interest intent)
     if (paymentLinkAction) {
       try {
         const paymentUrl = await generatePaymentLink(conversation, paymentLinkAction.product);
@@ -528,6 +554,7 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
     // STEP 8: Save agent message
     // ════════════════════════════════════════════════════════════════
     await db.addMessage(conversation.id, 'agent', fixedResponseText, effectivePhase, messageIds);
+    conversation.message_count = (conversation.message_count || 0) + 1;
 
     // ════════════════════════════════════════════════════════════════
     // STEP 9: Forward to Chatwoot
