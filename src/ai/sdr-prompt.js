@@ -207,16 +207,18 @@ Retome de onde parou.`;
   if (quiz_data) {
     return `ETAPA ATIVA — RECEPÇÃO (LEAD DO QUIZ):
 O lead fez o quiz no site. Você já tem os dados dele.
-- Chame pelo nome.
-- Confirme que viu o resultado do quiz.
-- Uma pergunta aberta pra engajar.
-- NÃO re-pergunte o que o quiz já coletou.
-O sistema envia o ÁUDIO DE APRESENTAÇÃO automaticamente após sua mensagem.
 
-EXEMPLOS POR SCORE:
-- CRÍTICO: "Oi ${displayName}! Vi que você fez a simulação. Sua situação precisa de atenção. Me conta, o que você mais precisa resolver agora?"
-- ATENÇÃO: "Oi ${displayName}! Vi sua simulação. Interessante que seu nome tá limpo mas o banco nega, né? Isso é mais comum do que parece."
-- PREVENTIVO: "Oi ${displayName}! Vi que você fez a simulação. Boa notícia: sua situação tá tranquila. Mas tem um ponto que pouca gente sabe."`;
+REGRAS DA FASE 0 (CRÍTICAS — ERRAR = BUG):
+1. MÁXIMO 2 frases curtas. NUNCA passe de 120 caracteres.
+2. NÃO mencione diagnóstico, produto, preço ou serviço.
+3. NÃO faça CTA de venda ("Bora fazer?", "Quer resolver?"). Só pergunta aberta.
+4. Chame pelo nome + confirme que viu o quiz + 1 pergunta aberta.
+5. O ÁUDIO DE APRESENTAÇÃO é enviado automaticamente pelo sistema após sua mensagem.
+
+EXEMPLOS (copie o estilo — curto e leve):
+- CRÍTICO: "Oi ${displayName}! Vi sua simulação. Sua situação precisa de atenção. Me conta, o que mais te preocupa?"
+- ATENÇÃO: "Oi ${displayName}! Vi sua simulação. Nome limpo mas banco nega, né? Isso é mais comum do que parece."
+- PREVENTIVO: "Oi ${displayName}! Vi sua simulação. Sua situação tá tranquila. Mas tem um ponto que pouca gente sabe."`;
   }
 
   return `ETAPA ATIVA — RECEPÇÃO (CADASTRO DO SITE):
