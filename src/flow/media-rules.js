@@ -19,9 +19,9 @@ export const MEDIA_CONFIG = {
   },
   educational: {
     stages: [
-      { asset: 'audio_diagnostico', nudgeText: 'Conseguiu ouvir o áudio? Se tiver qualquer dúvida é só me chamar!', nudgeDelay: 300000 },
-      { asset: 'rating_info_image', nudgeText: 'Conseguiu ver a imagem? Qualquer dúvida estou aqui!', nudgeDelay: 300000 },
-      { asset: 'tutorial_video', nudgeText: 'Conseguiu assistir o vídeo? Me conta o que achou!', nudgeDelay: 300000 },
+      { asset: 'audio_diagnostico', nudgeText: 'Conseguiu ouvir o áudio? Se tiver qualquer dúvida é só me chamar!', nudgeDelay: 35000 },
+      { asset: 'rating_info_image', nudgeText: 'Conseguiu ver a imagem? Qualquer dúvida estou aqui!', nudgeDelay: 35000 },
+      { asset: 'tutorial_video', nudgeText: 'Conseguiu assistir o vídeo? Me conta o que achou!', nudgeDelay: 35000 },
     ],
     delayAfterText: 3000, // 3s between text and material
   },
