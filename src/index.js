@@ -18,6 +18,7 @@ import { webhooksRouter } from './api/webhooks.js';
 import { couponRouter } from './payment/coupons.js';
 import { startFollowupScheduler } from './conversation/followup.js';
 import { startReengagementScheduler } from './conversation/reengagement.js';
+import { startNudgePoller } from './conversation/nudge-poller.js';
 import { initTokenMapping } from './quepasa/client.js';
 import { requireAdmin } from './api/auth.js';
 import { voicecallRouter } from './voicecall/routes.js';
@@ -346,6 +347,7 @@ app.use((err, req, res, next) => {
     `);
 
     startFollowupScheduler();
+    startNudgePoller();
     // startReengagementScheduler(); // DISABLED: redundant with followup scheduler
     initWavoip();
     startVapiScheduler();
