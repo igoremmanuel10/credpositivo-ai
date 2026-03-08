@@ -291,10 +291,12 @@ export function evaluateTransition(conversation, userMessage) {
  */
 function evaluatePauloTransition(currentPhase, conversation, userMessage, userProfile, noAdvance) {
   switch (currentPhase) {
-    // ── Phase 0 → 1: Lead responded (reception complete) ──
+    // ── Phase 0 → 1: Lead responded to greeting+audio (needs 2nd user message) ──
     case 0: {
+      // message_count >= 3 means: user1(1) + agent1(2) + user2(3)
+      // i.e., lead sent initial msg, got greeting+audio, then responded
       const messageCount = conversation.message_count || 0;
-      if (messageCount >= 1 && userMessage && userMessage.trim().length > 0) {
+      if (messageCount >= 3 && userMessage && userMessage.trim().length > 0) {
         return { shouldAdvance: true, nextPhase: 1, reason: 'reception_complete' };
       }
       return noAdvance;
