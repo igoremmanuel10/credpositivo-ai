@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import * as otplib from 'otplib';
 import QRCode from 'qrcode';
+import { getGamificationData } from '../gamification/engine.js';
 
 export const usersRouter = Router();
 
@@ -150,7 +151,6 @@ usersRouter.get('/api/orders/:cpf', async (req, res) => {
 usersRouter.get('/api/gamification/:cpf', async (req, res) => {
   try {
     const cpf = req.params.cpf.replace(/[^0-9]/g, '');
-    const { getGamificationData } = await import('../gamification/engine.js');
     const data = await getGamificationData(cpf);
     res.json(data);
   } catch (err) {
