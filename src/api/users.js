@@ -859,6 +859,41 @@ usersRouter.get('/api/profile/:cpf', async (req, res) => {
   }
 });
 
+// PUT /api/profile/:cpf — Update user profile
+usersRouter.put('/api/profile/:cpf', async (req, res) => {
+  try {
+    const cpf = req.params.cpf.replace(/[^0-9]/g, '');
+    const { nome, email, telefone } = req.body;
+
+    const sets = [];
+    const vals = [];
+    let idx = 1;
+
+    if (nome) { sets.push('nome = $' + idx); vals.push(nome); idx++; }
+    if (email) { sets.push('email = $' + idx); vals.push(email); idx++; }
+    if (telefone) { sets.push('telefone = $' + idx); vals.push(telefone.replace(/\D/g, '')); idx++; }
+
+    if (sets.length === 0) {
+      return res.status(400).json({ success: false, error: 'Nenhum campo para atualizar' });
+    }
+
+    vals.push(cpf);
+    const { rows } = await db.query(
+      'UPDATE users SET ' + sets.join(', ') + ' WHERE cpf = $' + idx + ' AND ativo = true RETURNING id, nome, cpf, email, telefone',
+      vals
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Usuario nao encontrado' });
+    }
+
+    res.json({ success: true, user: rows[0] });
+  } catch (err) {
+    console.error('[API] Update profile error:', err.message);
+    res.status(500).json({ success: false, error: 'Erro ao atualizar perfil' });
+  }
+});
+
 // ============================================
 // Admin Diagnostico Endpoints
 // ============================================
