@@ -145,41 +145,22 @@ usersRouter.get('/api/orders/:cpf', async (req, res) => {
 });
 
 // ============================================
-// GET /api/gamification/:cpf — Client gamification
+// GET /api/gamification/:cpf — Client gamification (CP-based)
 // ============================================
 usersRouter.get('/api/gamification/:cpf', async (req, res) => {
   try {
     const cpf = req.params.cpf.replace(/[^0-9]/g, '');
-    const { rows: orderRows } = await db.query(
-      `SELECT COALESCE(SUM(GREATEST(ROUND(price * 0.1), 10)), 0) as total_xp
-       FROM orders WHERE cpf = $1 AND status IN ('completed','paid','approved','Concluido','Concluído','processing')`,
-      [cpf]
-    );
-    const { rows: monthRows } = await db.query(
-      `SELECT COALESCE(SUM(GREATEST(ROUND(price * 0.1), 10)), 0) as xp_mes
-       FROM orders WHERE cpf = $1 AND status IN ('completed','paid','approved','Concluido','Concluído','processing')
-         AND created_at >= date_trunc('month', NOW())`,
-      [cpf]
-    );
-    const totalXp = parseInt(orderRows[0].total_xp);
-    const xpMes = parseInt(monthRows[0].xp_mes);
-    const levels = [
-      { name: 'Endividado', xp: 0 }, { name: 'Organizando', xp: 100 },
-      { name: 'Evoluindo', xp: 350 }, { name: 'Estratégico', xp: 750 },
-      { name: 'Premium Black', xp: 1500 }
-    ];
-    let currentLevel = levels[0], nextLevel = levels[1];
-    for (let i = levels.length - 1; i >= 0; i--) {
-      if (totalXp >= levels[i].xp) { currentLevel = levels[i]; nextLevel = levels[i + 1] || levels[i]; break; }
-    }
-    res.json({
-      nivel_atual: currentLevel.name, xp_atual: totalXp, xp_maximo: nextLevel.xp,
-      desconto_ativo: totalXp >= 750 ? 10 : totalXp >= 350 ? 5 : 0,
-      streak_dias: 0, xp_mes_atual: xpMes, meta_mes: 200
-    });
+    const { getGamificationData } = await import('../gamification/engine.js');
+    const data = await getGamificationData(cpf);
+    res.json(data);
   } catch (err) {
     console.error('[API] Gamification error:', err.message);
-    res.json({ nivel_atual: 'Iniciante', xp_atual: 0, xp_maximo: 500, desconto_ativo: 0, streak_dias: 0, xp_mes_atual: 0, meta_mes: 200 });
+    res.json({
+      nivel_atual: 'Endividado', xp_atual: 0, xp_maximo: 100,
+      rating: '--', desconto_ativo: 0, streak_dias: 0,
+      xp_mes_atual: 0, meta_mes: 100, tarefas_completas: [],
+      diagnostico_completo: false
+    });
   }
 });
 

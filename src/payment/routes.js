@@ -224,6 +224,14 @@ paymentRouter.post('/webhook/mercadopago', async (req, res) => {
         }
       }
       // Diagnostico: do NOT auto-process. Wait for client to provide target CPF via /api/process-diagnostico
+
+      // === GAMIFICATION: Award CP for purchase ===
+      try {
+        const { processServicePurchase } = await import('../gamification/engine.js');
+        await processServicePurchase(order.cpf, order.service);
+      } catch (gamErr) {
+        console.error('[MP Webhook] Gamification error:', gamErr.message);
+      }
     }
 
     // If payment failed/rejected, trigger purchase_abandoned voice call
@@ -659,6 +667,18 @@ paymentRouter.post('/api/admin/upload-diagnostico/:id', diagUpload.single('pdf')
     }
 
     await db.query("UPDATE orders SET status = 'completed', updated_at = NOW() WHERE id = $1", [orderId]);
+
+    // === GAMIFICATION: Process diagnostico completion ===
+    try {
+      const { processDiagnosticoCompleted } = await import('../gamification/engine.js');
+      // Fetch apiful_response if available
+      const { rows: diagData } = await db.query('SELECT cpf, apiful_response FROM diagnosticos WHERE id = $1', [diagId]);
+      if (diagData[0]) {
+        await processDiagnosticoCompleted(diagData[0].cpf, diagData[0].apiful_response);
+      }
+    } catch (gamErr) {
+      console.error('[Admin Upload] Gamification error:', gamErr.message);
+    }
 
     console.log('[Admin Upload] PDF uploaded for order #' + orderId + ' -> ' + pdfPath);
 
