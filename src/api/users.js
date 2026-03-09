@@ -101,6 +101,172 @@ usersRouter.post('/api/login', async (req, res) => {
 });
 
 // ============================================
+// GET /api/balance/:cpf — Client balance
+// ============================================
+usersRouter.get('/api/balance/:cpf', async (req, res) => {
+  try {
+    const cpf = req.params.cpf.replace(/[^0-9]/g, '');
+    const { rows } = await db.query(
+      'SELECT COALESCE(saldo, 0) as saldo FROM users WHERE cpf = $1 AND ativo = true',
+      [cpf]
+    );
+    if (rows.length === 0) return res.json({ saldo: 0 });
+    res.json({ saldo: parseFloat(rows[0].saldo) });
+  } catch (err) {
+    console.error('[API] Balance error:', err.message);
+    res.json({ saldo: 0 });
+  }
+});
+
+// ============================================
+// GET /api/orders/:cpf — Client orders
+// ============================================
+usersRouter.get('/api/orders/:cpf', async (req, res) => {
+  try {
+    const cpf = req.params.cpf.replace(/[^0-9]/g, '');
+    const { rows } = await db.query(
+      `SELECT id, service, price, status, created_at, doc_tipo, doc_numero
+       FROM orders WHERE cpf = $1 ORDER BY created_at DESC LIMIT 20`,
+      [cpf]
+    );
+    const orders = rows.map(o => ({
+      ...o,
+      status: o.status === 'Aguardando Pagamento' ? 'pending'
+            : ['Concluido','Concluído','approved'].includes(o.status) ? 'completed'
+            : ['Em Analise','Em Análise','processing'].includes(o.status) ? 'paid'
+            : ['Rejeitado','rejected'].includes(o.status) ? 'rejected'
+            : o.status
+    }));
+    res.json({ success: true, orders });
+  } catch (err) {
+    console.error('[API] Client orders error:', err.message);
+    res.json({ success: true, orders: [] });
+  }
+});
+
+// ============================================
+// GET /api/gamification/:cpf — Client gamification
+// ============================================
+usersRouter.get('/api/gamification/:cpf', async (req, res) => {
+  try {
+    const cpf = req.params.cpf.replace(/[^0-9]/g, '');
+    const { rows: orderRows } = await db.query(
+      `SELECT COALESCE(SUM(GREATEST(ROUND(price * 0.1), 10)), 0) as total_xp
+       FROM orders WHERE cpf = $1 AND status IN ('completed','paid','approved','Concluido','Concluído','processing')`,
+      [cpf]
+    );
+    const { rows: monthRows } = await db.query(
+      `SELECT COALESCE(SUM(GREATEST(ROUND(price * 0.1), 10)), 0) as xp_mes
+       FROM orders WHERE cpf = $1 AND status IN ('completed','paid','approved','Concluido','Concluído','processing')
+         AND created_at >= date_trunc('month', NOW())`,
+      [cpf]
+    );
+    const totalXp = parseInt(orderRows[0].total_xp);
+    const xpMes = parseInt(monthRows[0].xp_mes);
+    const levels = [
+      { name: 'Endividado', xp: 0 }, { name: 'Organizando', xp: 100 },
+      { name: 'Evoluindo', xp: 350 }, { name: 'Estratégico', xp: 750 },
+      { name: 'Premium Black', xp: 1500 }
+    ];
+    let currentLevel = levels[0], nextLevel = levels[1];
+    for (let i = levels.length - 1; i >= 0; i--) {
+      if (totalXp >= levels[i].xp) { currentLevel = levels[i]; nextLevel = levels[i + 1] || levels[i]; break; }
+    }
+    res.json({
+      nivel_atual: currentLevel.name, xp_atual: totalXp, xp_maximo: nextLevel.xp,
+      desconto_ativo: totalXp >= 750 ? 10 : totalXp >= 350 ? 5 : 0,
+      streak_dias: 0, xp_mes_atual: xpMes, meta_mes: 200
+    });
+  } catch (err) {
+    console.error('[API] Gamification error:', err.message);
+    res.json({ nivel_atual: 'Iniciante', xp_atual: 0, xp_maximo: 500, desconto_ativo: 0, streak_dias: 0, xp_mes_atual: 0, meta_mes: 200 });
+  }
+});
+
+// ============================================
+// POST /api/forgot-password — Send reset email
+// ============================================
+usersRouter.post('/api/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, error: 'Email obrigatorio' });
+
+    const { rows } = await db.query(
+      'SELECT id, nome, email FROM users WHERE email = $1 AND ativo = true', [email]
+    );
+    // Always return success (don't reveal if email exists)
+    if (rows.length === 0) return res.json({ success: true, message: 'Se o email estiver cadastrado, voce recebera um link.' });
+
+    const user = rows[0];
+    const crypto = await import('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 3600000);
+
+    await db.query(
+      `INSERT INTO password_resets (user_id, token, expires_at)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id) DO UPDATE SET token = $2, expires_at = $3, used = false`,
+      [user.id, token, expiresAt]
+    );
+
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.default.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: false,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+    });
+
+    const resetUrl = (process.env.FRONTEND_URL || 'https://credpositivo-web.vercel.app') + '/recuperar-senha/?token=' + token;
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || '"CredPositivo" <noreply@credpositivo.com>',
+      to: user.email,
+      subject: 'Recuperar sua senha - CredPositivo',
+      html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px;">
+        <h2 style="color:#333;">Ola, ${user.nome.split(' ')[0]}!</h2>
+        <p>Voce solicitou a recuperacao de senha.</p>
+        <a href="${resetUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Redefinir Senha</a>
+        <p style="color:#666;font-size:13px;margin-top:20px;">Este link expira em 1 hora.</p>
+      </div>`
+    });
+
+    res.json({ success: true, message: 'Se o email estiver cadastrado, voce recebera um link.' });
+  } catch (err) {
+    console.error('[API] Forgot password error:', err.message);
+    res.json({ success: true, message: 'Se o email estiver cadastrado, voce recebera um link.' });
+  }
+});
+
+// ============================================
+// POST /api/reset-password — Reset with token
+// ============================================
+usersRouter.post('/api/reset-password', async (req, res) => {
+  try {
+    const { token, senha } = req.body;
+    if (!token || !senha) return res.status(400).json({ success: false, error: 'Token e nova senha obrigatorios' });
+    if (senha.length < 6) return res.status(400).json({ success: false, error: 'Senha deve ter no minimo 6 caracteres' });
+
+    const { rows } = await db.query(
+      `SELECT pr.user_id FROM password_resets pr
+       JOIN users u ON u.id = pr.user_id
+       WHERE pr.token = $1 AND pr.used = false AND pr.expires_at > NOW()`,
+      [token]
+    );
+    if (rows.length === 0) return res.status(400).json({ success: false, error: 'Link expirado ou invalido.' });
+
+    const hashedPassword = await bcrypt.hash(senha, 10);
+    await db.query('UPDATE users SET senha = $1 WHERE id = $2', [hashedPassword, rows[0].user_id]);
+    await db.query('UPDATE password_resets SET used = true WHERE token = $1', [token]);
+
+    res.json({ success: true, message: 'Senha alterada com sucesso!' });
+  } catch (err) {
+    console.error('[API] Reset password error:', err.message);
+    res.status(500).json({ success: false, error: 'Erro ao redefinir senha' });
+  }
+});
+
+// ============================================
 // POST /api/admin/login — Admin/manager login (JWT + bcrypt + 2FA)
 // ============================================
 usersRouter.post('/api/admin/login', async (req, res) => {
