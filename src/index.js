@@ -33,6 +33,7 @@ import { getCostSummary } from './monitoring/cost-tracker.js';
 import { analyticsRouter } from './api/analytics.js';
 import { abTestsRouter } from './api/ab-tests.js';
 import { performanceRouter } from './api/analytics-performance.js';
+import { publicAgentsRouter } from './api/public-agents.js';
 import { startExpenseScheduler } from './expense/tracker.js';
 import { startCoachingScheduler } from './coaching/protocol.js';
 import { startAgendaScheduler } from './agenda/manager.js';
@@ -140,6 +141,9 @@ app.use(affiliateRouter);
 app.use(voicecallRouter);
 // Vapi.ai voice call webhooks
 app.use(vapiWebhookRouter);
+
+// Public agents status (no auth — rate limited by 30s cache)
+app.use(publicAgentsRouter);
 
 // Analytics API (admin only)
 app.use(analyticsRouter);
