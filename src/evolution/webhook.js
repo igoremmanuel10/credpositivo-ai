@@ -356,7 +356,6 @@ webhookRouter.post('/webhook/chatwoot', async (req, res) => {
     if (!senderType || senderType === 'contact' || senderType === 'agent_bot') return;
 
     // Try multiple paths to find the contact phone
-    const conversation = data.conversation || {};
     const contact = conversation.contact || data.contact || {};
     let phone = contact.phone_number?.replace(/^\+/, '') || '';
 
