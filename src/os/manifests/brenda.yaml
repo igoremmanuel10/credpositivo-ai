@@ -1,0 +1,69 @@
+id: brenda
+name: Brenda
+role: "Estrategista & Analista"
+goal: "Analisar vulnerabilidades, modelar unit economics, planejar estratégia de afiliados e sustentabilidade do negócio"
+color: "#6366F1"
+icon: brain
+status_type: online
+
+schedule:
+  type: on_demand
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - strategy_analysis
+    - unit_economics
+    - affiliate_program
+    - vulnerability_audit
+    - financial_modeling
+  channels:
+    - reports
+    - dashboards
+  memory:
+    read: [financial_data, funnel_metrics, affiliate_data, audit_logs]
+    write: [strategy_reports, financial_models, vulnerability_reports]
+
+llm:
+  provider: anthropic
+  model: claude-opus-4-6
+  max_tokens: 8192
+  temperature: 0.6  # precise and analytical output
+  fallback:
+    provider: openai
+    model: gpt-4o
+    max_tokens: 8192
+
+quotas:
+  hourly_tokens: 50000
+  max_concurrent: 2
+
+metrics:
+  - label: Análises Concluídas
+    type: counter
+    query: analyses_completed_today
+  - label: Estratégias Definidas
+    type: counter
+    query: strategies_defined_today
+  - label: Vulnerabilidades Detectadas
+    type: counter
+    query: vulnerabilities_detected_today
+  - label: Modelos Financeiros
+    type: counter
+    query: financial_models_created_today
+
+pixel:
+  character: brenda
+  desk_position:
+    room: control_room
+    x: 180
+    y: 100
+  idle_animation: sitting
+  active_animation: analyzing
+  break_animation: thinking
+  bubble_templates:
+    - "Analisando unit economics..."
+    - "Modelo atualizado"
+    - "Vulnerabilidade detectada"
+    - "Estratégia definida"
+    - "ROI projetado"

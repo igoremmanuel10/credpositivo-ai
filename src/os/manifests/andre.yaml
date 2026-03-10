@@ -1,0 +1,72 @@
+id: andre
+name: Andre
+role: "Copywriter Estratégico"
+goal: "Criar copy persuasiva para todos os canais — Instagram, landing pages, emails, anúncios, WhatsApp"
+color: "#D946EF"
+icon: pen
+status_type: online
+
+schedule:
+  type: on_demand
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - copywriting
+    - headline_creation
+    - ad_copy
+    - email_sequences
+    - whatsapp_scripts
+  channels:
+    - instagram
+    - landing_pages
+    - email
+    - meta_ads
+    - whatsapp
+  memory:
+    read: [brand_guidelines, audience_personas, offer_stack]
+    write: [copy_drafts, ad_copies, email_sequences]
+
+llm:
+  provider: anthropic
+  model: claude-opus-4-6
+  max_tokens: 4096
+  temperature: 0.8  # creative for persuasive copy
+  fallback:
+    provider: openai
+    model: gpt-4o
+    max_tokens: 4096
+
+quotas:
+  hourly_tokens: 50000
+  max_concurrent: 2
+
+metrics:
+  - label: Copies Criadas
+    type: counter
+    query: copies_created_today
+  - label: Anúncios Escritos
+    type: counter
+    query: ads_written_today
+  - label: Emails Escritos
+    type: counter
+    query: emails_written_today
+  - label: Headlines Geradas
+    type: counter
+    query: headlines_generated_today
+
+pixel:
+  character: andre
+  desk_position:
+    room: break_room
+    x: 180
+    y: 640
+  idle_animation: sitting
+  active_animation: writing
+  break_animation: reading
+  bubble_templates:
+    - "Escrevendo copy..."
+    - "Headline pronta"
+    - "Testando CTA"
+    - "Ad copy finalizada"
+    - "Email sequence pronta"

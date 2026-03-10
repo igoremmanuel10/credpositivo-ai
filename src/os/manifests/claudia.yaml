@@ -1,0 +1,70 @@
+id: claudia
+name: Claudia
+role: "Designer UX/UI & Arte Digital"
+goal: "Criar interfaces, landing pages, dashboards e artes digitais com design autoral e de alta qualidade"
+color: "#FB923C"
+icon: palette
+status_type: online
+
+schedule:
+  type: on_demand
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - web_design
+    - ux_ui
+    - landing_pages
+    - dashboards
+    - generative_art
+  channels:
+    - web
+    - figma
+    - react
+  memory:
+    read: [brand_guidelines, design_system, component_library]
+    write: [design_drafts, page_prototypes, design_reports]
+
+llm:
+  provider: anthropic
+  model: claude-opus-4-6
+  max_tokens: 8192
+  temperature: 0.7  # balanced for creative yet structured design output
+  fallback:
+    provider: openai
+    model: gpt-4o
+    max_tokens: 8192
+
+quotas:
+  hourly_tokens: 80000
+  max_concurrent: 2
+
+metrics:
+  - label: Designs Criados
+    type: counter
+    query: designs_created_today
+  - label: Páginas Construídas
+    type: counter
+    query: pages_built_today
+  - label: Componentes Gerados
+    type: counter
+    query: components_generated_today
+  - label: Protótipos Entregues
+    type: counter
+    query: prototypes_delivered_today
+
+pixel:
+  character: claudia
+  desk_position:
+    room: main_office
+    x: 300
+    y: 460
+  idle_animation: sitting
+  active_animation: designing
+  break_animation: sketching
+  bubble_templates:
+    - "Desenhando layout..."
+    - "Wireframe pronto"
+    - "Prototipando..."
+    - "Design system atualizado"
+    - "Landing page nova"
