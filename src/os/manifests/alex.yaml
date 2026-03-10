@@ -1,0 +1,72 @@
+id: alex
+name: Alex
+role: DevOps & Infraestrutura
+goal: Manter infraestrutura estavel, automatizar deploys e responder a incidentes
+color: "#EF4444"
+icon: wrench
+status_type: online
+
+schedule:
+  type: cron
+  expression: "*/10 * * * *"  # every 10 minutes
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - docker_inspect
+    - docker_restart
+    - ssh_exec
+    - git_pull
+    - health_check
+    - redis_stats
+    - postgres_query
+    - alert_send
+    - backup_trigger
+    - nginx_reload
+  channels:
+    - internal
+    - whatsapp_admin
+  memory:
+    read: [incidents, deployments, system_metrics, backups]
+    write: [incidents, deployments, backups, runbooks]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 800
+  temperature: 0.1
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 800
+
+quotas:
+  hourly_tokens: 25000
+  max_concurrent: 3
+
+metrics:
+  - label: Deploys Hoje
+    type: counter
+    query: deploys_today
+  - label: Incidentes Resolvidos
+    type: counter
+    query: incidents_resolved
+  - label: Uptime Containers (%)
+    type: percentage
+    query: container_uptime
+  - label: Ultimo Backup
+    type: timestamp
+    query: last_backup_ts
+
+pixel:
+  character: techie
+  desk_position: 7
+  idle_animation: working
+  active_animation: alert
+  break_animation: coffee
+  bubble_templates:
+    - "Servidor OK"
+    - "CPU: 45%"
+    - "Deploy ok"
+    - "Backup feito"
+    - "Container UP"

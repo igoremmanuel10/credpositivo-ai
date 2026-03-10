@@ -1,0 +1,71 @@
+id: luan
+name: Luan
+role: Gerente de Vendas
+goal: Analisar performance do time, gerar relatorios e identificar gargalos no funil
+color: "#F59E0B"
+icon: chart
+status_type: online
+
+schedule:
+  type: cron
+  expression: "0 7,12,18 * * 1-6"  # 3x per day on business days (7h, 12h, 18h)
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - report_generate
+    - chatwoot_stats
+    - postgres_query
+    - whatsapp_send
+    - dashboard_update
+    - funnel_analysis
+    - agent_performance_query
+    - email_send
+  channels:
+    - internal
+    - whatsapp_admin
+    - email
+  memory:
+    read: [conversations, leads, agents, reports, metrics, goals]
+    write: [reports, goals, coaching_notes]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 1500
+  temperature: 0.3
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 1500
+
+quotas:
+  hourly_tokens: 30000
+  max_concurrent: 3
+
+metrics:
+  - label: Relatorios Gerados
+    type: counter
+    query: reports_today
+  - label: Meta Mensal (%)
+    type: percentage
+    query: monthly_goal_progress
+  - label: Receita Hoje (R$)
+    type: currency
+    query: revenue_today
+  - label: Deals Fechados
+    type: counter
+    query: deals_closed_today
+
+pixel:
+  character: manager
+  desk_position: 6
+  idle_animation: working
+  active_animation: talking
+  break_animation: coffee
+  bubble_templates:
+    - "Relatorio pronto"
+    - "Analisando dados..."
+    - "Pipeline saudavel"
+    - "Meta: 85%"
+    - "Funil otimizado"

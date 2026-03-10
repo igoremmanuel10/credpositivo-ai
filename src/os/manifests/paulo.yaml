@@ -1,0 +1,67 @@
+id: paulo
+name: Paulo
+role: SDR — Prospecção Ativa
+goal: Qualificar e nutrir leads frios via follow-up automatizado
+color: "#8B5CF6"
+icon: megaphone
+status_type: online
+
+schedule:
+  type: cron
+  expression: "*/15 7-20 * * 1-6"  # every 15 min, Mon-Sat, 7h-20h
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - whatsapp_send
+    - chatwoot_sync
+    - lead_score
+    - followup_schedule
+    - knowledge_search
+    - crm_update
+  channels:
+    - whatsapp
+  memory:
+    read: [leads, conversations, knowledge, followup_queue]
+    write: [leads, conversations, followup_queue]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 400
+  temperature: 0.6
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 400
+
+quotas:
+  hourly_tokens: 40000
+  max_concurrent: 20
+
+metrics:
+  - label: Follow-ups Hoje
+    type: counter
+    query: followups_today
+  - label: Leads Qualificados
+    type: counter
+    query: leads_qualified_today
+  - label: Taxa de Resposta
+    type: percentage
+    query: reply_rate
+  - label: Pipeline Gerado (R$)
+    type: currency
+    query: pipeline_generated
+
+pixel:
+  character: salesman
+  desk_position: 4
+  idle_animation: typing
+  active_animation: talking
+  break_animation: coffee
+  bubble_templates:
+    - "Follow-up enviado"
+    - "Novo contato!"
+    - "Prospectando..."
+    - "Quiz recebido"
+    - "Agendando call..."

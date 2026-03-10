@@ -1,0 +1,70 @@
+id: ana
+name: Ana
+role: Monitora Operacional
+goal: Garantir saude do sistema, alertar anomalias e gerar relatorios de operacao
+color: "#10B981"
+icon: shield
+status_type: online
+
+schedule:
+  type: cron
+  expression: "*/5 * * * *"  # every 5 minutes, 24/7
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - system_health_check
+    - alert_send
+    - chatwoot_sync
+    - report_generate
+    - uptime_query
+    - redis_stats
+    - postgres_query
+    - docker_inspect
+  channels:
+    - internal
+    - whatsapp_admin
+  memory:
+    read: [system_metrics, alerts, incidents, agents]
+    write: [incidents, alerts, reports]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 800
+  temperature: 0.2  # deterministic for analysis
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 800
+
+quotas:
+  hourly_tokens: 20000
+  max_concurrent: 5
+
+metrics:
+  - label: Uptime Sistema
+    type: percentage
+    query: system_uptime
+  - label: Alertas Hoje
+    type: counter
+    query: alerts_today
+  - label: Incidentes Abertos
+    type: gauge
+    query: open_incidents
+  - label: Latencia P95 (ms)
+    type: gauge
+    query: p95_latency
+
+pixel:
+  character: analyst
+  desk_position: 5
+  idle_animation: working
+  active_animation: alert
+  break_animation: coffee
+  bubble_templates:
+    - "Pipeline OK"
+    - "Verificando..."
+    - "Lead parado!"
+    - "Compliance ok"
+    - "Alerta emitido"

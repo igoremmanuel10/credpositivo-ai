@@ -50,6 +50,7 @@ import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.
 import { startInstagramScheduler } from './social/instagram.js';
 import { runCeoCycle } from './ceo/musk.js';
 import { startIgorScheduler, getIgorStatus, runIgorCycleNow } from './orchestrator/igor.js';
+import { initOS } from './os/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -334,10 +335,18 @@ app.use((err, req, res, next) => {
   // Initialize token mapping for multi-number support
   await initTokenMapping();
 
+  // Initialize AI OS kernel (event bus, registry, scheduler, API routes)
+  try {
+    await initOS(app);
+    console.log('[AI-OS] Kernel initialized successfully');
+  } catch (err) {
+    console.error('[AI-OS] Kernel init failed (non-fatal):', err.message);
+  }
+
   app.listen(config.port, () => {
     console.log(`
 =============================================
-  CredPositivo Agents v2 (Augusto + Paulo SDR)
+  CredPositivo AI OS v1.0 (Augusto + Paulo SDR)
   Port: ${config.port}
   Chat: ${config.anthropic.model}
   Vision/TTS: ${config.openai.visionModel} + ${config.tts.model}

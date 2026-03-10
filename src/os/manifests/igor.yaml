@@ -1,0 +1,69 @@
+id: igor
+name: Igor
+role: Orquestrador do Sistema
+goal: Coordenar agentes, rotear tarefas e manter coerencia operacional do AI OS
+color: "#06B6D4"
+icon: eye
+status_type: online
+
+schedule:
+  type: cron
+  expression: "* * * * *"  # every minute — orchestrator heartbeat
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - agent_invoke
+    - event_publish
+    - task_route
+    - registry_query
+    - loop_guard_check
+    - quota_check
+    - session_repair
+    - scheduler_control
+  channels:
+    - internal
+  memory:
+    read: [agents, events, tasks, quotas, conversations]
+    write: [tasks, events, agent_directives]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 1000
+  temperature: 0.1  # near-deterministic for routing decisions
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 1000
+
+quotas:
+  hourly_tokens: 50000
+  max_concurrent: 10
+
+metrics:
+  - label: Tarefas Roteadas
+    type: counter
+    query: tasks_routed
+  - label: Agentes Ativos
+    type: gauge
+    query: active_agents
+  - label: Eventos/hora
+    type: gauge
+    query: events_per_hour
+  - label: Erros de Loop
+    type: counter
+    query: loop_guard_blocks
+
+pixel:
+  character: engineer
+  desk_position: 2
+  idle_animation: working
+  active_animation: alert
+  break_animation: coffee
+  bubble_templates:
+    - "Monitorando..."
+    - "Correcao aplicada"
+    - "Tudo normal"
+    - "Ciclo completo"
+    - "Intervencao!"

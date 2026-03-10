@@ -1,0 +1,67 @@
+id: augusto
+name: Augusto
+role: Closer de Vendas
+goal: Converter leads em clientes via WhatsApp usando o framework Hormozi
+color: "#3B82F6"
+icon: robot
+status_type: online
+
+schedule:
+  type: always  # event-driven — fires on every incoming WhatsApp message
+
+capabilities:
+  tools:
+    - whatsapp_send
+    - chatwoot_sync
+    - payment_link
+    - knowledge_search
+    - followup_schedule
+    - coupon_apply
+  channels:
+    - whatsapp
+  memory:
+    read: [conversations, contacts, knowledge, products, coupons]
+    write: [conversations, messages, contacts]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 500
+  temperature: 0.7
+  system_prompt: src/ai/system-prompt.js
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 500
+
+quotas:
+  hourly_tokens: 80000
+  max_concurrent: 50
+
+metrics:
+  - label: Conversas Hoje
+    type: counter
+    query: conversations_today
+  - label: Resp. Média (s)
+    type: gauge
+    query: avg_response_time
+  - label: Taxa de Conversão
+    type: percentage
+    query: conversion_rate
+  - label: Links Enviados
+    type: counter
+    query: payment_links_sent
+
+pixel:
+  character: businessman
+  desk_position: 3
+  idle_animation: typing
+  active_animation: talking
+  break_animation: coffee
+  bubble_templates:
+    - "Respondendo lead..."
+    - "Fechando venda!"
+    - "Enviando audio..."
+    - "Qualificando..."
+    - "Mandando link..."
+    - "Negociando preco..."

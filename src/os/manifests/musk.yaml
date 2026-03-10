@@ -1,0 +1,72 @@
+id: musk
+name: Musk
+role: CEO & Estrategista
+goal: Tomar decisoes estrategicas, aprovar investimentos e definir direcao do negocio
+color: "#EAB308"
+icon: crown
+status_type: online
+
+schedule:
+  type: cron
+  expression: "0 9,17 * * 1-5"  # 9h e 17h em dias uteis — briefings diarios
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - report_generate
+    - postgres_query
+    - dashboard_query
+    - financial_summary
+    - agent_directive
+    - email_send
+    - whatsapp_send
+    - goal_set
+    - budget_approve
+  channels:
+    - internal
+    - whatsapp_admin
+    - email
+  memory:
+    read: [reports, metrics, agents, goals, financials, market_data]
+    write: [goals, directives, decisions, budget]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 2000
+  temperature: 0.4
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 2000
+
+quotas:
+  hourly_tokens: 60000
+  max_concurrent: 2
+
+metrics:
+  - label: Receita MRR (R$)
+    type: currency
+    query: mrr
+  - label: Leads no Pipeline
+    type: gauge
+    query: pipeline_total_leads
+  - label: CAC Medio (R$)
+    type: currency
+    query: avg_cac
+  - label: NPS
+    type: gauge
+    query: nps_score
+
+pixel:
+  character: executive
+  desk_position: 1
+  idle_animation: working
+  active_animation: talking
+  break_animation: coffee
+  bubble_templates:
+    - "KPI positivo"
+    - "Revisando Q1..."
+    - "Meta: 100 vendas"
+    - "Diretiva emitida"
+    - "Foco: conversao"
