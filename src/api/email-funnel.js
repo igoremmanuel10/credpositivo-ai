@@ -6,7 +6,10 @@ export const emailFunnelRouter = Router();
 // ── Config ──────────────────────────────────────────────────────────────────
 const BREVO_KEY = process.env.BREVO_API_KEY || "";
 const BREVO_BASE = "https://api.brevo.com/v3";
-const SENDER = { name: "CredPositivo", email: "sac@credpositivo.com" };
+const SENDER = {
+  name: process.env.BREVO_SENDER_NAME || "CredPositivo",
+  email: process.env.BREVO_SENDER_EMAIL || "sac@credpositivo.com",
+};
 const WHATSAPP_LINK =
   "https://api.whatsapp.com/send?phone=5521971364221&text=Oi%2C%20vim%20pelo%20email%20e%20quero%20saber%20mais%20sobre%20o%20diagnostico%20completo";
 
