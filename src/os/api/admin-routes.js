@@ -79,6 +79,7 @@ import {
 import {
   getNotificationSettings,
   updateNotificationSettings,
+  sendTelegram,
 } from '../notifications/telegram.js';
 
 export const adminRouter = Router();
@@ -1175,6 +1176,36 @@ adminRouter.put('/notifications', requireWriteAccess, async (req, res) => {
     res.json({ ok: true, notifications: merged, updatedAt });
   } catch (err) {
     console.error('[Admin API] PUT /notifications error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/os/admin/notifications/test
+ *
+ * Send a test notification via Telegram to verify the integration is working.
+ * Uses the configured chat IDs from settings, or accepts an optional chatId override.
+ *
+ * Body (optional):
+ *   { chatId: "123456789" }
+ *
+ * Response 200:
+ *   { ok: true, message: "Test notification sent" }
+ */
+adminRouter.post('/notifications/test', requireWriteAccess, async (req, res) => {
+  try {
+    const { chatId } = req.body || {};
+    const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const text =
+      `🧪 *TESTE DE NOTIFICAÇÃO*\n\n` +
+      `Sistema de notificações Telegram funcionando corretamente.\n\n` +
+      `_Enviado em: ${now}_\n` +
+      `_Por: ${req.admin?.email || 'admin'}_`;
+
+    await sendTelegram(text, chatId || undefined);
+    res.json({ ok: true, message: 'Test notification sent' });
+  } catch (err) {
+    console.error('[Admin API] POST /notifications/test error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
