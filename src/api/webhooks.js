@@ -368,6 +368,39 @@ webhooksRouter.post('/api/events/affiliate-invite', async (req, res) => {
 });
 
 /**
+ * POST /api/messages/register-outgoing — Registra mensagem enviada externamente (ex: MCP).
+ * Garante que o agent tenha o histórico completo pra quando o lead responder.
+ *
+ * Body: { phone, text }
+ */
+webhooksRouter.post('/api/messages/register-outgoing', async (req, res) => {
+  const { phone: rawPhone, text } = req.body;
+
+  if (!rawPhone || !text) {
+    return res.status(400).json({ error: 'phone e text são obrigatórios' });
+  }
+
+  const phone = normalizePhone(rawPhone);
+
+  try {
+    let conversation = await db.getConversation(phone);
+
+    if (!conversation) {
+      conversation = await db.createConversation(phone, null, 'augusto');
+      console.log(`[RegisterOutgoing] Created conversation for ${phone}`);
+    }
+
+    await db.addMessage(conversation.id, 'agent', text, conversation.phase);
+    console.log(`[RegisterOutgoing] Registered outgoing message for ${phone}`);
+
+    res.json({ status: 'ok', conversation_id: conversation.id, phone });
+  } catch (err) {
+    console.error(`[RegisterOutgoing] Error for ${phone}:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/events — Lista de eventos disponíveis (para documentação).
  */
 webhooksRouter.get('/api/events', (req, res) => {
