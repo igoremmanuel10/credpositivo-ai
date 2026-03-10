@@ -566,12 +566,21 @@ webhookRouter.post('/webhook/instagram', async (req, res) => {
         }
       }
 
-      // Handle DMs via Instagram Messaging API (if not going through Chatwoot)
+      // Handle DMs via Instagram Messaging API directly
       const messaging = entry.messaging || [];
       for (const msg of messaging) {
         if (msg.message && !msg.message.is_echo) {
-          // DMs are already handled via Chatwoot inbox, log only
-          console.log(`[Instagram Messaging] DM from ${msg.sender?.id}: ${(msg.message.text || '').substring(0, 50)}`);
+          const senderId = msg.sender?.id;
+          const msgText = msg.message?.text || '';
+          if (!senderId || !msgText || msgText.length < 2) continue;
+          // Skip our own messages
+          if (senderId === process.env.INSTAGRAM_ACCOUNT_ID) continue;
+
+          console.log(`[Instagram DM] From ${senderId}: ${msgText.substring(0, 100)}`);
+
+          await handleInstagramDMDirect(senderId, msgText).catch(err => {
+            console.error('[Instagram DM] Error:', err.message);
+          });
         }
       }
     }
@@ -711,6 +720,78 @@ async function sendInstagramDM(userId, userName, commentText) {
     const { emit } = await import('../os/emitter.js');
     await emit('bia.ig_comment_dm_sent', 'bia', { user: userName, platform: 'instagram' });
   } catch {}
+}
+
+// --- Instagram DM handler (direct via Graph API, no Chatwoot) ---
+const igDmHistory = new Map(); // userId -> [{role, content}]
+
+async function handleInstagramDMDirect(senderId, text) {
+  if (!IG_DM_ENABLED || !META_ACCESS_TOKEN) return;
+
+  // Rate limit
+  const now = Date.now();
+  if (now - igReplyWindowStart > 3600000) {
+    igReplyCount = 0;
+    igReplyWindowStart = now;
+  }
+  if (igReplyCount >= IG_MAX_REPLIES_HOUR) {
+    console.log('[Instagram DM] Rate limit reached, skipping');
+    return;
+  }
+
+  // Skip story mentions, shared posts
+  if (text === 'Shared a story' || text === 'Shared post' || text.startsWith('[')) return;
+
+  // Build conversation history (in-memory, last 10 messages)
+  if (!igDmHistory.has(senderId)) igDmHistory.set(senderId, []);
+  const history = igDmHistory.get(senderId);
+  history.push({ role: 'user', content: text });
+  // Keep only last 10 messages
+  while (history.length > 10) history.shift();
+
+  const systemPrompt = await getPromptOverride('instagram') || IG_DEFAULT_PROMPT;
+
+  try {
+    const response = await igAnthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      system: systemPrompt,
+      messages: history,
+    });
+
+    const reply = response.content[0].text.trim();
+    if (!reply) return;
+
+    // Send reply via Instagram Messaging API
+    const dmRes = await fetch(`https://graph.facebook.com/v21.0/${process.env.INSTAGRAM_ACCOUNT_ID}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient: { id: senderId },
+        message: { text: reply },
+        access_token: META_ACCESS_TOKEN,
+      }),
+    });
+
+    const dmResult = await dmRes.json();
+    if (dmResult.error) {
+      console.error(`[Instagram DM] Send error: ${dmResult.error.message}`);
+      return;
+    }
+
+    // Add AI reply to history
+    history.push({ role: 'assistant', content: reply });
+    igReplyCount++;
+
+    console.log(`[Instagram DM] Replied to ${senderId}: ${reply.substring(0, 100)}`);
+
+    try {
+      await emit('bia.ig_dm_replied', 'bia', { contact: senderId, platform: 'instagram_dm' });
+    } catch {}
+
+  } catch (err) {
+    console.error('[Instagram DM] AI error:', err.message);
+  }
 }
 
 export function getQrState() {
