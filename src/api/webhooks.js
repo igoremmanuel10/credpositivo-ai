@@ -7,6 +7,7 @@ import { handleFollowup } from '../conversation/manager.js';
 import { normalizePhone } from '../utils/phone.js';
 import { config } from '../config.js';
 import { syncDealWon } from '../crm/sync.js';
+import { fireEmailForEvent } from '../email/hook.js';
 
 export const webhooksRouter = Router();
 
@@ -120,6 +121,10 @@ webhooksRouter.post('/api/events/purchase-completed', async (req, res) => {
       syncDealWon(phone, produto || conversation.recommended_product, valor).catch(err => {
         console.error('[CRM] syncDealWon error:', err.message);
       });
+      // Email: purchase confirmation
+      fireEmailForEvent('purchase_completed', phone, { produto, valor }).catch(err => {
+        console.error('[Email] purchase_completed error:', err.message);
+      });
     } else {
       console.log(`[Webhook] No conversation found for ${phone}, skipping purchase_completed`);
     }
@@ -150,8 +155,12 @@ webhooksRouter.post('/api/events/purchase-abandoned', async (req, res) => {
     const conversation = await db.getConversation(phone);
     if (conversation) {
       await handleFollowup(conversation, 'purchase_abandoned');
-      // Trigger voice call after delay for high-value leads
+      // Email: purchase abandoned
       const produto = req.body.produto || conversation.recommended_product || '';
+      fireEmailForEvent('purchase_abandoned', phone, { produto }).catch(err => {
+        console.error('[Email] purchase_abandoned error:', err.message);
+      });
+      // Trigger voice call after delay for high-value leads
       setTimeout(() => {
         handleVoiceCallTrigger(phone, 'purchase_abandoned', { produto }).catch(err => {
           console.error(`[Webhook] Voice call trigger error for ${phone}:`, err.message);

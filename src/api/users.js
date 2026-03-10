@@ -9,6 +9,7 @@ import jwt from 'jsonwebtoken';
 import * as otplib from 'otplib';
 import QRCode from 'qrcode';
 import { getGamificationData } from '../gamification/engine.js';
+import { onRegister, onForgotPassword } from '../email/triggers.js';
 
 export const usersRouter = Router();
 
@@ -47,6 +48,11 @@ usersRouter.post('/api/register', async (req, res) => {
     );
 
     res.json({ success: true, user: rows[0] });
+
+    // Trigger welcome email via Brevo — async, does not block response
+    onRegister({ email, nome }).catch(err => {
+      console.error("[Email] Welcome trigger error:", err.message);
+    });
 
     // Trigger SDR outreach (Paulo) if phone present — async, does not block response
     if (telefone) {
@@ -190,26 +196,12 @@ usersRouter.post('/api/forgot-password', async (req, res) => {
       [user.id, token, expiresAt]
     );
 
-    const nodemailer = await import('nodemailer');
-    const transporter = nodemailer.default.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-    });
-
     const resetUrl = (process.env.FRONTEND_URL || 'https://credpositivo-web.vercel.app') + '/recuperar-senha/?token=' + token;
 
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"CredPositivo" <noreply@credpositivo.com>',
-      to: user.email,
-      subject: 'Recuperar sua senha - CredPositivo',
-      html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px;">
-        <h2 style="color:#333;">Ola, ${user.nome.split(' ')[0]}!</h2>
-        <p>Voce solicitou a recuperacao de senha.</p>
-        <a href="${resetUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Redefinir Senha</a>
-        <p style="color:#666;font-size:13px;margin-top:20px;">Este link expira em 1 hora.</p>
-      </div>`
+    await onForgotPassword({
+      email: user.email,
+      nome: user.nome ? user.nome.split(' ')[0] : '',
+      resetLink: resetUrl,
     });
 
     res.json({ success: true, message: 'Se o email estiver cadastrado, voce recebera um link.' });

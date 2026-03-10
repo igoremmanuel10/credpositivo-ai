@@ -8,9 +8,7 @@ import { db } from "../db/client.js";
 import {
   onPurchaseCompleted,
   onPurchaseAbandoned,
-  onSignupCompleted,
-  onDiagnosisCompleted,
-  onServiceCompleted,
+  onPixGenerated,
 } from "./triggers.js";
 
 /**
@@ -18,11 +16,9 @@ import {
  */
 async function getEmailByPhone(phone) {
   try {
-    // Try conversation metadata first
     const conv = await db.getConversation(phone);
     if (conv?.email) return { email: conv.email, nome: conv.name || conv.nome || "" };
 
-    // Try users table
     const result = await db.query(
       "SELECT email, nome FROM users WHERE telefone = $1 LIMIT 1",
       [phone]
@@ -46,7 +42,6 @@ async function getEmailByPhone(phone) {
  */
 export async function fireEmailForEvent(event, phone, data = {}) {
   try {
-    // If email is already in data, use it directly
     let email = data.email;
     let nome = data.nome || "";
 
@@ -63,10 +58,6 @@ export async function fireEmailForEvent(event, phone, data = {}) {
     console.log(`[email-hook] Firing ${event} email to ${email}`);
 
     switch (event) {
-      case "signup_completed":
-        await onSignupCompleted({ email, nome });
-        break;
-
       case "purchase_completed":
         await onPurchaseCompleted({ email, nome, produto: data.produto, valor: data.valor });
         break;
@@ -75,16 +66,8 @@ export async function fireEmailForEvent(event, phone, data = {}) {
         await onPurchaseAbandoned({ email, nome, produto: data.produto });
         break;
 
-      case "diagnosis_completed":
-        await onDiagnosisCompleted({ email, nome, resultado: data.resultado, score: data.score });
-        break;
-
-      case "limpa_completed":
-        await onServiceCompleted({ email, nome, servico: "Limpa Nome" });
-        break;
-
-      case "rating_completed":
-        await onServiceCompleted({ email, nome, servico: "Rating Bancário" });
+      case "pix_generated":
+        await onPixGenerated({ email, nome, valor: data.valor, pixCode: data.pixCode, expiration: data.expiration });
         break;
 
       default:

@@ -46,6 +46,8 @@ import { startAnaScheduler } from './ops/ana.js';
 import { startAlexScheduler, sendAlexReportNow, runAlexCheckCycle } from './devops/alex.js';
 import { startUnansweredMonitor, checkAndFixUnanswered } from './monitoring/unanswered-monitor.js';
 import { startFunnelWatcher } from './manager/funnel-watcher.js';
+import { emailFunnelRouter, startEmailFunnelPoller } from './api/email-funnel.js';
+import agentFeedRouter from './api/agent-feed.js';
 import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.js';
 import { startInstagramScheduler } from './social/instagram.js';
 import { runCeoCycle } from './ceo/musk.js';
@@ -138,6 +140,12 @@ app.use(couponRouter);
 
 // Affiliate program routes
 app.use(affiliateRouter);
+
+// Email funnel routes
+app.use(emailFunnelRouter);
+
+// Agent feed (admin)
+app.use(agentFeedRouter);
 
 // Voice call routes (Wavoip)
 app.use(voicecallRouter);
@@ -375,6 +383,7 @@ app.use((err, req, res, next) => {
     startAlexScheduler();
     startUnansweredMonitor();
     startFunnelWatcher();
+    startEmailFunnelPoller();
     startAdsScheduler();
     startInstagramScheduler();
     startIgorScheduler();
