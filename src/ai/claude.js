@@ -6,6 +6,7 @@ import { filterOutput, buildCorrectionInstruction } from './output-filter.js';
 import { trackApiCost } from '../monitoring/cost-tracker.js';
 import { captureError } from '../monitoring/sentry.js';
 import { buildContextFromSimilar } from './embeddings.js';
+import { buildKnowledgeContext } from './notion-rag.js';
 
 // Anthropic client for chat (Haiku 4.5)
 const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
@@ -19,6 +20,19 @@ const openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
  */
 export async function getAgentResponse(conversationState, messageHistory, userMessage, persona = 'augusto', abOverrides = {}) {
   let systemPrompt = buildSystemPrompt(conversationState, persona, abOverrides);
+
+  // Inject similar conversation patterns via pgvector (RAG)
+  // Only for phases 2+ (investigation onwards) where context matters most.
+  // Phases 0-1 are simple greetings — no need for extra tokens.
+  // Inject knowledge base context (Notion RAG) — always available
+  try {
+    const knowledgeContext = await buildKnowledgeContext(userMessage);
+    if (knowledgeContext) {
+      systemPrompt += knowledgeContext;
+    }
+  } catch (err) {
+    // Knowledge base is optional — don't block the response
+  }
 
   // Inject similar conversation patterns via pgvector (RAG)
   // Only for phases 2+ (investigation onwards) where context matters most.

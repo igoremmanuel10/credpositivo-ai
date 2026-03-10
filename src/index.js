@@ -40,6 +40,7 @@ import { startAgendaScheduler } from './agenda/manager.js';
 import { startEventDetector } from './conversation/event-detector.js';
 import { runMigrations, db } from './db/client.js';
 import { processUnembeddedConversations, refreshStaleEmbeddings } from './ai/embed-job.js';
+import { syncNotionKnowledgeBase } from './ai/notion-rag.js';
 import { affiliateRouter } from './affiliate/routes.js';
 import { startAnaScheduler } from './ops/ana.js';
 import { startAlexScheduler, sendAlexReportNow, runAlexCheckCycle } from './devops/alex.js';
@@ -384,5 +385,15 @@ app.use((err, req, res, next) => {
     setTimeout(() => {
       processUnembeddedConversations().catch(() => {});
     }, 2 * 60 * 1000);
+
+    // Notion Knowledge Base sync: every 6 hours + initial sync after 3 min
+    setInterval(() => {
+      syncNotionKnowledgeBase().catch(err =>
+        console.error('[NotionRAG] Scheduler error:', err.message)
+      );
+    }, 6 * 60 * 60 * 1000);
+    setTimeout(() => {
+      syncNotionKnowledgeBase().catch(() => {});
+    }, 3 * 60 * 1000);
   });
 })();

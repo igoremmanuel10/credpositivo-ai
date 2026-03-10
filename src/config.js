@@ -98,6 +98,10 @@ export const config = {
     admGroupJid: process.env.ADM_GROUP_JID || '',
   },
 
+  notion: {
+    apiKey: process.env.NOTION_API_KEY || '',
+  },
+
   krayin: {
     enabled: process.env.KRAYIN_ENABLED !== 'false',
     apiUrl: process.env.KRAYIN_API_URL || 'http://krayin:80',
