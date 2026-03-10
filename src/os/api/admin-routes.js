@@ -13,39 +13,58 @@
  * Endpoint surface
  * ──────────────────────────────────────────────────────────────────────────────
  * Prompts
- *   GET  /prompts                  List all agent prompt overrides
- *   GET  /prompts/:agentId         Get one agent's active prompt override
- *   PUT  /prompts/:agentId         Set / update a prompt override (Redis-backed)
- *   DELETE /prompts/:agentId       Remove override (falls back to compiled code)
+ *   GET  /prompts                        List all agents — override, defaultPrompt, llm config
+ *   GET  /prompts/:agentId               Get one agent's active prompt override
+ *   PUT  /prompts/:agentId               Set / update a prompt override; pushes prior version to history
+ *   DELETE /prompts/:agentId             Remove override (falls back to compiled code)
+ *   GET  /prompts/:agentId/history       List up to 20 previous prompt versions
+ *   POST /prompts/:agentId/rollback      Restore a history version as the active override
  *
  * Workflows
- *   GET  /workflows                List all rules (static + dynamic) with stats
- *   POST /workflows                Create a new dynamic rule
- *   PUT  /workflows/:ruleId        Update a dynamic rule
- *   DELETE /workflows/:ruleId      Delete a dynamic rule
- *   POST /workflows/:ruleId/test   Test-fire a rule with a mock event payload
+ *   GET  /workflows                      List all rules (static + dynamic) with stats
+ *   POST /workflows                      Create a new dynamic rule
+ *   PUT  /workflows/:ruleId              Update a dynamic rule
+ *   DELETE /workflows/:ruleId            Delete a dynamic rule
+ *   POST /workflows/:ruleId/test         Test-fire a rule with a mock event payload
  *
  * Schedules
- *   GET  /schedules                List agent schedules (manifest + overrides)
- *   PUT  /schedules/:agentId       Override agent's cron expression
- *   DELETE /schedules/:agentId     Remove override (restores manifest default)
+ *   GET  /schedules                      List agent schedules (manifest + overrides)
+ *   PUT  /schedules/:agentId             Override agent's cron expression
+ *   DELETE /schedules/:agentId           Remove override (restores manifest default)
  *
  * Logs / Event History
- *   GET  /logs                     Paginated, filterable event history
- *   GET  /logs/:agentId            Events for a single agent
+ *   GET  /logs                           Paginated, filterable event history
+ *   GET  /logs/:agentId                  Events for a single agent
  *
  * Config
- *   GET  /config                   Current OS configuration
- *   PUT  /config                   Update OS configuration
+ *   GET  /config                         Current OS configuration
+ *   PUT  /config                         Update OS configuration
  *
  * Notifications
- *   GET  /notifications            Notification settings
- *   PUT  /notifications            Update notification settings
+ *   GET  /notifications                  Notification settings
+ *   PUT  /notifications                  Update notification settings
+ *
+ * Agent Runtime Config
+ *   GET  /agents/:agentId/config         Delay, hours, on/off settings
+ *   PUT  /agents/:agentId/config         Update runtime config
+ *
+ * Agent Simulate
+ *   POST /agents/:agentId/simulate       Send a test message and get AI response (max 10/min)
+ *
+ * Agent Cost
+ *   GET  /agents/:agentId/cost           Token usage + estimated BRL cost
+ *
+ * Media Catalog
+ *   GET    /media/:agentId               List all media items
+ *   POST   /media/:agentId               Add a new media item
+ *   PUT    /media/:agentId/:mediaId      Update media metadata
+ *   DELETE /media/:agentId/:mediaId      Remove a media item
  */
 
 import { Router } from 'express';
 import Redis from 'ioredis';
 import cron from 'node-cron';
+import { randomUUID } from 'crypto';
 import 'dotenv/config';
 
 import { getAllAgents, getAgent } from '../kernel/registry.js';
@@ -88,6 +107,9 @@ const PROMPT_KEY = (agentId) => `os:prompts:${agentId}`;
 const SCHEDULE_KEY = (agentId) => `os:schedules:${agentId}`;
 const CONFIG_KEY = 'os:config';
 const NOTIFICATIONS_KEY = 'os:notifications';
+const AGENT_CONFIG_KEY = (agentId) => `os:agent-config:${agentId}`;
+const PROMPT_HISTORY_KEY = (agentId) => `os:prompt-history:${agentId}`;
+const MEDIA_KEY = (agentId) => `os:media:${agentId}`;
 
 // ─── Guard: reject viewer-role writes ────────────────────────────────────────
 
@@ -166,6 +188,79 @@ function pagination(query) {
   return { page, limit, skip };
 }
 
+/**
+ * Default runtime config applied when no Redis key exists for an agent.
+ */
+const DEFAULT_AGENT_CONFIG = {
+  enabled: true,
+  delay: {
+    minMs: 2000,
+    maxMs: 5000,
+    betweenBubblesMs: 1500,
+    showTyping: true,
+  },
+  operatingHours: {
+    start: '08:00',
+    end: '22:00',
+    timezone: 'America/Sao_Paulo',
+    offHoursMessage: 'Nosso horário de atendimento é das 8h às 22h.',
+  },
+  updatedAt: null,
+};
+
+/**
+ * Return the static/default prompt text for a given agent.
+ * Wraps every module import in try/catch so a broken module does not crash
+ * the admin API.
+ *
+ * @param {string} agentId
+ * @returns {Promise<string | null>}
+ */
+async function getDefaultPrompt(agentId) {
+  const noPromptNote = 'Prompt não configurado para este agente';
+
+  const DEFAULT_STATE = {
+    phase: 0,
+    message_count: 0,
+    lead_name: 'Lead',
+    products: [],
+  };
+
+  try {
+    switch (agentId) {
+      case 'augusto': {
+        const mod = await import('../../ai/system-prompt.js');
+        return mod.buildSystemPrompt(DEFAULT_STATE, 'augusto');
+      }
+
+      case 'paulo': {
+        const mod = await import('../../ai/system-prompt.js');
+        return mod.buildSystemPrompt(DEFAULT_STATE, 'paulo');
+      }
+
+      case 'alex': {
+        const mod = await import('../../devops/system-prompt.js');
+        return mod.ALEX_SYSTEM_PROMPT ?? null;
+      }
+
+      case 'musk': {
+        const mod = await import('../../ceo/system-prompt.js');
+        return mod.MUSK_SYSTEM_PROMPT ?? null;
+      }
+
+      case 'luan': {
+        const mod = await import('../../manager/system-prompt.js');
+        return mod.LUAN_SYSTEM_PROMPT ?? null;
+      }
+
+      default:
+        return noPromptNote;
+    }
+  } catch {
+    return null;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  PROMPTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -202,6 +297,15 @@ adminRouter.get('/prompts', async (req, res) => {
         const raw = await r.get(PROMPT_KEY(agent.id));
         const stored = tryParse(raw, null);
 
+        // Resolve default prompt — catch failures per agent so one bad module
+        // does not break the entire list response.
+        let defaultPrompt = null;
+        try {
+          defaultPrompt = await getDefaultPrompt(agent.id);
+        } catch {
+          defaultPrompt = null;
+        }
+
         return {
           agentId:       agent.id,
           agentName:     agent.name,
@@ -209,6 +313,8 @@ adminRouter.get('/prompts', async (req, res) => {
           hasOverride:   stored !== null,
           overrideText:  stored?.text  ?? null,
           overrideSetAt: stored?.setAt ?? null,
+          defaultPrompt,
+          llm:           tryParse(typeof agent.llm === 'string' ? agent.llm : JSON.stringify(agent.llm ?? {}), {}),
           note:          promptNote(agent.id),
         };
       })
@@ -288,7 +394,23 @@ adminRouter.put('/prompts/:agentId', requireWriteAccess, async (req, res) => {
     }
 
     const setAt = new Date().toISOString();
-    await getRedis().set(
+    const r = getRedis();
+
+    // Push previous version to history before overwriting (max 20 entries)
+    const prevRaw = await r.get(PROMPT_KEY(agentId));
+    const prev = tryParse(prevRaw, null);
+    if (prev?.text) {
+      const historyEntry = JSON.stringify({
+        text:    prev.text,
+        savedAt: prev.setAt || new Date().toISOString(),
+        savedBy: prev.setBy || 'unknown',
+      });
+      const histKey = PROMPT_HISTORY_KEY(agentId);
+      await r.lpush(histKey, historyEntry);
+      await r.ltrim(histKey, 0, 19); // keep last 20 versions
+    }
+
+    await r.set(
       PROMPT_KEY(agentId),
       JSON.stringify({ text: text.trim(), setAt, setBy: req.admin?.email || 'unknown' })
     );
@@ -1033,6 +1155,651 @@ adminRouter.put('/notifications', requireWriteAccess, async (req, res) => {
     res.json({ ok: true, notifications: merged, updatedAt });
   } catch (err) {
     console.error('[Admin API] PUT /notifications error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PROMPT VERSION HISTORY
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/os/admin/prompts/:agentId/history
+ *
+ * Returns up to 20 previous prompt versions for an agent, most-recent first.
+ * Versions are pushed every time a PUT /prompts/:agentId call replaces an
+ * existing override.
+ *
+ * Response 200:
+ *   {
+ *     ok: true,
+ *     agentId: "augusto",
+ *     count: 3,
+ *     history: [
+ *       { text: "...", savedAt: "2026-03-10T12:00:00.000Z", savedBy: "admin@credpositivo.com.br" },
+ *       ...
+ *     ]
+ *   }
+ */
+adminRouter.get('/prompts/:agentId/history', async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    const rawList = await getRedis().lrange(PROMPT_HISTORY_KEY(agentId), 0, 19);
+    const history = rawList.map((item) => tryParse(item, null)).filter(Boolean);
+
+    res.json({ ok: true, agentId, count: history.length, history });
+  } catch (err) {
+    console.error('[Admin API] GET /prompts/:agentId/history error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/os/admin/prompts/:agentId/rollback
+ *
+ * Restore a previous prompt version as the active override.
+ * The restored text is written back to `os:prompts:{agentId}` exactly like a
+ * PUT /prompts/:agentId call would — including pushing the current active
+ * override to the history list first.
+ *
+ * Body:
+ *   { "index": 0 }   — 0 = most recent history entry, 1 = second-most-recent, etc.
+ *
+ * Response 200:
+ *   { ok: true, agentId, restoredAt, index, text: "..." }
+ * Response 404:
+ *   { ok: false, error: "History entry at index N not found" }
+ */
+adminRouter.post('/prompts/:agentId/rollback', requireWriteAccess, async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { index = 0 } = req.body || {};
+
+    if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) {
+      return res.status(400).json({ ok: false, error: '"index" must be a non-negative integer' });
+    }
+
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    const r = getRedis();
+    const rawItem = await r.lindex(PROMPT_HISTORY_KEY(agentId), index);
+    if (!rawItem) {
+      return res.status(404).json({ ok: false, error: `History entry at index ${index} not found` });
+    }
+
+    const entry = tryParse(rawItem, null);
+    if (!entry?.text) {
+      return res.status(422).json({ ok: false, error: 'History entry is malformed or has no text' });
+    }
+
+    // Save current active override to history before overwriting
+    const prevRaw = await r.get(PROMPT_KEY(agentId));
+    const prev = tryParse(prevRaw, null);
+    if (prev?.text) {
+      const historyEntry = JSON.stringify({
+        text:    prev.text,
+        savedAt: prev.setAt || new Date().toISOString(),
+        savedBy: prev.setBy || 'unknown',
+      });
+      await r.lpush(PROMPT_HISTORY_KEY(agentId), historyEntry);
+      await r.ltrim(PROMPT_HISTORY_KEY(agentId), 0, 19);
+    }
+
+    const restoredAt = new Date().toISOString();
+    await r.set(
+      PROMPT_KEY(agentId),
+      JSON.stringify({ text: entry.text, setAt: restoredAt, setBy: req.admin?.email || 'unknown' })
+    );
+
+    console.log(`[Admin API] Prompt rolled back for agent "${agentId}" (index ${index}) by ${req.admin?.email}`);
+
+    res.json({ ok: true, agentId, restoredAt, index, text: entry.text });
+  } catch (err) {
+    console.error('[Admin API] POST /prompts/:agentId/rollback error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  AGENT RUNTIME CONFIG  (delay, operating hours, on/off)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/os/admin/agents/:agentId/config
+ *
+ * Returns the runtime configuration for an agent: enable/disable toggle,
+ * typing-delay settings, and operating hours.  Falls back to defaults when
+ * nothing has been stored in Redis yet.
+ *
+ * Response 200:
+ *   {
+ *     ok: true,
+ *     agentId: "augusto",
+ *     source: "redis" | "default",
+ *     config: {
+ *       enabled: true,
+ *       delay: { minMs: 2000, maxMs: 5000, betweenBubblesMs: 1500, showTyping: true },
+ *       operatingHours: {
+ *         start: "08:00", end: "22:00",
+ *         timezone: "America/Sao_Paulo",
+ *         offHoursMessage: "Nosso horário de atendimento é das 8h às 22h."
+ *       },
+ *       updatedAt: null
+ *     }
+ *   }
+ */
+adminRouter.get('/agents/:agentId/config', async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    const raw = await getRedis().get(AGENT_CONFIG_KEY(agentId));
+    const stored = tryParse(raw, null);
+    const source = stored ? 'redis' : 'default';
+    const config = stored ? { ...DEFAULT_AGENT_CONFIG, ...stored } : { ...DEFAULT_AGENT_CONFIG };
+
+    res.json({ ok: true, agentId, source, config });
+  } catch (err) {
+    console.error('[Admin API] GET /agents/:agentId/config error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * PUT /api/os/admin/agents/:agentId/config
+ *
+ * Create or update the runtime configuration for an agent.
+ * Performs a shallow merge with the current stored config so partial updates
+ * are safe.  Deep merge is applied for `delay` and `operatingHours` sub-objects.
+ *
+ * Body (all fields optional — only include what you want to change):
+ *   {
+ *     "enabled": false,
+ *     "delay": { "minMs": 3000 },
+ *     "operatingHours": { "start": "09:00", "end": "21:00" }
+ *   }
+ *
+ * Response 200:
+ *   { ok: true, agentId, config: { ...merged }, updatedAt }
+ */
+adminRouter.put('/agents/:agentId/config', requireWriteAccess, async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const updates = req.body;
+
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+      return res.status(400).json({ ok: false, error: 'Request body must be a JSON object' });
+    }
+
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    // Field-level validation
+    if ('enabled' in updates && typeof updates.enabled !== 'boolean') {
+      return res.status(400).json({ ok: false, error: '"enabled" must be a boolean' });
+    }
+    if ('delay' in updates) {
+      if (typeof updates.delay !== 'object' || Array.isArray(updates.delay)) {
+        return res.status(400).json({ ok: false, error: '"delay" must be a plain object' });
+      }
+      const { minMs, maxMs, betweenBubblesMs } = updates.delay;
+      if (minMs !== undefined && (typeof minMs !== 'number' || minMs < 0)) {
+        return res.status(400).json({ ok: false, error: '"delay.minMs" must be a non-negative number' });
+      }
+      if (maxMs !== undefined && (typeof maxMs !== 'number' || maxMs < 0)) {
+        return res.status(400).json({ ok: false, error: '"delay.maxMs" must be a non-negative number' });
+      }
+      if (betweenBubblesMs !== undefined && (typeof betweenBubblesMs !== 'number' || betweenBubblesMs < 0)) {
+        return res.status(400).json({ ok: false, error: '"delay.betweenBubblesMs" must be a non-negative number' });
+      }
+    }
+    if ('operatingHours' in updates) {
+      if (typeof updates.operatingHours !== 'object' || Array.isArray(updates.operatingHours)) {
+        return res.status(400).json({ ok: false, error: '"operatingHours" must be a plain object' });
+      }
+      const timeRe = /^\d{2}:\d{2}$/;
+      const { start, end } = updates.operatingHours;
+      if (start !== undefined && !timeRe.test(start)) {
+        return res.status(400).json({ ok: false, error: '"operatingHours.start" must be a "HH:MM" string' });
+      }
+      if (end !== undefined && !timeRe.test(end)) {
+        return res.status(400).json({ ok: false, error: '"operatingHours.end" must be a "HH:MM" string' });
+      }
+    }
+
+    const r = getRedis();
+    const prevRaw = await r.get(AGENT_CONFIG_KEY(agentId));
+    const prev = tryParse(prevRaw, { ...DEFAULT_AGENT_CONFIG });
+
+    const merged = {
+      ...DEFAULT_AGENT_CONFIG,
+      ...prev,
+      ...updates,
+      delay: { ...DEFAULT_AGENT_CONFIG.delay, ...(prev.delay || {}), ...(updates.delay || {}) },
+      operatingHours: {
+        ...DEFAULT_AGENT_CONFIG.operatingHours,
+        ...(prev.operatingHours || {}),
+        ...(updates.operatingHours || {}),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    await r.set(AGENT_CONFIG_KEY(agentId), JSON.stringify(merged));
+
+    console.log(`[Admin API] Agent config updated for "${agentId}" by ${req.admin?.email}`);
+
+    res.json({ ok: true, agentId, config: merged, updatedAt: merged.updatedAt });
+  } catch (err) {
+    console.error('[Admin API] PUT /agents/:agentId/config error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  AGENT SIMULATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/os/admin/agents/:agentId/simulate
+ *
+ * Send a one-shot test message to an agent and get its AI response.
+ * Uses the active prompt (override if set, otherwise the compiled default).
+ * Rate-limited to 10 calls per minute per admin session via Redis counter.
+ *
+ * Body:
+ *   { "message": "Oi, quero saber sobre o plano..." }
+ *
+ * Response 200:
+ *   { ok: true, agentId, model, response: "...", inputTokens, outputTokens }
+ * Response 429:
+ *   { ok: false, error: "Rate limit exceeded (10/min). Try again in N seconds." }
+ */
+adminRouter.post('/agents/:agentId/simulate', requireWriteAccess, async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { message } = req.body || {};
+
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      return res.status(400).json({ ok: false, error: '"message" must be a non-empty string' });
+    }
+    if (message.length > 4_000) {
+      return res.status(400).json({ ok: false, error: '"message" exceeds maximum of 4,000 characters' });
+    }
+
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    // Rate limit: 10 calls per minute per admin identifier
+    const adminId = req.admin?.email || req.admin?.sub || 'unknown';
+    const rateLimitKey = `os:simulate-rate:${adminId}`;
+    const r = getRedis();
+    const calls = await r.incr(rateLimitKey);
+    if (calls === 1) {
+      await r.expire(rateLimitKey, 60); // first call in the window — set TTL
+    }
+    if (calls > 10) {
+      const ttl = await r.ttl(rateLimitKey);
+      return res.status(429).json({
+        ok: false,
+        error: `Rate limit exceeded (10/min). Try again in ${ttl} second${ttl === 1 ? '' : 's'}.`,
+      });
+    }
+
+    // Resolve the active prompt (override wins over default)
+    let systemPrompt = await getPromptOverride(agentId);
+    if (!systemPrompt) {
+      systemPrompt = await getDefaultPrompt(agentId);
+    }
+    if (!systemPrompt || systemPrompt === 'Prompt não configurado para este agente') {
+      systemPrompt = `Você é ${agent.name}, um agente da CredPositivo. Responda de forma concisa e profissional.`;
+    }
+
+    // Resolve the model from the agent's llm manifest config, falling back to env
+    const llmConfig = tryParse(typeof agent.llm === 'string' ? agent.llm : JSON.stringify(agent.llm ?? {}), {});
+    const model = llmConfig.model || process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
+
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const aiResponse = await anthropic.messages.create({
+      model,
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: message.trim() }],
+    });
+
+    const responseText = aiResponse.content
+      .filter((b) => b.type === 'text')
+      .map((b) => b.text)
+      .join('');
+
+    console.log(`[Admin API] Simulate "${agentId}" by ${req.admin?.email} — model: ${model}, tokens in: ${aiResponse.usage.input_tokens}, out: ${aiResponse.usage.output_tokens}`);
+
+    res.json({
+      ok: true,
+      agentId,
+      model,
+      response:     responseText,
+      inputTokens:  aiResponse.usage.input_tokens,
+      outputTokens: aiResponse.usage.output_tokens,
+    });
+  } catch (err) {
+    console.error('[Admin API] POST /agents/:agentId/simulate error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  AGENT COST TRACKING
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Estimated BRL cost per 1 M tokens by model (input + output combined average).
+ * Values are rough approximations — update as Anthropic pricing changes.
+ * Exchange rate reference: 1 USD = 5.80 BRL (Mar 2026)
+ */
+const MODEL_PRICE_BRL_PER_1M = {
+  'claude-haiku-4-5-20251001': { input: 4.64,   output: 13.92  }, // $0.80/$2.40 * 5.80
+  'claude-3-5-haiku-20241022': { input: 4.64,   output: 13.92  },
+  'claude-sonnet-4-5':         { input: 17.40,  output: 86.94  }, // $3/$15 * 5.80
+  'claude-opus-4':             { input: 87.00,  output: 434.88 }, // $15/$75 * 5.80
+};
+
+/**
+ * GET /api/os/admin/agents/:agentId/cost
+ *
+ * Returns token usage counters for today and the current month along with an
+ * estimated BRL cost.  Counters are stored by other parts of the system under
+ * keys `os:metrics:{agentId}:tokens_today` and
+ * `os:metrics:{agentId}:tokens_month` as JSON objects
+ * `{ input: N, output: N }`.  Returns zeros when the keys do not exist yet.
+ *
+ * Response 200:
+ *   {
+ *     ok: true,
+ *     agentId: "augusto",
+ *     model: "claude-haiku-4-5-20251001",
+ *     today: { inputTokens: 12400, outputTokens: 3200, estimatedBRL: 0.10 },
+ *     month: { inputTokens: 340000, outputTokens: 89000, estimatedBRL: 2.82 }
+ *   }
+ */
+adminRouter.get('/agents/:agentId/cost', async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    const r = getRedis();
+    const [rawToday, rawMonth] = await Promise.all([
+      r.get(`os:metrics:${agentId}:tokens_today`),
+      r.get(`os:metrics:${agentId}:tokens_month`),
+    ]);
+
+    const tokensToday = tryParse(rawToday, { input: 0, output: 0 });
+    const tokensMonth = tryParse(rawMonth, { input: 0, output: 0 });
+
+    const llmConfig = tryParse(typeof agent.llm === 'string' ? agent.llm : JSON.stringify(agent.llm ?? {}), {});
+    const model = llmConfig.model || process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
+    const pricing = MODEL_PRICE_BRL_PER_1M[model] || MODEL_PRICE_BRL_PER_1M['claude-haiku-4-5-20251001'];
+
+    /**
+     * Estimate BRL cost for a token count pair.
+     * @param {{ input: number, output: number }} t
+     */
+    function estimateBRL(t) {
+      const input  = (t.input  || 0) / 1_000_000 * pricing.input;
+      const output = (t.output || 0) / 1_000_000 * pricing.output;
+      return Math.round((input + output) * 10000) / 10000; // 4 decimal places
+    }
+
+    res.json({
+      ok: true,
+      agentId,
+      model,
+      today: {
+        inputTokens:  tokensToday.input  || 0,
+        outputTokens: tokensToday.output || 0,
+        estimatedBRL: estimateBRL(tokensToday),
+      },
+      month: {
+        inputTokens:  tokensMonth.input  || 0,
+        outputTokens: tokensMonth.output || 0,
+        estimatedBRL: estimateBRL(tokensMonth),
+      },
+    });
+  } catch (err) {
+    console.error('[Admin API] GET /agents/:agentId/cost error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  MEDIA CATALOG
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Valid media item types */
+const VALID_MEDIA_TYPES = new Set(['image', 'video', 'audio', 'pdf', 'link']);
+
+/**
+ * GET /api/os/admin/media/:agentId
+ *
+ * Returns all media items catalogued for an agent.
+ * Items are stored as individual JSON fields in a Redis hash
+ * keyed by their UUID (mediaId).
+ *
+ * Response 200:
+ *   {
+ *     ok: true,
+ *     agentId: "augusto",
+ *     count: 2,
+ *     items: [
+ *       { mediaId, url, type, label, tags, createdAt },
+ *       ...
+ *     ]
+ *   }
+ */
+adminRouter.get('/media/:agentId', async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    const rawHash = await getRedis().hgetall(MEDIA_KEY(agentId));
+    const items = rawHash
+      ? Object.values(rawHash).map((v) => tryParse(v, null)).filter(Boolean)
+      : [];
+
+    // Sort by createdAt descending (newest first)
+    items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    res.json({ ok: true, agentId, count: items.length, items });
+  } catch (err) {
+    console.error('[Admin API] GET /media/:agentId error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/os/admin/media/:agentId
+ *
+ * Add a new media item to the agent's catalog.
+ * A UUID is generated server-side as the mediaId.
+ *
+ * Body:
+ *   {
+ *     "url":   "https://example.com/video.mp4",
+ *     "type":  "video",                           — image|video|audio|pdf|link
+ *     "label": "Vídeo de apresentação CredPositivo",
+ *     "tags":  ["apresentacao", "produto"]         — optional
+ *   }
+ *
+ * Response 201:
+ *   { ok: true, agentId, item: { mediaId, url, type, label, tags, createdAt } }
+ */
+adminRouter.post('/media/:agentId', requireWriteAccess, async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { url, type, label, tags = [] } = req.body || {};
+
+    if (!url || typeof url !== 'string' || url.trim().length === 0) {
+      return res.status(400).json({ ok: false, error: '"url" must be a non-empty string' });
+    }
+    if (!type || !VALID_MEDIA_TYPES.has(type)) {
+      return res.status(400).json({
+        ok: false,
+        error: `"type" must be one of: ${[...VALID_MEDIA_TYPES].join(', ')}`,
+      });
+    }
+    if (!label || typeof label !== 'string' || label.trim().length === 0) {
+      return res.status(400).json({ ok: false, error: '"label" must be a non-empty string' });
+    }
+    if (!Array.isArray(tags) || tags.some((t) => typeof t !== 'string')) {
+      return res.status(400).json({ ok: false, error: '"tags" must be an array of strings' });
+    }
+
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    const mediaId = randomUUID();
+    const item = {
+      mediaId,
+      url:       url.trim(),
+      type,
+      label:     label.trim(),
+      tags,
+      createdAt: new Date().toISOString(),
+      createdBy: req.admin?.email || 'unknown',
+    };
+
+    await getRedis().hset(MEDIA_KEY(agentId), mediaId, JSON.stringify(item));
+
+    console.log(`[Admin API] Media item added for agent "${agentId}" (${mediaId}) by ${req.admin?.email}`);
+
+    res.status(201).json({ ok: true, agentId, item });
+  } catch (err) {
+    console.error('[Admin API] POST /media/:agentId error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * PUT /api/os/admin/media/:agentId/:mediaId
+ *
+ * Update the metadata of an existing media item.
+ * `mediaId` and `createdAt` are immutable and ignored in the body.
+ *
+ * Body (all fields optional — only include what you want to change):
+ *   { "label": "New label", "tags": ["tag1"], "url": "...", "type": "image" }
+ *
+ * Response 200:
+ *   { ok: true, agentId, item: { ...updatedItem } }
+ */
+adminRouter.put('/media/:agentId/:mediaId', requireWriteAccess, async (req, res) => {
+  try {
+    const { agentId, mediaId } = req.params;
+    const updates = req.body || {};
+
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    const r = getRedis();
+    const rawItem = await r.hget(MEDIA_KEY(agentId), mediaId);
+    if (!rawItem) {
+      return res.status(404).json({ ok: false, error: `Media item "${mediaId}" not found` });
+    }
+
+    const existing = tryParse(rawItem, null);
+    if (!existing) {
+      return res.status(422).json({ ok: false, error: 'Media item data is malformed' });
+    }
+
+    // Validate updated fields if present
+    if ('type' in updates && !VALID_MEDIA_TYPES.has(updates.type)) {
+      return res.status(400).json({
+        ok: false,
+        error: `"type" must be one of: ${[...VALID_MEDIA_TYPES].join(', ')}`,
+      });
+    }
+    if ('url' in updates && (typeof updates.url !== 'string' || updates.url.trim().length === 0)) {
+      return res.status(400).json({ ok: false, error: '"url" must be a non-empty string' });
+    }
+    if ('label' in updates && (typeof updates.label !== 'string' || updates.label.trim().length === 0)) {
+      return res.status(400).json({ ok: false, error: '"label" must be a non-empty string' });
+    }
+    if ('tags' in updates && (!Array.isArray(updates.tags) || updates.tags.some((t) => typeof t !== 'string'))) {
+      return res.status(400).json({ ok: false, error: '"tags" must be an array of strings' });
+    }
+
+    const { mediaId: _id, createdAt: _ca, ...safeUpdates } = updates; // strip immutable fields
+    const updated = {
+      ...existing,
+      ...safeUpdates,
+      mediaId,                           // always preserve
+      createdAt: existing.createdAt,     // always preserve
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.admin?.email || 'unknown',
+    };
+
+    await r.hset(MEDIA_KEY(agentId), mediaId, JSON.stringify(updated));
+
+    res.json({ ok: true, agentId, item: updated });
+  } catch (err) {
+    console.error('[Admin API] PUT /media/:agentId/:mediaId error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/os/admin/media/:agentId/:mediaId
+ *
+ * Remove a media item from the agent's catalog.
+ *
+ * Response 200:
+ *   { ok: true, agentId, mediaId, message: "Media item removed" }
+ * Response 404:
+ *   { ok: false, error: "Media item not found" }
+ */
+adminRouter.delete('/media/:agentId/:mediaId', requireWriteAccess, async (req, res) => {
+  try {
+    const { agentId, mediaId } = req.params;
+    const agent = await getAgent(agentId);
+    if (!agent) {
+      return res.status(404).json({ ok: false, error: `Agent "${agentId}" not found` });
+    }
+
+    const deleted = await getRedis().hdel(MEDIA_KEY(agentId), mediaId);
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: `Media item "${mediaId}" not found` });
+    }
+
+    console.log(`[Admin API] Media item "${mediaId}" deleted for agent "${agentId}" by ${req.admin?.email}`);
+
+    res.json({ ok: true, agentId, mediaId, message: 'Media item removed' });
+  } catch (err) {
+    console.error('[Admin API] DELETE /media/:agentId/:mediaId error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
