@@ -307,8 +307,15 @@ webhookRouter.post('/webhook/quepasa', async (req, res) => {
 });
 
 // ============================================
-// CHATWOOT WEBHOOK - Human agent replies here
+// CHATWOOT WEBHOOK - Human agent replies + Instagram DM auto-reply
 // ============================================
+const IG_INBOX_ID = '4'; // Instagram - CredPositivo inbox
+const IG_REPLY_ENABLED = process.env.IG_REPLY_ENABLED === 'true';
+const IG_DM_ENABLED = process.env.IG_DM_ENABLED === 'true';
+const IG_MAX_REPLIES_HOUR = parseInt(process.env.IG_MAX_REPLIES_HOUR || '30');
+let igReplyCount = 0;
+let igReplyWindowStart = Date.now();
+
 webhookRouter.post('/webhook/chatwoot', async (req, res) => {
   res.status(200).json({ status: 'received' });
 
@@ -318,10 +325,20 @@ webhookRouter.post('/webhook/chatwoot', async (req, res) => {
 
     console.log(`[Chatwoot Webhook] Event: ${event}`);
 
-    // Only handle outgoing messages from human agents
     if (event !== 'message_created') return;
 
     const message = data.message || data;
+    const conversation = data.conversation || {};
+    const inboxId = String(conversation.inbox_id || '');
+
+    // ── INSTAGRAM DM AUTO-REPLY ──────────────────────────────────────────
+    // Incoming messages from Instagram inbox → process with AI → reply via Chatwoot
+    if (inboxId === IG_INBOX_ID && message.message_type === 'incoming' && IG_DM_ENABLED) {
+      await handleInstagramDM(data, message, conversation).catch(err => {
+        console.error('[Instagram DM] Error:', err.message);
+      });
+      return;
+    }
 
     // Ignore incoming messages (from contacts) and bot messages
     if (message.message_type !== 'outgoing') return;
@@ -400,6 +417,228 @@ webhookRouter.post('/webhook/chatwoot', async (req, res) => {
     trackBridgeError(err);
   }
 });
+
+// ============================================
+// INSTAGRAM DM HANDLER — AI auto-reply via Chatwoot
+// ============================================
+import { getPromptOverride } from '../os/api/admin-routes.js';
+import Anthropic from '@anthropic-ai/sdk';
+
+const igAnthropic = new Anthropic({ apiKey: config.anthropic?.apiKey || process.env.ANTHROPIC_API_KEY });
+
+const IG_DEFAULT_PROMPT = `Você é Augusto, consultor financeiro da CredPositivo. Está respondendo uma DM no Instagram.
+
+SOBRE A CREDPOSITIVO:
+- Hub de serviços financeiros: Diagnóstico de Rating (R$67), Limpa Nome, Rating Bancário
+- Objetivo: ajudar pessoas a destravar crédito e limpar o nome
+- Site: credpositivo.com
+
+REGRAS PARA INSTAGRAM DM:
+- Respostas curtas e diretas (máximo 3 frases)
+- Tom amigável e acessível
+- NÃO mencione preços proativamente (exceto Diagnóstico R$67 quando perguntarem)
+- Sempre direcione para o WhatsApp para atendimento completo: "Me chama no WhatsApp que te explico tudo certinho: wa.me/5571936180654"
+- Se perguntarem sobre serviço específico, dê uma explicação breve e direcione pro WhatsApp
+- Sem emojis excessivos (máximo 1-2 por mensagem)
+- Português brasileiro informal mas profissional`;
+
+async function handleInstagramDM(data, message, conversation) {
+  if (!IG_REPLY_ENABLED) return;
+
+  // Rate limit
+  const now = Date.now();
+  if (now - igReplyWindowStart > 3600000) {
+    igReplyCount = 0;
+    igReplyWindowStart = now;
+  }
+  if (igReplyCount >= IG_MAX_REPLIES_HOUR) {
+    console.log('[Instagram DM] Rate limit reached, skipping');
+    return;
+  }
+
+  const content = message.content || '';
+  if (!content || content.length < 2) return;
+
+  // Skip system messages, story mentions, shared posts without text
+  if (content === 'Shared a story' || content === 'Shared post' || content.startsWith('[')) return;
+
+  const conversationId = conversation.id || data.conversation_id;
+  const contact = conversation.meta?.sender || conversation.contact || data.contact || {};
+  const contactName = contact.name || 'amigo';
+
+  console.log(`[Instagram DM] From ${contactName}: ${content.substring(0, 100)}`);
+
+  // Get conversation history from Chatwoot for context
+  let history = [];
+  try {
+    const histRes = await fetch(
+      `${config.chatwoot.apiUrl}/api/v1/accounts/${config.chatwoot.accountId}/conversations/${conversationId}/messages`,
+      { headers: { 'api_access_token': config.chatwoot.apiToken } }
+    );
+    const histData = await histRes.json();
+    const msgs = (histData.payload || []).slice(-10); // last 10 messages
+    history = msgs.map(m => ({
+      role: m.message_type === 'incoming' ? 'user' : 'assistant',
+      content: m.content || '',
+    })).filter(m => m.content);
+  } catch (e) {
+    console.error('[Instagram DM] Failed to get history:', e.message);
+    history = [{ role: 'user', content }];
+  }
+
+  // Ensure last message is user's
+  if (history.length === 0 || history[history.length - 1].role !== 'user') {
+    history.push({ role: 'user', content });
+  }
+
+  // Get prompt (admin override or default)
+  const systemPrompt = await getPromptOverride('instagram') || IG_DEFAULT_PROMPT;
+
+  try {
+    const response = await igAnthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      system: systemPrompt,
+      messages: history,
+    });
+
+    const reply = response.content[0].text.trim();
+    if (!reply) return;
+
+    // Send reply via Chatwoot (which delivers to Instagram)
+    await chatwootSendOutgoing(conversationId, reply);
+    igReplyCount++;
+
+    console.log(`[Instagram DM] Replied to ${contactName}: ${reply.substring(0, 100)}`);
+
+    // Emit event for AI OS
+    try {
+      const { emit } = await import('../os/emitter.js');
+      await emit('bia.ig_dm_replied', 'bia', { contact: contactName, platform: 'instagram_dm' });
+    } catch {}
+
+  } catch (err) {
+    console.error('[Instagram DM] AI error:', err.message);
+  }
+}
+
+// ============================================
+// INSTAGRAM COMMENT AUTO-REPLY — via Meta Graph API
+// ============================================
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+const IG_COMMENT_REPLY_PROMPT = `Você é Augusto, da CredPositivo. Responda um comentário no Instagram de forma curta (1-2 frases máximo).
+Seja simpático, engajante. Direcione pro link na bio ou DM. Sem preços. Sem emojis excessivos.`;
+
+webhookRouter.get('/webhook/instagram', (req, res) => {
+  // Meta webhook verification
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  const VERIFY_TOKEN = process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN || 'credpositivo-ig-verify';
+
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log('[Instagram Webhook] Verification OK');
+    return res.status(200).send(challenge);
+  }
+  res.status(403).send('Forbidden');
+});
+
+webhookRouter.post('/webhook/instagram', async (req, res) => {
+  res.status(200).send('EVENT_RECEIVED');
+
+  if (!IG_REPLY_ENABLED || !META_ACCESS_TOKEN) return;
+
+  try {
+    const body = req.body;
+    const entries = body.entry || [];
+
+    for (const entry of entries) {
+      // Handle comments
+      const changes = entry.changes || [];
+      for (const change of changes) {
+        if (change.field === 'comments') {
+          const comment = change.value;
+          if (!comment || !comment.id || !comment.text) continue;
+          // Don't reply to our own comments
+          if (comment.from?.id === process.env.INSTAGRAM_ACCOUNT_ID) continue;
+
+          await handleInstagramComment(comment).catch(err => {
+            console.error('[Instagram Comment] Error:', err.message);
+          });
+        }
+      }
+
+      // Handle DMs via Instagram Messaging API (if not going through Chatwoot)
+      const messaging = entry.messaging || [];
+      for (const msg of messaging) {
+        if (msg.message && !msg.message.is_echo) {
+          // DMs are already handled via Chatwoot inbox, log only
+          console.log(`[Instagram Messaging] DM from ${msg.sender?.id}: ${(msg.message.text || '').substring(0, 50)}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Instagram Webhook] Error:', err.message);
+  }
+});
+
+async function handleInstagramComment(comment) {
+  // Rate limit check
+  const now = Date.now();
+  if (now - igReplyWindowStart > 3600000) {
+    igReplyCount = 0;
+    igReplyWindowStart = now;
+  }
+  if (igReplyCount >= IG_MAX_REPLIES_HOUR) {
+    console.log('[Instagram Comment] Rate limit reached');
+    return;
+  }
+
+  const text = comment.text || '';
+  const userName = comment.from?.username || 'amigo';
+  console.log(`[Instagram Comment] @${userName}: ${text.substring(0, 100)}`);
+
+  // Skip very short or spammy comments
+  if (text.length < 3) return;
+
+  // Generate reply with AI
+  const systemPrompt = await getPromptOverride('instagram_comments') || IG_COMMENT_REPLY_PROMPT;
+
+  const response = await igAnthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 150,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: `Comentário de @${userName}: "${text}"\n\nResponda de forma breve e engajante.` }],
+  });
+
+  const reply = response.content[0].text.trim();
+  if (!reply) return;
+
+  // Reply to the comment via Meta Graph API
+  const replyRes = await fetch(`https://graph.facebook.com/v21.0/${comment.id}/replies`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: reply,
+      access_token: META_ACCESS_TOKEN,
+    }),
+  });
+
+  const result = await replyRes.json();
+  if (result.error) {
+    console.error(`[Instagram Comment] Reply failed: ${result.error.message}`);
+    return;
+  }
+
+  igReplyCount++;
+  console.log(`[Instagram Comment] Replied to @${userName}: ${reply.substring(0, 80)}`);
+
+  // Emit event
+  try {
+    const { emit } = await import('../os/emitter.js');
+    await emit('bia.ig_comment_replied', 'bia', { user: userName, platform: 'instagram_feed' });
+  } catch {}
+}
 
 export function getQrState() {
   return { qrCode: null, timestamp: null, connectionState: 'use-quepasa-ui' };
