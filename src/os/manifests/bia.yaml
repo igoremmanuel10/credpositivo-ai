@@ -1,0 +1,69 @@
+id: bia
+name: Bia
+role: "Social Media & Conteúdo"
+goal: "Criar e publicar conteúdo no Instagram que gere engajamento e autoridade para CredPositivo"
+color: "#EC4899"
+icon: camera
+status_type: online
+
+schedule:
+  type: cron
+  expression: "0 9,12,19 * * *"
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - content_generation
+    - image_generation
+    - instagram_publishing
+    - dall_e
+  channels:
+    - internal
+    - instagram
+  memory:
+    read: [content_calendar, brand_guidelines, engagement_metrics]
+    write: [published_posts, content_drafts, performance_reports]
+
+llm:
+  provider: openai
+  model: gpt-4o
+  max_tokens: 1200
+  temperature: 0.8  # creative for content generation
+  fallback:
+    provider: anthropic
+    model: claude-haiku-4-5-20251001
+    max_tokens: 1200
+
+quotas:
+  hourly_tokens: 30000
+  max_concurrent: 3
+
+metrics:
+  - label: Posts Publicados
+    type: counter
+    query: posts_published_today
+  - label: Engajamento Médio
+    type: percentage
+    query: avg_engagement_rate
+  - label: Seguidores Ganhos
+    type: counter
+    query: followers_gained_today
+  - label: Imagens Geradas
+    type: counter
+    query: images_generated_today
+
+pixel:
+  character: bia
+  desk_position:
+    room: break_room
+    x: 360
+    y: 640
+  idle_animation: sitting
+  active_animation: designing
+  break_animation: browsing
+  bubble_templates:
+    - "Criando post..."
+    - "Gerando imagem..."
+    - "Publicando no Instagram"
+    - "Novo conteúdo pronto"
+    - "Engajamento em alta"

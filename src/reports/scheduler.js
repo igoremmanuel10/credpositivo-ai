@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import { generateManagerReport } from '../manager/luan.js';
 import { generateTeamMeeting } from '../manager/team-meeting.js';
 import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
+import { emit, setStatus } from '../os/emitter.js';
 
 const REPORT_PHONES = ['5511932145806', '557191234115', '557187700120'];
 
@@ -26,6 +27,8 @@ export async function sendDailyReportNow() {
     const report = await generateDailyReport();
     await postToOpsInbox('Relatório Diário — CredPositivo', report, { labels: ['relatorio-diario'] });
     console.log('[ReportScheduler] Relatório diário postado no Chatwoot Operações');
+    await emit('fernando.report_sent', 'fernando', { type: 'daily' });
+    await setStatus('fernando', 'online');
 
     return {
       success: true,
@@ -59,6 +62,8 @@ export async function sendManagerReportNow(reportType = 'daily', days = 7) {
       : 'Luan — Relatório Gerencial Diário';
     await postToOpsInbox(title, fullReport, { labels: ['relatorio-luan', `relatorio-${reportType}`] });
     console.log('[ReportScheduler] Luan report postado no Chatwoot Operações');
+    await emit('fernando.report_sent', 'fernando', { type: reportType });
+    await setStatus('fernando', 'online');
 
     return {
       success: true,
@@ -90,6 +95,8 @@ export async function sendTeamMeetingNow(reportType = 'weekly', days = 7) {
     const title = 'Reuniao de Time — Analise de Funil';
     await postToOpsInbox(title, report, { labels: ['reuniao-time', 'relatorio-semanal', 'igor'] });
     console.log('[ReportScheduler] Team meeting postado no Chatwoot Operacoes');
+    await emit('fernando.report_sent', 'fernando', { type: reportType });
+    await setStatus('fernando', 'online');
 
     return {
       success: true,
@@ -172,6 +179,8 @@ export async function sendWeeklyRatingReportNow() {
     const report = await generateWeeklyRatingReport();
     await postToOpsInbox('Relatório Semanal — Rating Bancário', report, { labels: ['relatorio-rating', 'semanal'] });
     console.log('[ReportScheduler] Weekly rating report postado no Chatwoot Operações');
+    await emit('fernando.report_sent', 'fernando', { type: 'weekly_rating' });
+    await setStatus('fernando', 'online');
 
     return { success: true, report, results: [{ channel: 'chatwoot-ops', status: 'sent' }], sentCount: 1, totalTargets: 1 };
   } catch (err) {

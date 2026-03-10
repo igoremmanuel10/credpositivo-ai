@@ -1,0 +1,70 @@
+id: vapi
+name: Vapi
+role: "Agente de Voz & Ligações"
+goal: "Realizar ligações automáticas para leads abandonados e follow-ups por voz"
+color: "#A855F7"
+icon: phone
+status_type: online
+
+schedule:
+  type: cron
+  expression: "*/15 8-20 * * 1-6"
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - voice_calls
+    - abandoned_order_recovery
+    - lead_warmup
+    - vapi_integration
+  channels:
+    - internal
+    - vapi
+    - whatsapp_admin
+  memory:
+    read: [leads, abandoned_orders, call_history, follow_up_queue]
+    write: [call_logs, recovery_events, lead_status_updates]
+
+llm:
+  provider: openai
+  model: gpt-4o
+  max_tokens: 600
+  temperature: 0.4  # balanced for natural voice conversation
+  fallback:
+    provider: anthropic
+    model: claude-haiku-4-5-20251001
+    max_tokens: 600
+
+quotas:
+  hourly_tokens: 15000
+  max_concurrent: 10
+
+metrics:
+  - label: Ligações Hoje
+    type: counter
+    query: calls_made_today
+  - label: Leads Recuperados
+    type: counter
+    query: leads_recovered_today
+  - label: Taxa de Atendimento
+    type: percentage
+    query: call_answer_rate
+  - label: Duração Média (seg)
+    type: gauge
+    query: avg_call_duration_seconds
+
+pixel:
+  character: vapi
+  desk_position:
+    room: server_room
+    x: 360
+    y: 640
+  idle_animation: sitting
+  active_animation: calling
+  break_animation: waiting
+  bubble_templates:
+    - "Ligando para lead..."
+    - "Chamada em andamento"
+    - "Lead recuperado!"
+    - "Agendando ligação"
+    - "Follow-up por voz"

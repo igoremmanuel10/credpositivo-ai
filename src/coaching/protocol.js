@@ -15,6 +15,7 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { sendText, getTokenForWid } from '../quepasa/client.js';
 import { trackApiCost } from '../monitoring/cost-tracker.js';
+import { emit, setStatus } from '../os/emitter.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -237,6 +238,8 @@ Regra: se nao fez as duas antes do almoco, o dia ficou devendo.`;
   await sendText(COACHING_GROUP_JID, text, getBotToken());
   await markSent(today, 'mc');
   console.log('[Coaching] MC sent');
+  await emit('coaching.checkin_sent', 'coaching', { type: 'morning' });
+  await setStatus('coaching', 'online');
 }
 
 async function sendNC() {
@@ -261,6 +264,8 @@ Responde com honestidade. Sem justificativa. O padrao so aparece quando voce ano
   await sendText(COACHING_GROUP_JID, text, getBotToken());
   await markSent(today, 'nc');
   console.log('[Coaching] NC sent');
+  await emit('coaching.checkin_sent', 'coaching', { type: 'night' });
+  await setStatus('coaching', 'online');
 }
 
 async function sendRS() {
@@ -290,6 +295,8 @@ Meta minima: 5/7 dias. Abaixo disso, simplifica. Nao adiciona.`;
   await sendText(COACHING_GROUP_JID, text, getBotToken());
   await markSent(today, 'rs');
   console.log('[Coaching] RS sent');
+  await emit('coaching.checkin_sent', 'coaching', { type: 'weekly' });
+  await setStatus('coaching', 'online');
 }
 
 async function sendRM() {
@@ -312,6 +319,8 @@ async function sendRM() {
   await sendText(COACHING_GROUP_JID, text, getBotToken());
   await markSent(today, 'rm');
   console.log('[Coaching] RM sent');
+  await emit('coaching.checkin_sent', 'coaching', { type: 'monthly' });
+  await setStatus('coaching', 'online');
 }
 
 // ─── Follow-up nudges ────────────────────────────────────────────────────────

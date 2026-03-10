@@ -27,6 +27,7 @@ import { sendAlexReportNow, runAlexCheckCycle } from '../devops/alex.js';
 import { formatDailyReport } from '../devops/formatter.js';
 import { getRecentErrors, getErrorPatterns } from '../devops/error-interceptor.js';
 import { generateManagerReport } from '../manager/luan.js';
+import { emit, setStatus } from '../os/emitter.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -615,6 +616,10 @@ async function checkReminders() {
       await markReminderSent(event.id);
       console.log(`[Agenda] Reminder sent for event #${event.id}: ${event.title}`);
     }
+    if (pending.length > 0) {
+      await emit('agenda.reminder_sent', 'agenda', { count: pending.length });
+      await setStatus('agenda', 'online');
+    }
   } catch (err) {
     console.error('[Agenda] Reminder check error:', err.message);
   }
@@ -630,6 +635,8 @@ async function sendDailyAgenda() {
     const msg = formatDailyAgenda(events, todayBRT());
     await sendText(ADM_GROUP_JID, msg, getAugustoToken());
     console.log(`[Agenda] Daily agenda sent: ${events.length} events`);
+    await emit('agenda.daily_agenda', 'agenda', { events: events.length });
+    await setStatus('agenda', 'online');
   } catch (err) {
     console.error('[Agenda] Daily agenda error:', err.message);
   }

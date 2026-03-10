@@ -18,6 +18,7 @@ import { config } from '../config.js';
 import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 import { sendText, getTokenForWid } from '../quepasa/client.js';
 import { db } from '../db/client.js';
+import { emit, setStatus, reportMetrics } from '../os/emitter.js';
 
 // --- Config ---
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
@@ -248,6 +249,12 @@ async function morningCheck() {
     await saveMetricsSnapshot('morning_check', { totalSpend, totalClicks, totalImpressions, totalLeads, totalMessages });
 
     lastKnownMetrics = { totalSpend, totalClicks, totalImpressions, totalLeads, date: new Date().toISOString() };
+
+    const cpl = totalLeads > 0 ? totalSpend / totalLeads : null;
+    const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : null;
+    await emit('carol.ads_check', 'carol', { campaigns: activeCampaigns.length, spend: totalSpend, cpl });
+    await reportMetrics('carol', { campaigns: activeCampaigns.length, spend_today: totalSpend, cpl, ctr });
+    await setStatus('carol', 'online');
     console.log('[AdsManager] Morning check done');
   } catch (err) {
     console.error('[AdsManager] Morning check error:', err.message);

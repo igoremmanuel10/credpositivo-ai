@@ -1,0 +1,69 @@
+id: agenda
+name: Agenda
+role: "Gestor de Agenda & Reuniões"
+goal: "Gerenciar agendamentos, enviar lembretes e coordenar a agenda da equipe"
+color: "#0EA5E9"
+icon: calendar
+status_type: online
+
+schedule:
+  type: cron
+  expression: "* * * * *"
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - scheduling
+    - reminders
+    - daily_agenda
+    - team_coordination
+  channels:
+    - internal
+    - whatsapp_admin
+  memory:
+    read: [calendar_events, team_availability, reminders, appointments]
+    write: [scheduled_events, reminder_logs, coordination_notes]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 600
+  temperature: 0.1  # highly deterministic for scheduling logic
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 600
+
+quotas:
+  hourly_tokens: 10000
+  max_concurrent: 5
+
+metrics:
+  - label: Reuniões Hoje
+    type: counter
+    query: meetings_today
+  - label: Lembretes Enviados
+    type: counter
+    query: reminders_sent_today
+  - label: Agendamentos Pendentes
+    type: gauge
+    query: pending_appointments
+  - label: Conflitos Detectados
+    type: counter
+    query: scheduling_conflicts_today
+
+pixel:
+  character: agenda
+  desk_position:
+    room: control_room
+    x: 240
+    y: 100
+  idle_animation: sitting
+  active_animation: organizing
+  break_animation: checking
+  bubble_templates:
+    - "Verificando agenda..."
+    - "Lembrete enviado"
+    - "Reunião em 30min"
+    - "Agenda atualizada"
+    - "Novo agendamento"

@@ -1,0 +1,69 @@
+id: fernando
+name: Fernando
+role: "Analista de Relatórios"
+goal: "Gerar e distribuir relatórios diários, semanais e de rating para a equipe"
+color: "#14B8A6"
+icon: chart_bar
+status_type: online
+
+schedule:
+  type: cron
+  expression: "0 10,18,23 * * *"
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - daily_reports
+    - weekly_reports
+    - rating_reports
+    - team_meeting_summaries
+  channels:
+    - internal
+    - whatsapp_admin
+  memory:
+    read: [leads, conversions, agent_metrics, campaign_data, ratings]
+    write: [daily_reports, weekly_reports, rating_reports, meeting_summaries]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 1500
+  temperature: 0.3  # low variance for structured reports
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 1500
+
+quotas:
+  hourly_tokens: 25000
+  max_concurrent: 3
+
+metrics:
+  - label: Relatórios Gerados
+    type: counter
+    query: reports_generated_today
+  - label: Rating Médio
+    type: gauge
+    query: avg_rating_today
+  - label: Distribuições Enviadas
+    type: counter
+    query: distributions_sent_today
+  - label: Última Geração
+    type: timestamp
+    query: last_report_generated_at
+
+pixel:
+  character: fernando
+  desk_position:
+    room: main_office
+    x: 240
+    y: 280
+  idle_animation: sitting
+  active_animation: typing
+  break_animation: reading
+  bubble_templates:
+    - "Gerando relatório..."
+    - "Dados consolidados"
+    - "Relatório enviado"
+    - "Analisando métricas"
+    - "Rating atualizado"

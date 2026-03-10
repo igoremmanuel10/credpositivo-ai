@@ -13,6 +13,7 @@ import cron from 'node-cron';
 import { config } from '../config.js';
 import { processScheduledCalls } from './call-handler.js';
 import { isVapiEnabled } from './vapi-client.js';
+import { emit, setStatus } from '../os/emitter.js';
 
 /**
  * Start the Vapi scheduled calls processor.
@@ -27,7 +28,10 @@ export function startVapiScheduler() {
   // Run every 15 minutes (at :00, :15, :30, :45)
   cron.schedule('*/15 * * * *', async () => {
     try {
-      await processScheduledCalls();
+      const result = await processScheduledCalls();
+      const count = result?.processed ?? result?.count ?? 1;
+      await emit('vapi.call_scheduled', 'vapi', { count });
+      await setStatus('vapi', 'online');
     } catch (err) {
       console.error('[Vapi Scheduler] Error:', err.message);
     }

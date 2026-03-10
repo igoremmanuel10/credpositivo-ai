@@ -20,6 +20,7 @@ import { config } from '../config.js';
 import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 import { sendText, getTokenForWid } from '../quepasa/client.js';
 import { db } from '../db/client.js';
+import { emit, setStatus } from '../os/emitter.js';
 
 // --- Config ---
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
@@ -259,6 +260,7 @@ async function generateDailyContent() {
 
     dailyQueue.push({ content, imageUrl });
     console.log(`[Instagram] Post ${i} ready: ${content.pillar} — ${content.topic}`);
+    await emit('bia.content_generated', 'bia', { topic: content.topic, pillar: content.pillar });
   }
 
   if (dailyQueue.length > 0) {
@@ -268,6 +270,7 @@ async function generateDailyContent() {
   } else {
     console.error('[Instagram] Failed to generate any content');
   }
+  await setStatus('bia', 'online');
 }
 
 // --- Publish post from queue ---
@@ -287,6 +290,7 @@ async function publishFromQueue(index) {
 
   if (postId) {
     await notify(`*[IG] Post publicado*\n\n${content.pillar}: ${content.topic}\nhttps://instagram.com/p/${postId}`);
+    await emit('bia.post_published', 'bia', { platform: 'instagram' });
   } else {
     await notify(`*[IG] Falha ao publicar*\n\nPost: ${content.topic}\nVerificar logs.`);
   }

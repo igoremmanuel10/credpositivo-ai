@@ -1,0 +1,70 @@
+id: coaching
+name: Coach
+role: "Coach de Accountability"
+goal: "Garantir execução diária com check-ins matinais e noturnos, reviews semanais e mensais"
+color: "#F97316"
+icon: fire
+status_type: online
+
+schedule:
+  type: cron
+  expression: "30 7,21 * * *"
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - morning_checkin
+    - night_review
+    - weekly_score
+    - monthly_review
+    - obstacle_tracking
+  channels:
+    - internal
+    - whatsapp_admin
+  memory:
+    read: [goals, daily_checkins, weekly_scores, obstacles, commitments]
+    write: [checkin_logs, weekly_scores, monthly_reviews, obstacle_reports]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 1000
+  temperature: 0.5  # balanced for motivational yet structured output
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 1000
+
+quotas:
+  hourly_tokens: 15000
+  max_concurrent: 3
+
+metrics:
+  - label: Check-ins Realizados
+    type: counter
+    query: checkins_completed_today
+  - label: Score Semanal
+    type: gauge
+    query: current_weekly_score
+  - label: Obstáculos Abertos
+    type: gauge
+    query: open_obstacles
+  - label: Taxa de Execução
+    type: percentage
+    query: execution_rate_this_week
+
+pixel:
+  character: coaching
+  desk_position:
+    room: ceo_room
+    x: 240
+    y: 100
+  idle_animation: sitting
+  active_animation: motivating
+  break_animation: reviewing
+  bubble_templates:
+    - "Bom dia! Check-in..."
+    - "Como foi o dia?"
+    - "Score semanal pronto"
+    - "Revisão mensal"
+    - "Foco nos objetivos"

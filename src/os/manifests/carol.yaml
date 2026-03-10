@@ -1,0 +1,69 @@
+id: carol
+name: Carol
+role: "Gestora de Tráfego & Anúncios"
+goal: "Monitorar e otimizar campanhas Meta Ads, controlar CPA/CPL e detectar anomalias"
+color: "#F472B6"
+icon: target
+status_type: online
+
+schedule:
+  type: cron
+  expression: "0 8,12,18 * * *"
+  timezone: America/Sao_Paulo
+
+capabilities:
+  tools:
+    - meta_ads_monitoring
+    - campaign_optimization
+    - anomaly_detection
+    - creative_analysis
+  channels:
+    - internal
+    - whatsapp_admin
+  memory:
+    read: [campaigns, ad_creatives, budget_targets, cpa_benchmarks]
+    write: [campaign_reports, anomaly_alerts, optimization_logs]
+
+llm:
+  provider: anthropic
+  model: claude-haiku-4-5-20251001
+  max_tokens: 800
+  temperature: 0.2  # deterministic for anomaly detection
+  fallback:
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 800
+
+quotas:
+  hourly_tokens: 20000
+  max_concurrent: 4
+
+metrics:
+  - label: CPA Atual
+    type: gauge
+    query: current_cpa
+  - label: CPL Atual
+    type: gauge
+    query: current_cpl
+  - label: Anomalias Detectadas
+    type: counter
+    query: anomalies_detected_today
+  - label: Budget Consumido
+    type: percentage
+    query: budget_consumed_today
+
+pixel:
+  character: carol
+  desk_position:
+    room: main_office
+    x: 240
+    y: 460
+  idle_animation: sitting
+  active_animation: analyzing
+  break_animation: thinking
+  bubble_templates:
+    - "Analisando campanhas..."
+    - "CPA dentro do target"
+    - "Anomalia detectada!"
+    - "Otimizando criativos"
+    - "Budget atualizado"
