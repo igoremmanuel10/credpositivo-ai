@@ -1463,6 +1463,61 @@
       </div>
 
 
+      <!-- KNOWLEDGE BASE RAG -->
+      <div class="table-card" id="rag-section">
+        <div class="table-header">
+          <div class="table-title">Knowledge Base RAG</div>
+          <div class="table-desc">Artigos sincronizados do Notion e embeddings de conversas</div>
+        </div>
+        <div id="rag-state">
+          <div class="state-loading" id="rag-loading">
+            <div class="spinner"></div>
+            <span>Carregando...</span>
+          </div>
+        </div>
+        <div id="rag-content" style="display:none;">
+          <div class="metrics-row" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px;">
+            <div class="metric-card" style="text-align:center; padding:16px; background:var(--bg-input); border-radius:var(--radius); border:1px solid var(--border);">
+              <div style="font-size:24px; font-weight:700; color:var(--accent);" id="rag-total-articles">0</div>
+              <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Artigos</div>
+            </div>
+            <div class="metric-card" style="text-align:center; padding:16px; background:var(--bg-input); border-radius:var(--radius); border:1px solid var(--border);">
+              <div style="font-size:24px; font-weight:700; color:var(--success);" id="rag-categories-count">0</div>
+              <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Categorias</div>
+            </div>
+            <div class="metric-card" style="text-align:center; padding:16px; background:var(--bg-input); border-radius:var(--radius); border:1px solid var(--border);">
+              <div style="font-size:24px; font-weight:700; color:var(--warning);" id="rag-conv-embeddings">0</div>
+              <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Embeddings Conv.</div>
+            </div>
+            <div class="metric-card" style="text-align:center; padding:16px; background:var(--bg-input); border-radius:var(--radius); border:1px solid var(--border);">
+              <div style="font-size:14px; font-weight:700; color:var(--text-pri);" id="rag-last-sync">—</div>
+              <div style="font-size:11px; color:var(--text-sec); margin-top:4px;">Ultimo Sync</div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 2fr; gap:16px;">
+            <div>
+              <div style="font-size:12px; font-weight:600; color:var(--text-sec); margin-bottom:8px;">Artigos por Categoria</div>
+              <div id="rag-categories-list"></div>
+            </div>
+            <div>
+              <div style="font-size:12px; font-weight:600; color:var(--text-sec); margin-bottom:8px;">Artigos Recentes</div>
+              <div class="table-wrap">
+                <table class="data-table" id="rag-articles-table">
+                  <thead>
+                    <tr>
+                      <th>Titulo</th>
+                      <th>Categoria</th>
+                      <th>Sincronizado</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rag-articles-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- INSIGHTS / FEEDBACK -->
       <div class="table-card" id="insights-section">
         <div class="table-header">
@@ -3137,6 +3192,69 @@
   // ─────────────────────────────────────────────
   //  LOAD: INSIGHTS
   // ─────────────────────────────────────────────
+  async function loadRagStats() {
+    $('rag-loading').style.display = 'flex';
+    $('rag-content').style.display = 'none';
+    try {
+      const data = await apiFetch('/api/admin/analytics/rag-stats');
+
+      var totalArticles = data.knowledge_articles.total || 0;
+      var categories = data.categories || [];
+      var articles = data.recent_articles || [];
+      var convEmb = data.conversation_embeddings;
+
+      $('rag-total-articles').textContent = fmtNumber(totalArticles);
+      $('rag-categories-count').textContent = fmtNumber(categories.length);
+      $('rag-conv-embeddings').textContent = fmtNumber(convEmb.total || 0);
+
+      if (data.knowledge_articles.last_sync) {
+        var d = new Date(data.knowledge_articles.last_sync);
+        $('rag-last-sync').textContent = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      } else {
+        $('rag-last-sync').textContent = 'Nunca';
+      }
+
+      // Categories list
+      var catEl = $('rag-categories-list');
+      catEl.innerHTML = '';
+      if (!categories.length) {
+        catEl.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:8px;">Nenhuma categoria encontrada.</div>';
+      } else {
+        categories.forEach(function(c) {
+          var row = document.createElement('div');
+          row.style.cssText = 'display:flex; justify-content:space-between; padding:6px 10px; border-bottom:1px solid var(--border); font-size:12px;';
+          row.innerHTML = '<span style="color:var(--text-pri);">' + escHtml(c.category) + '</span><span style="color:var(--accent); font-weight:600;">' + c.count + '</span>';
+          catEl.appendChild(row);
+        });
+      }
+
+      // Recent articles table
+      var tbody = $('rag-articles-tbody');
+      tbody.innerHTML = '';
+      if (!articles.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Nenhum artigo sincronizado.</td></tr>';
+      } else {
+        articles.forEach(function(a) {
+          var syncDate = a.synced_at ? new Date(a.synced_at).toLocaleDateString('pt-BR') : '—';
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + escHtml(a.title) + '</td><td>' + escHtml(a.category || 'sem_categoria') + '</td><td>' + syncDate + '</td>';
+          tbody.appendChild(tr);
+        });
+      }
+
+      $('rag-loading').style.display = 'none';
+      if (totalArticles === 0 && (convEmb.total || 0) === 0) {
+        $('rag-content').innerHTML = '<div style="text-align:center; padding:24px; color:var(--text-muted);">Nenhum dado RAG encontrado. Sincronize artigos do Notion para comecar.</div>';
+      }
+      $('rag-content').style.display = '';
+    } catch (err) {
+      $('rag-loading').innerHTML =
+        '<span style="color:var(--danger);">Erro: ' + err.message + '</span>' +
+        '<button class="btn-retry" id="retry-rag">Tentar novamente</button>';
+      $('retry-rag').addEventListener('click', loadRagStats);
+    }
+  }
+
   async function loadInsights() {
     const loadingEl = $('insights-loading');
     const contentEl = $('insights-content');
@@ -3221,6 +3339,7 @@
     loadCalls();
     loadSalesAttribution();
     loadInsights();
+    loadRagStats();
     // Reload pipeline and leads if they were previously loaded
     if (pipelineLoaded) loadPipeline();
     if (leadsLoaded) loadLeads();

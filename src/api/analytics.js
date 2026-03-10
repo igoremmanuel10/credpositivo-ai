@@ -650,6 +650,63 @@ analyticsRouter.get('/api/admin/analytics/insights', async (req, res) => {
 
 
 /**
+ * GET /api/admin/analytics/rag-stats
+ * Knowledge base RAG statistics: articles, categories, sync status, conversation embeddings.
+ */
+analyticsRouter.get('/api/admin/analytics/rag-stats', async (req, res) => {
+  try {
+    const [totalArticles, categories, recentArticles, convEmbeddings] = await Promise.all([
+      db.query(`
+        SELECT
+          COUNT(*) as total,
+          MAX(synced_at) as last_sync
+        FROM knowledge_embeddings
+      `),
+      db.query(`
+        SELECT
+          COALESCE(category, 'sem_categoria') as category,
+          COUNT(*) as count
+        FROM knowledge_embeddings
+        GROUP BY category
+        ORDER BY count DESC
+      `),
+      db.query(`
+        SELECT
+          id, title, category, notion_page_id,
+          synced_at, notion_last_edited
+        FROM knowledge_embeddings
+        ORDER BY synced_at DESC
+        LIMIT 20
+      `),
+      db.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(DISTINCT conversation_id) as unique_conversations,
+          MAX(created_at) as last_embedded
+        FROM conversation_embeddings
+      `),
+    ]);
+
+    res.json({
+      knowledge_articles: {
+        total: parseInt(totalArticles.rows[0]?.total) || 0,
+        last_sync: totalArticles.rows[0]?.last_sync || null,
+      },
+      categories: categories.rows,
+      recent_articles: recentArticles.rows,
+      conversation_embeddings: {
+        total: parseInt(convEmbeddings.rows[0]?.total) || 0,
+        unique_conversations: parseInt(convEmbeddings.rows[0]?.unique_conversations) || 0,
+        last_embedded: convEmbeddings.rows[0]?.last_embedded || null,
+      },
+    });
+  } catch (err) {
+    console.error('[API] RAG stats error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/admin/analytics/system-reports
  * Returns recent manager reports and alex health logs for the dashboard.
  */
