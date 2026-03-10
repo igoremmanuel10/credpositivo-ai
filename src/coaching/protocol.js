@@ -37,7 +37,7 @@ const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
 
 // ─── System prompt for contextual responses ──────────────────────────────────
 
-const COACHING_SYSTEM_PROMPT = `Voce e o coach de accountability do Igor Emmanuel no grupo "Mudanca de Vida".
+export const COACHING_SYSTEM_PROMPT = `Voce e o coach de accountability do Igor Emmanuel no grupo "Mudanca de Vida".
 
 CONTEXTO DO IGOR:
 - Arquetipos: Governante + Mago + Amante

@@ -40,7 +40,7 @@ const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey, dangerouslyAl
 let dailyQueue = [];
 
 // --- Bia System Prompt (default — overridable via admin panel) ---
-const BIA_PROMPT_DEFAULT = `Você é Bia, social media da CredPositivo. Crie um post para Instagram.
+export const BIA_PROMPT_DEFAULT = `Você é Bia, social media da CredPositivo. Crie um post para Instagram.
 
 SOBRE A CREDPOSITIVO:
 - Empresa de serviços financeiros que ajuda pessoas a recuperar e construir crédito

@@ -27,7 +27,7 @@ const AI_MODEL = 'claude-haiku-4-5-20251001';
 
 // ─── Agent Prompts ───────────────────────────────────────────
 
-const AGENT_PROMPTS = {
+export const AGENT_PROMPTS = {
   luan: `Voce e Luan, gerente de performance da CredPositivo.
 Analise os dados do funil e identifique:
 1. O PRINCIPAL gargalo (1 so, com severidade)
@@ -74,7 +74,7 @@ Analise os dados da perspectiva tecnica:
 Formato: maximo 8 linhas. Foco em bugs que impedem receita. Numeros.`,
 };
 
-const IGOR_PROMPT = `Voce e Igor, orquestrador do time de vendas da CredPositivo.
+export const IGOR_PROMPT = `Voce e Igor, orquestrador do time de vendas da CredPositivo.
 
 Voce acabou de receber 5 analises de agentes diferentes sobre o MESMO funil de vendas:
 - Luan (Manager): visao de metricas e gargalos

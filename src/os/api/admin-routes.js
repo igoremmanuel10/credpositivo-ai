@@ -253,6 +253,26 @@ async function getDefaultPrompt(agentId) {
         return mod.LUAN_SYSTEM_PROMPT ?? null;
       }
 
+      case 'bia': {
+        const mod = await import('../../social/instagram.js');
+        return mod.BIA_PROMPT_DEFAULT ?? null;
+      }
+
+      case 'ana': {
+        const mod = await import('../../manager/team-meeting.js');
+        return mod.AGENT_PROMPTS?.ana ?? null;
+      }
+
+      case 'igor': {
+        const mod = await import('../../manager/team-meeting.js');
+        return mod.IGOR_PROMPT ?? null;
+      }
+
+      case 'coaching': {
+        const mod = await import('../../coaching/protocol.js');
+        return mod.COACHING_SYSTEM_PROMPT ?? null;
+      }
+
       default:
         return noPromptNote;
     }
