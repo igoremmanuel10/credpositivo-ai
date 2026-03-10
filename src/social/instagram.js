@@ -21,6 +21,7 @@ import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 import { sendText, getTokenForWid } from '../quepasa/client.js';
 import { db } from '../db/client.js';
 import { emit, setStatus } from '../os/emitter.js';
+import { getPromptOverride } from '../os/api/admin-routes.js';
 
 // --- Config ---
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
@@ -38,8 +39,8 @@ const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey, dangerouslyAl
 // Content queue for the day
 let dailyQueue = [];
 
-// --- Bia System Prompt ---
-const BIA_PROMPT = `Você é Bia, social media da CredPositivo. Crie um post para Instagram.
+// --- Bia System Prompt (default — overridable via admin panel) ---
+const BIA_PROMPT_DEFAULT = `Você é Bia, social media da CredPositivo. Crie um post para Instagram.
 
 SOBRE A CREDPOSITIVO:
 - Empresa de serviços financeiros que ajuda pessoas a recuperar e construir crédito
@@ -70,6 +71,12 @@ Responda EXATAMENTE neste formato JSON:
   "topic": "Tema resumido em 3 palavras"
 }`;
 
+// --- Get active prompt (Redis override or default) ---
+async function getBiaPrompt() {
+  const override = await getPromptOverride('bia');
+  return override || BIA_PROMPT_DEFAULT;
+}
+
 // --- Generate Content with Bia (Claude) ---
 async function generateContent(postNumber) {
   try {
@@ -93,7 +100,7 @@ async function generateContent(postNumber) {
         role: 'user',
         content: `Crie o post ${postNumber} do dia para o Instagram da CredPositivo.${recentInfo}\n\nResponda APENAS o JSON, sem markdown.`
       }],
-      system: BIA_PROMPT,
+      system: await getBiaPrompt(),
     });
 
     const text = msg.content[0].text.trim();
