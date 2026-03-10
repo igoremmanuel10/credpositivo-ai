@@ -58,8 +58,8 @@ async function fetchKnowledgeBasePages() {
 
   try {
     do {
-      const response = await notion.databases.query({
-        database_id: KNOWLEDGE_BASE_ID,
+      const response = await notion.dataSources.query({
+        data_source_id: KNOWLEDGE_BASE_ID,
         start_cursor: cursor,
         page_size: 100,
       });
