@@ -631,10 +631,85 @@ async function handleInstagramComment(comment) {
   igReplyCount++;
   console.log(`[Instagram Comment] Replied to @${userName}: ${reply.substring(0, 80)}`);
 
+  // Send follow-up DM to the commenter
+  await sendInstagramDM(comment.from?.id, userName, text).catch(err => {
+    console.error(`[Instagram Comment→DM] Failed for @${userName}: ${err.message}`);
+  });
+
   // Emit event
   try {
     const { emit } = await import('../os/emitter.js');
     await emit('bia.ig_comment_replied', 'bia', { user: userName, platform: 'instagram_feed' });
+  } catch {}
+}
+
+// ============================================
+// INSTAGRAM DM AFTER COMMENT — Send private message to commenter
+// ============================================
+const IG_DM_AFTER_COMMENT_PROMPT = `Você é Augusto, consultor da CredPositivo. Alguém comentou num post do Instagram e você quer puxar conversa no privado.
+
+REGRAS:
+- Mensagem curta e natural (máximo 2 frases)
+- Referencie o comentário da pessoa de forma sutil
+- Seja acolhedor, não vendedor
+- Pergunte qual a situação dela com crédito
+- NÃO mencione preços
+- Tom: amigo que entende do assunto`;
+
+const igDmSentRecently = new Set(); // Track who we DMed to avoid spam
+
+async function sendInstagramDM(userId, userName, commentText) {
+  if (!IG_DM_ENABLED || !META_ACCESS_TOKEN || !userId) return;
+
+  // Don't DM ourselves
+  if (userId === process.env.INSTAGRAM_ACCOUNT_ID) return;
+
+  // Don't DM the same person twice in 24h
+  const dmKey = `ig_dm_${userId}`;
+  if (igDmSentRecently.has(dmKey)) {
+    console.log(`[Instagram Comment→DM] Already DMed @${userName} recently, skipping`);
+    return;
+  }
+
+  // Generate personalized DM
+  const systemPrompt = await getPromptOverride('instagram_dm_after_comment') || IG_DM_AFTER_COMMENT_PROMPT;
+
+  const response = await igAnthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 150,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: `@${userName} comentou no post: "${commentText}"\n\nEscreva a DM para enviar.` }],
+  });
+
+  const dmText = response.content[0].text.trim();
+  if (!dmText) return;
+
+  // Send DM via Instagram Messaging API
+  const dmRes = await fetch(`https://graph.facebook.com/v21.0/${process.env.INSTAGRAM_ACCOUNT_ID}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipient: { id: userId },
+      message: { text: dmText },
+      access_token: META_ACCESS_TOKEN,
+    }),
+  });
+
+  const dmResult = await dmRes.json();
+  if (dmResult.error) {
+    console.error(`[Instagram Comment→DM] API error: ${dmResult.error.message}`);
+    return;
+  }
+
+  // Mark as sent (expires after 24h)
+  igDmSentRecently.add(dmKey);
+  setTimeout(() => igDmSentRecently.delete(dmKey), 24 * 60 * 60 * 1000);
+
+  console.log(`[Instagram Comment→DM] Sent DM to @${userName}: ${dmText.substring(0, 80)}`);
+
+  try {
+    const { emit } = await import('../os/emitter.js');
+    await emit('bia.ig_comment_dm_sent', 'bia', { user: userName, platform: 'instagram' });
   } catch {}
 }
 
