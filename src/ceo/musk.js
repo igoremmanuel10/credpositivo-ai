@@ -17,6 +17,7 @@ import { db } from '../db/client.js';
 import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 import { MUSK_SYSTEM_PROMPT, MUSK_REVIEW_PROMPT } from './system-prompt.js';
 import { generateTeamMeeting } from '../manager/team-meeting.js';
+import { emit, setStatus } from '../os/emitter.js';
 
 const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey, dangerouslyAllowBrowser: true });
 const AI_MODEL = 'claude-haiku-4-5-20251001';
@@ -190,6 +191,9 @@ export async function runCeoCycle(options = {}) {
   }
 
   console.log(`[Musk] CEO cycle complete`);
+
+  await emit('musk.directive', 'musk', { type: 'ceo_directive' });
+  await setStatus('musk', 'online');
 
   return {
     directive: ceoResult.directive,

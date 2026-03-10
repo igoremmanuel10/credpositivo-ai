@@ -20,6 +20,7 @@ import { scheduleJob, closeScheduler } from './kernel/scheduler.js';
 import { closeLoopGuard } from './kernel/loop-guard.js';
 import { osRouter } from './api/os-routes.js';
 import { startBridge, stopBridge } from './bridge.js';
+import { startWorkflows, stopWorkflows } from './engine/workflows.js';
 
 // Health check interval in milliseconds (default: every 60 seconds)
 const HEALTH_CHECK_INTERVAL_MS = parseInt(
@@ -63,6 +64,8 @@ export async function initOS(app) {
 
   startAgentMonitoring();
   console.log(`[OS] Agent health monitoring started (interval: ${HEALTH_CHECK_INTERVAL_MS}ms)`);
+
+  await startWorkflows();
 
   try {
     await startBridge();
@@ -164,6 +167,7 @@ export async function shutdownOS() {
 
   await Promise.allSettled([
     stopBridge(),
+    stopWorkflows(),
     closeEventBus(),
     closeScheduler(),
     closeLoopGuard(),

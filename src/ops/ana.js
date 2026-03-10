@@ -33,6 +33,7 @@ import { sendText, getTokenForWid, getBotInfo } from '../quepasa/client.js';
 import { resetCircuitBreaker, generateEmbedding } from '../ai/embeddings.js';
 import { config, isBusinessHours } from '../config.js';
 import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
+import { emit, setStatus, reportMetrics } from '../os/emitter.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -470,6 +471,10 @@ async function runQAReview(period) {
 
   await sendAnaAlert(msg);
   console.log(`[Ana] QA ${period} report sent — score ${score}/100, ${totalIssues} issues`);
+
+  await emit('ana.cycle_complete', 'ana', { type: 'qa', period, issues: totalIssues, corrections: transfersFixed });
+  await reportMetrics('ana', { cycles_today: 0, issues_detected: totalIssues, corrections: transfersFixed });
+  await setStatus('ana', 'online');
 }
 
 // ─── QA SQL Queries ───────────────────────────────────────────────────────────
@@ -650,6 +655,10 @@ async function runPipelineScan(period = 'morning') {
 
   await sendAnaAlert(report);
   console.log(`[Ana] Pipeline report sent to ADM group`);
+
+  await emit('ana.cycle_complete', 'ana', { type: 'pipeline', period, issues: totalIssues, corrections: autoFixed });
+  await reportMetrics('ana', { cycles_today: 0, issues_detected: totalIssues, corrections: autoFixed });
+  await setStatus('ana', 'online');
 }
 
 // ─── Pipeline SQL Queries ─────────────────────────────────────────────────────

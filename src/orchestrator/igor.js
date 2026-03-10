@@ -26,6 +26,7 @@
 import { db } from '../db/client.js';
 import { config, isBusinessHours } from '../config.js';
 import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
+import { emit, setStatus, reportMetrics } from '../os/emitter.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,9 @@ async function runMonitorCycle() {
 
     // 4. Log do ciclo
     lastCycleStats = { checked: stats.checked, issues: stats.issues.length, fixes: stats.fixes };
+
+    await emit('igor.cycle_complete', 'igor', { conversations: stats.checked, issues: stats.issues.length, corrections: stats.fixes });
+    await reportMetrics('igor', { conversations_checked: stats.checked, issues: stats.issues.length, corrections: stats.fixes });
 
     if (stats.issues.length > 0) {
       console.log(`[Igor] Ciclo #${cycleCount}: ${stats.checked} conversas, ${stats.issues.length} problemas, ${stats.fixes} correcoes`);

@@ -15,6 +15,7 @@ import { applyMetadataUpdates } from '../conversation/state.js';
 import { findOrCreateContact, findOrCreateConversation, getInboxForPhone, sendOutgoingMessage } from '../chatwoot/client.js';
 import { postToOpsInbox } from '../chatwoot/ops-inbox.js';
 import { config } from '../config.js';
+import { emit } from '../os/emitter.js';
 
 const MONITOR_INTERVAL = '*/5 * * * *'; // every 5 minutes
 const UNANSWERED_THRESHOLD_MINUTES = 10; // consider unanswered after 10 min
@@ -296,6 +297,9 @@ export async function checkAndFixUnanswered() {
     }
 
     console.log(`[UnansweredMonitor] Done. Fixed: ${fixed}, Skipped: ${skipped}, Failed: ${failed}, Total: ${unanswered.length}`);
+
+    await emit('ana.unanswered_fixed', 'ana', { fixed, skipped, failed });
+
     return { checked: unanswered.length, fixed, failed, skipped };
   } catch (err) {
     console.error('[UnansweredMonitor] Check failed:', err.message);

@@ -31,6 +31,8 @@ import {
 } from '../kernel/event-bus.js';
 import { listJobs, getUsage } from '../kernel/scheduler.js';
 import { getMetricsCache } from '../bridge.js';
+import { getWorkflowStats } from '../engine/workflows.js';
+import { controlAgent, getControlState, listControllableAgents } from '../agent-control.js';
 
 export const osRouter = Router();
 
@@ -125,6 +127,14 @@ osRouter.get('/agents/:id', async (req, res) => {
  * Control an agent lifecycle.
  *
  * Body: { "action": "start" | "stop" | "restart" }
+ *
+ * The endpoint does two things:
+ *   1. Calls the real scheduler start/stop via agent-control.js
+ *   2. Updates the OS registry status in Redis and publishes a lifecycle event
+ *
+ * If the agent ID is not known to the control module (e.g. 'augusto' which is
+ * purely event-driven), only the registry update is performed and a note is
+ * included in the response.
  */
 osRouter.post('/agents/:id/control', async (req, res) => {
   const { id } = req.params;
@@ -139,34 +149,71 @@ osRouter.post('/agents/:id/control', async (req, res) => {
   }
 
   try {
+    // Verify agent exists in the OS registry
     const agent = await getAgent(id);
     if (!agent) {
       return res.status(404).json({ ok: false, error: `Agent "${id}" not found` });
     }
 
-    let newStatus;
-    if (action === 'start' || action === 'restart') {
-      newStatus = 'online';
-    } else {
-      newStatus = 'offline';
+    // Determine target registry status
+    const newStatus = (action === 'start' || action === 'restart') ? 'online' : 'offline';
+
+    // ── Real scheduler control ────────────────────────────────────────────────
+    let schedulerResult = null;
+    const controllable = listControllableAgents();
+    const isControllable = controllable.some(a => a.id === id);
+
+    if (isControllable) {
+      schedulerResult = await controlAgent(id, action);
+      if (!schedulerResult.ok) {
+        // Scheduler call failed — don't update registry, surface the error
+        return res.status(500).json({
+          ok: false,
+          agentId: id,
+          action,
+          schedulerError: schedulerResult.error,
+        });
+      }
     }
 
+    // ── Registry + event bus update ───────────────────────────────────────────
     await updateStatus(id, newStatus, { controlledBy: 'api', controlAction: action });
 
-    // Publish lifecycle event to the bus
     await publish({
       type: `agent.${action}`,
       agentId: id,
       payload: { action, previousStatus: agent.status, newStatus },
     });
 
-    res.json({
+    // ── Response ──────────────────────────────────────────────────────────────
+    const response = {
       ok: true,
       agentId: id,
       action,
       status: newStatus,
       ts: new Date().toISOString(),
-    });
+    };
+
+    if (schedulerResult) {
+      // Surface cron task count and any stop warnings from the control module
+      response.scheduler = {
+        tasksRegistered: schedulerResult.tasksRegistered ?? null,
+        tasksStopped:    schedulerResult.tasksStopped    ?? null,
+        already:         schedulerResult.already         ?? false,
+        stop:            schedulerResult.stop            ?? null,
+        start:           schedulerResult.start           ?? null,
+      };
+      if (schedulerResult.warning)   response.schedulerWarning  = schedulerResult.warning;
+      if (schedulerResult.warnings)  response.schedulerWarnings = schedulerResult.warnings;
+    } else {
+      response.schedulerNote = `Agent "${id}" is not scheduler-controlled (event-driven). Registry status updated only.`;
+    }
+
+    // Attach current control state for introspection
+    const controlState = getControlState(id);
+    if (controlState) response.controlState = controlState;
+
+    res.json(response);
   } catch (err) {
     console.error(`[OS API] /agents/${id}/control error:`, err.message);
     res.status(500).json({ ok: false, error: err.message });
@@ -385,6 +432,16 @@ osRouter.get('/pixel-state', async (req, res) => {
     console.error('[OS API] /pixel-state error:', err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// ─── GET /workflows ───────────────────────────────────────────────────────────
+
+/**
+ * Return the current state of the workflow engine — whether it is running
+ * and per-rule execution stats (trigger count, last triggered timestamp).
+ */
+osRouter.get('/workflows', (req, res) => {
+  res.json(getWorkflowStats());
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

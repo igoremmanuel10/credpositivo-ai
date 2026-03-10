@@ -22,7 +22,7 @@
  */
 
 import Redis from 'ioredis';
-import { publish } from './kernel/event-bus.js';
+import { publish, subscribeAll } from './kernel/event-bus.js';
 import { updateStatus, getAgent } from './kernel/registry.js';
 import { db } from '../db/client.js';
 
@@ -36,6 +36,9 @@ let metricsTimer = null;
 
 /** @type {NodeJS.Timeout | null} */
 let activityTimer = null;
+
+/** @type {Function | null} Unsubscribe handle returned by subscribeAll() */
+let eventUnsubscribe = null;
 
 // ─── Redis connection (bridge-owned, read-only usage) ─────────────────────────
 
@@ -69,10 +72,18 @@ function getBridgeRedis() {
  * Module-level cache for the most recent database metrics snapshot.
  * Consumed by getMetricsCache() which is called from os-routes.js.
  *
+ * augusto / paulo / system are populated by pollAgentMetrics() (PostgreSQL).
+ * ana / alex / igor / luan / musk are populated by initEventSubscription() (EventBus).
+ *
  * @type {{
  *   augusto: { conversations: number, reached_offer: number, messages: number, conversion: number, avg_session_duration: number },
  *   paulo:   { conversations: number, qualified: number, followups: number },
  *   system:  { totalMessages: number, userMessages: number, apiCost: number, tokens: number, avgResponseTime: number },
+ *   ana:     { cycles_today: number, issues_detected: number, corrections: number, unanswered_fixed: number },
+ *   alex:    { overall_status: string, errors: number, auto_fixes: number },
+ *   igor:    { conversations_checked: number, issues: number, corrections: number },
+ *   luan:    { reports_today: number, last_report_type: string | null },
+ *   musk:    { directives_today: number, last_directive: string | null },
  *   lastUpdated: string | null
  * }}
  */
@@ -96,8 +107,41 @@ const metricsCache = {
     tokens: 0,
     avgResponseTime: 0,
   },
+  ana: {
+    cycles_today: 0,
+    issues_detected: 0,
+    corrections: 0,
+    unanswered_fixed: 0,
+  },
+  alex: {
+    overall_status: 'OK',
+    errors: 0,
+    auto_fixes: 0,
+  },
+  igor: {
+    conversations_checked: 0,
+    issues: 0,
+    corrections: 0,
+  },
+  luan: {
+    reports_today: 0,
+    last_report_type: null,
+  },
+  musk: {
+    directives_today: 0,
+    last_directive: null,
+  },
   lastUpdated: null,
 };
+
+/**
+ * ISO date string (YYYY-MM-DD) of the last day for which event counters were
+ * accumulated. When the calendar date rolls over we zero the event-sourced
+ * counters so they stay "today-only", matching the PostgreSQL queries above.
+ *
+ * @type {string}
+ */
+let eventCounterDay = new Date().toISOString().slice(0, 10);
 
 // ─── SQL queries ──────────────────────────────────────────────────────────────
 
@@ -191,8 +235,143 @@ export function getMetricsCache() {
   return metricsCache;
 }
 
+// ─── Event-bus subscription ───────────────────────────────────────────────────
+
 /**
- * Start both polling loops.
+ * Reset event-sourced daily counters for all agents that emit bus events.
+ * Called automatically when the calendar date rolls over.
+ */
+function resetEventCounters() {
+  metricsCache.ana.cycles_today      = 0;
+  metricsCache.ana.issues_detected   = 0;
+  metricsCache.ana.corrections       = 0;
+  metricsCache.ana.unanswered_fixed  = 0;
+
+  metricsCache.alex.errors           = 0;
+  metricsCache.alex.auto_fixes       = 0;
+
+  metricsCache.igor.conversations_checked = 0;
+  metricsCache.igor.issues           = 0;
+  metricsCache.igor.corrections      = 0;
+
+  metricsCache.luan.reports_today    = 0;
+  // last_report_type is kept — it describes *what* was last generated, not a count
+
+  metricsCache.musk.directives_today = 0;
+  // last_directive is kept — stale value is still useful for display
+}
+
+/**
+ * Guard called at the top of every event handler.
+ * If the calendar date has rolled over since the last event, resets all
+ * event-sourced daily counters and advances the sentinel.
+ */
+function guardDailyReset() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== eventCounterDay) {
+    resetEventCounters();
+    eventCounterDay = today;
+  }
+}
+
+/**
+ * Subscribe to the OS event bus and accumulate per-agent metrics into
+ * metricsCache as events arrive.  Each known event type maps directly to one
+ * or more counter increments.  Unknown / irrelevant event types are silently
+ * ignored so future events never cause errors here.
+ *
+ * The function is idempotent: calling it a second time is a no-op because
+ * eventUnsubscribe is already set.
+ *
+ * @returns {Promise<void>}
+ */
+export async function initEventSubscription() {
+  if (eventUnsubscribe) {
+    console.warn('[Bridge] initEventSubscription() called again — already subscribed, skipping');
+    return;
+  }
+
+  /**
+   * Central event handler.  All events on the global bus pass through here.
+   *
+   * @param {{ type: string, agentId?: string, payload: Object }} event
+   */
+  function handleBusEvent(event) {
+    try {
+      guardDailyReset();
+
+      const { type, payload = {} } = event;
+
+      switch (type) {
+        // ── Ana ───────────────────────────────────────────────────────────────
+        case 'ana.cycle_complete':
+          metricsCache.ana.cycles_today++;
+          if (typeof payload.issues === 'number')      metricsCache.ana.issues_detected += payload.issues;
+          if (typeof payload.corrections === 'number') metricsCache.ana.corrections     += payload.corrections;
+          break;
+
+        case 'ana.unanswered_fixed':
+          if (typeof payload.fixed === 'number') metricsCache.ana.unanswered_fixed += payload.fixed;
+          break;
+
+        // ── Alex ──────────────────────────────────────────────────────────────
+        case 'alex.health_check':
+          if (typeof payload.overall === 'string') metricsCache.alex.overall_status = payload.overall;
+          if (typeof payload.errors === 'number')  metricsCache.alex.errors         += payload.errors;
+          if (typeof payload.fixes === 'number')   metricsCache.alex.auto_fixes     += payload.fixes;
+          break;
+
+        // ── Igor ──────────────────────────────────────────────────────────────
+        case 'igor.cycle_complete':
+          if (typeof payload.conversations === 'number') metricsCache.igor.conversations_checked += payload.conversations;
+          if (typeof payload.issues === 'number')        metricsCache.igor.issues                += payload.issues;
+          if (typeof payload.corrections === 'number')   metricsCache.igor.corrections           += payload.corrections;
+          break;
+
+        // ── Luan ──────────────────────────────────────────────────────────────
+        case 'luan.report_generated':
+          metricsCache.luan.reports_today++;
+          if (typeof payload.type === 'string') metricsCache.luan.last_report_type = payload.type;
+          break;
+
+        // ── Musk ──────────────────────────────────────────────────────────────
+        case 'musk.directive':
+          metricsCache.musk.directives_today++;
+          if (typeof payload.type === 'string') metricsCache.musk.last_directive = payload.type;
+          break;
+
+        // ── Paulo (event-bus path, complements PostgreSQL polling) ────────────
+        case 'paulo.followup_processed':
+          // The PostgreSQL poll already covers followups_today but this event
+          // provides an immediate increment between poll cycles.
+          if (typeof payload.followups === 'number') {
+            metricsCache.paulo.followups += payload.followups;
+          }
+          break;
+
+        // ── Generic agent metrics ─────────────────────────────────────────────
+        case 'agent.metrics':
+          // Arbitrary payload — merge into the correct agent bucket if known.
+          if (event.agentId && metricsCache[event.agentId]) {
+            Object.assign(metricsCache[event.agentId], payload);
+          }
+          break;
+
+        default:
+          // Silently ignore unknown event types.
+          break;
+      }
+    } catch (err) {
+      console.error('[Bridge] handleBusEvent error:', err.message);
+    }
+  }
+
+  eventUnsubscribe = await subscribeAll(handleBusEvent);
+  console.log('[Bridge] Event-bus subscription active — watching all agent events');
+}
+
+/**
+ * Start both polling loops and the event-bus subscription.
  * Safe to call multiple times — subsequent calls are no-ops if already running.
  *
  * @returns {Promise<void>}
@@ -202,6 +381,10 @@ export async function startBridge() {
     console.warn('[Bridge] Already running — startBridge() called again, skipping');
     return;
   }
+
+  // Subscribe to the event bus first so no events are missed during the
+  // initial PostgreSQL poll that follows immediately after.
+  await initEventSubscription();
 
   // Run an immediate pass so the dashboard is not blank on first load
   await Promise.allSettled([pollAgentMetrics(), detectActivity()]);
@@ -250,6 +433,12 @@ export async function stopBridge() {
   if (activityTimer) {
     clearInterval(activityTimer);
     activityTimer = null;
+  }
+
+  // Remove the global event-bus listener registered in initEventSubscription()
+  if (eventUnsubscribe) {
+    eventUnsubscribe();
+    eventUnsubscribe = null;
   }
 
   if (redis) {

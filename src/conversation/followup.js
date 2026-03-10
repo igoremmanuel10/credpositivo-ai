@@ -5,6 +5,7 @@ import { config, isBusinessHours, msUntilNextBusinessHour } from '../config.js';
 import { cache } from '../db/redis.js';
 import { sendMessages } from '../quepasa/client.js';
 import { shouldSendNudge } from '../flow/media-rules.js';
+import { emit, setStatus } from '../os/emitter.js';
 
 /**
  * Start the follow-up scheduler.
@@ -260,6 +261,8 @@ async function processPendingFollowups() {
       console.error(`[Followup] Error processing followup ${followup.id}:`, err);
     }
   }
+
+  await emit('paulo.followup_processed', 'paulo', { followups: pending.length });
 }
 
 /**

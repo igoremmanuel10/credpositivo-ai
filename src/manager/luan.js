@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { LUAN_SYSTEM_PROMPT } from './system-prompt.js';
+import { emit, setStatus, reportMetrics } from '../os/emitter.js';
 import {
   getPipelineData, getFunnelData, getRevenueData,
   getTeamPerformance, getFollowupData, getStaleLeadsData,
@@ -72,6 +73,9 @@ export async function generateManagerReport(options = {}) {
 
   const totalChars = whatsappMessages.reduce((s, m) => s + m.length, 0);
   console.log(`[Luan] Report generated (${totalChars} chars, ${whatsappMessages.length} message(s))`);
+
+  await emit('luan.report_generated', 'luan', { type: reportType, days });
+  await setStatus('luan', 'online');
 
   return { whatsappMessages, jsonData, metrics };
 }

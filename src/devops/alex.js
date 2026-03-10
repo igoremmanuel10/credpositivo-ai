@@ -24,6 +24,7 @@ import { getRecentErrors, getErrorPatterns, clearErrorBuffer } from './error-int
 import { runAutoFixes } from './auto-fixer.js';
 import { ALEX_SYSTEM_PROMPT } from './system-prompt.js';
 import { formatDailyReport, formatCriticalAlert, formatCycleJSON } from './formatter.js';
+import { emit, setStatus, reportMetrics } from '../os/emitter.js';
 
 const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
 
@@ -80,6 +81,9 @@ export async function runAlexCheckCycle() {
 
     const fixCount = fixes.reduce((s, f) => s + f.fixed, 0);
     console.log(`[Alex] Cycle ${cycleId} done: ${health.overall} | ${errors.length} errors | ${fixCount} fixes`);
+
+    await emit('alex.health_check', 'alex', { overall: health.overall, errors: errors.length, fixes: fixCount });
+    await reportMetrics('alex', { overall_status: health.overall, errors: errors.length, auto_fixes: fixCount });
 
     return lastCycleResult;
   } catch (err) {
