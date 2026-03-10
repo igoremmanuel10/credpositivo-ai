@@ -19,8 +19,11 @@ import { publish, closeEventBus } from './kernel/event-bus.js';
 import { scheduleJob, closeScheduler } from './kernel/scheduler.js';
 import { closeLoopGuard } from './kernel/loop-guard.js';
 import { osRouter } from './api/os-routes.js';
+import { adminRouter } from './api/admin-routes.js';
 import { startBridge, stopBridge } from './bridge.js';
 import { startWorkflows, stopWorkflows } from './engine/workflows.js';
+import { startNotifications, stopNotifications } from './notifications/telegram.js';
+import { requireAdmin } from '../api/auth.js';
 
 // Health check interval in milliseconds (default: every 60 seconds)
 const HEALTH_CHECK_INTERVAL_MS = parseInt(
@@ -66,6 +69,13 @@ export async function initOS(app) {
   console.log(`[OS] Agent health monitoring started (interval: ${HEALTH_CHECK_INTERVAL_MS}ms)`);
 
   await startWorkflows();
+
+  try {
+    await startNotifications();
+    console.log('[OS] Telegram notification listener started');
+  } catch (err) {
+    console.warn('[OS] Telegram notifications init failed (non-fatal):', err.message);
+  }
 
   try {
     await startBridge();
@@ -121,6 +131,10 @@ export async function initKernel() {
  */
 export function initApi(app) {
   app.use('/api/os', osRouter);
+  // Admin panel endpoints — protected by requireAdmin JWT middleware.
+  // The adminRouter itself applies an additional viewer-role guard on write operations.
+  app.use('/api/os/admin', requireAdmin, adminRouter);
+  console.log('[OS] Admin API routes mounted at /api/os/admin');
 }
 
 /**
@@ -164,6 +178,8 @@ export function stopAgentMonitoring() {
 export async function shutdownOS() {
   console.log('[OS] Shutting down AI OS kernel...');
   stopAgentMonitoring();
+
+  stopNotifications();
 
   await Promise.allSettled([
     stopBridge(),
