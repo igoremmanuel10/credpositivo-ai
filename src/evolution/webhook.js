@@ -387,7 +387,6 @@ webhookRouter.post('/webhook/chatwoot', async (req, res) => {
     if (!content) return;
 
     // Determine which bot token to use based on inbox
-    const inboxId = String(conversation.inbox_id || '');
     let botTokenForSend = null;
     // Reverse-lookup: find which bot phone maps to this inbox, then get its token
     for (const [botPhone, mappedInbox] of Object.entries(config.chatwoot.inboxMapping)) {
