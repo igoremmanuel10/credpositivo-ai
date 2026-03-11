@@ -9,7 +9,7 @@
 import { config } from '../config.js';
 
 const { apiUrl, apiToken, accountId } = config.chatwoot;
-const OPS_INBOX_ID = parseInt(process.env.CHATWOOT_OPS_INBOX_ID || '3');
+const OPS_INBOX_ID = parseInt(process.env.CHATWOOT_OPS_INBOX_ID || '5');
 const baseUrl = `${apiUrl}/api/v1/accounts/${accountId}`;
 
 const SYSTEM_CONTACT_EMAIL = 'sistema@credpositivo.com';
