@@ -47,6 +47,7 @@ import { startAlexScheduler, sendAlexReportNow, runAlexCheckCycle } from './devo
 import { startUnansweredMonitor, checkAndFixUnanswered } from './monitoring/unanswered-monitor.js';
 import { startFunnelWatcher } from './manager/funnel-watcher.js';
 import { emailFunnelRouter, startEmailFunnelPoller } from './api/email-funnel.js';
+import { quizLeadRouter } from './api/quiz-lead.js';
 import agentFeedRouter from './api/agent-feed.js';
 import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.js';
 import { startInstagramScheduler } from './social/instagram.js';
@@ -143,6 +144,9 @@ app.use(affiliateRouter);
 
 // Email funnel routes
 app.use(emailFunnelRouter);
+
+// Quiz lead capture
+app.use(quizLeadRouter);
 
 // Agent feed (admin)
 app.use(agentFeedRouter);

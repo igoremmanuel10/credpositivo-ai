@@ -107,6 +107,55 @@ function buildSendDates(now) {
   });
 }
 
+// ── Core enqueue logic (reusable) ───────────────────────────────────────────
+export async function enqueueLeadToFunnel({ nome, email, whatsapp, score, nivel }) {
+  const cleanNivel = (nivel || "critico").toLowerCase();
+  if (!TEMPLATES[cleanNivel]) {
+    throw new Error("Invalid nivel. Use: critico, atencao, preventivo");
+  }
+
+  // 1) Create/update contact in Brevo
+  const contactRes = await createOrUpdateContact({ nome, email, whatsapp, score, nivel: cleanNivel });
+  console.log(`[email-funnel] Contact sync for ${email}: ${contactRes.ok ? "OK" : "FAIL"}`);
+
+  // 2) Send D+0 email immediately (first template)
+  const templates = TEMPLATES[cleanNivel];
+  const d0Res = await sendTemplateEmail(email, nome, score, templates[0]);
+  console.log(`[email-funnel] D+0 email (template ${templates[0]}) to ${email}: ${d0Res.ok ? "SENT" : "FAIL"}`);
+
+  // 3) Schedule remaining 6 emails
+  const now = new Date();
+  const queue = readQueue();
+
+  // Remove existing entry for this email if any (re-enqueue)
+  const filtered = queue.filter((e) => e.email !== email);
+
+  const entry = {
+    email,
+    nome: nome || "",
+    score: score || 0,
+    nivel: cleanNivel,
+    templateIds: templates.slice(1), // templates 2-7
+    sendDates: buildSendDates(now),
+    sent: [false, false, false, false, false, false],
+    active: true,
+    createdAt: now.toISOString(),
+  };
+
+  filtered.push(entry);
+  writeQueue(filtered);
+
+  console.log(`[email-funnel] Enqueued ${email} (${cleanNivel}), 6 emails scheduled`);
+
+  return {
+    success: true,
+    email,
+    nivel: cleanNivel,
+    d0Sent: d0Res.ok,
+    scheduled: entry.sendDates,
+  };
+}
+
 // ── POST /api/email-funnel/enqueue ──────────────────────────────────────────
 emailFunnelRouter.post("/api/email-funnel/enqueue", async (req, res) => {
   try {
@@ -116,51 +165,8 @@ emailFunnelRouter.post("/api/email-funnel/enqueue", async (req, res) => {
       return res.status(400).json({ error: "email is required" });
     }
 
-    const cleanNivel = (nivel || "critico").toLowerCase();
-    if (!TEMPLATES[cleanNivel]) {
-      return res.status(400).json({ error: "Invalid nivel. Use: critico, atencao, preventivo" });
-    }
-
-    // 1) Create/update contact in Brevo
-    const contactRes = await createOrUpdateContact({ nome, email, whatsapp, score, nivel: cleanNivel });
-    console.log(`[email-funnel] Contact sync for ${email}: ${contactRes.ok ? "OK" : "FAIL"}`);
-
-    // 2) Send D+0 email immediately (first template)
-    const templates = TEMPLATES[cleanNivel];
-    const d0Res = await sendTemplateEmail(email, nome, score, templates[0]);
-    console.log(`[email-funnel] D+0 email (template ${templates[0]}) to ${email}: ${d0Res.ok ? "SENT" : "FAIL"}`);
-
-    // 3) Schedule remaining 6 emails
-    const now = new Date();
-    const queue = readQueue();
-
-    // Remove existing entry for this email if any (re-enqueue)
-    const filtered = queue.filter((e) => e.email !== email);
-
-    const entry = {
-      email,
-      nome: nome || "",
-      score: score || 0,
-      nivel: cleanNivel,
-      templateIds: templates.slice(1), // templates 2-7
-      sendDates: buildSendDates(now),
-      sent: [false, false, false, false, false, false],
-      active: true,
-      createdAt: now.toISOString(),
-    };
-
-    filtered.push(entry);
-    writeQueue(filtered);
-
-    console.log(`[email-funnel] Enqueued ${email} (${cleanNivel}), 6 emails scheduled`);
-
-    res.json({
-      success: true,
-      email,
-      nivel: cleanNivel,
-      d0Sent: d0Res.ok,
-      scheduled: entry.sendDates,
-    });
+    const result = await enqueueLeadToFunnel({ nome, email, whatsapp, score, nivel });
+    res.json(result);
   } catch (err) {
     console.error("[email-funnel] enqueue error:", err);
     res.status(500).json({ error: "Internal error", detail: err.message });
