@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { config } from '../config.js';
 import { buildSystemPrompt } from './system-prompt.js';
@@ -8,22 +7,22 @@ import { captureError } from '../monitoring/sentry.js';
 import { buildContextFromSimilar } from './embeddings.js';
 import { buildKnowledgeContext } from './notion-rag.js';
 
-// Anthropic client for chat (Haiku 4.5)
-const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
+// OpenRouter client — unified gateway for chat, fallback, vision
+const openrouter = new OpenAI({
+  apiKey: config.openrouter.apiKey,
+  baseURL: config.openrouter.baseUrl,
+});
 
-// OpenAI client kept for Vision and TTS only
+// OpenAI client kept for TTS only
 const openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
 
 /**
  * Get AI response for a conversation turn.
- * Uses Claude Haiku 4.5 for chat responses.
+ * Uses Grok 4.1 Fast via OpenRouter for chat responses.
  */
 export async function getAgentResponse(conversationState, messageHistory, userMessage, persona = 'augusto', abOverrides = {}) {
   let systemPrompt = buildSystemPrompt(conversationState, persona, abOverrides);
 
-  // Inject similar conversation patterns via pgvector (RAG)
-  // Only for phases 2+ (investigation onwards) where context matters most.
-  // Phases 0-1 are simple greetings — no need for extra tokens.
   // Inject knowledge base context (Notion RAG) — always available
   try {
     const knowledgeContext = await buildKnowledgeContext(userMessage);
@@ -59,14 +58,14 @@ export async function getAgentResponse(conversationState, messageHistory, userMe
 
   messages.push({ role: 'user', content: userMessage });
 
-  let response = await callClaude(systemPrompt, messages);
+  let response = await callOpenRouter(systemPrompt, messages);
 
   // Skip compliance filter for phase 0 — menu is hardcoded text, no need to filter
   const filterResult = conversationState.phase === 0
     ? { clean: true, violations: [] }
     : filterOutput(response.text, conversationState.phase);
   if (!filterResult.clean) {
-    console.warn(`[Claude] Compliance violation detected: ${filterResult.violations.join(', ')}`);
+    console.warn(`[AI] Compliance violation detected: ${filterResult.violations.join(', ')}`);
 
     messages.push({ role: 'assistant', content: response.text });
     messages.push({
@@ -74,11 +73,11 @@ export async function getAgentResponse(conversationState, messageHistory, userMe
       content: buildCorrectionInstruction(filterResult.violations),
     });
 
-    response = await callClaude(systemPrompt, messages);
+    response = await callOpenRouter(systemPrompt, messages);
 
     const retryFilter = filterOutput(response.text, conversationState.phase);
     if (!retryFilter.clean) {
-      console.error(`[Claude] Still non-compliant after retry: ${retryFilter.violations.join(', ')}`);
+      console.error(`[AI] Still non-compliant after retry: ${retryFilter.violations.join(', ')}`);
     }
   }
 
@@ -86,33 +85,36 @@ export async function getAgentResponse(conversationState, messageHistory, userMe
 }
 
 /**
- * Call Claude Haiku with automatic retry on rate limit (429) / overloaded (529).
- * Retries up to 4 times with aggressive backoff for 529.
- * Falls back to GPT-4o-mini if all Claude retries fail.
+ * Call primary model (Grok 4.1 Fast) via OpenRouter.
+ * Retries up to 4 times with backoff on 429/529.
+ * Falls back to Gemini 2.5 Flash Lite if all retries fail.
  */
-async function callClaude(systemPrompt, messages, attempt = 1) {
+async function callOpenRouter(systemPrompt, messages, attempt = 1) {
   const MAX_RETRIES = 4;
+  const model = config.openrouter.model;
 
   try {
-    const response = await anthropic.messages.create({
-      model: config.anthropic.model,
+    const response = await openrouter.chat.completions.create({
+      model,
       max_tokens: 500,
       temperature: 0.7,
-      system: systemPrompt,
-      messages: messages,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages,
+      ],
     });
 
-    const text = response.content[0]?.text || '';
+    const text = response.choices[0]?.message?.content || '';
     const metadata = extractMetadata(text);
     console.log(`[AI] Metadata extracted: ${JSON.stringify(metadata.data)}`);
 
-    const inputTokens = response.usage?.input_tokens || 0;
-    const outputTokens = response.usage?.output_tokens || 0;
-    console.log(`[AI] Model: ${config.anthropic.model} | Tokens: ${inputTokens}in/${outputTokens}out`);
+    const inputTokens = response.usage?.prompt_tokens || 0;
+    const outputTokens = response.usage?.completion_tokens || 0;
+    console.log(`[AI] Model: ${model} | Tokens: ${inputTokens}in/${outputTokens}out`);
 
     trackApiCost({
-      provider: 'anthropic',
-      model: config.anthropic.model,
+      provider: 'openrouter',
+      model,
       inputTokens,
       outputTokens,
       endpoint: 'chat',
@@ -123,64 +125,64 @@ async function callClaude(systemPrompt, messages, attempt = 1) {
       metadata: metadata.data,
     };
   } catch (err) {
+    const status = err.status || err.code;
+
     // Retry on rate limit (429) or overloaded (529)
-    if ((err.status === 429 || err.status === 529) && attempt <= MAX_RETRIES) {
-      // Aggressive backoff for 529: 3s, 8s, 20s, 45s
+    if ((status === 429 || status === 529) && attempt <= MAX_RETRIES) {
       const retryAfter = err.headers?.['retry-after'];
       const backoffMs = retryAfter
         ? parseInt(retryAfter) * 1000
-        : err.status === 529
+        : status === 529
           ? [3000, 8000, 20000, 45000][attempt - 1] || 45000
           : 1000 * Math.pow(2, attempt - 1);
       const waitMs = Math.min(backoffMs + Math.random() * 1000, 60000);
 
-      console.warn(`[Claude] Rate limit/overloaded (${err.status}, attempt ${attempt}/${MAX_RETRIES}). Retrying in ${Math.round(waitMs)}ms...`);
+      console.warn(`[AI] Rate limit/overloaded (${status}, attempt ${attempt}/${MAX_RETRIES}). Retrying in ${Math.round(waitMs)}ms...`);
       await new Promise(r => setTimeout(r, waitMs));
-      return callClaude(systemPrompt, messages, attempt + 1);
+      return callOpenRouter(systemPrompt, messages, attempt + 1);
     }
 
-    // All Claude retries exhausted — try GPT-4o-mini as fallback
-    if (err.status === 429 || err.status === 529) {
-      console.warn(`[Claude] All ${MAX_RETRIES} retries failed (${err.status}). Falling back to GPT-4o-mini...`);
+    // All retries exhausted — try fallback model
+    if (status === 429 || status === 529) {
+      console.warn(`[AI] All ${MAX_RETRIES} retries failed (${status}). Falling back to ${config.openrouter.fallbackModel}...`);
       try {
-        return await callGptFallback(systemPrompt, messages);
-      } catch (gptErr) {
-        console.error(`[GPT Fallback] Also failed: ${gptErr.message}`);
-        captureError(err, { module: 'claude', action: 'callClaude', extra: { status: err.status, attempt, fallback: 'gpt-failed' } });
+        return await callFallback(systemPrompt, messages);
+      } catch (fbErr) {
+        console.error(`[AI Fallback] Also failed: ${fbErr.message}`);
+        captureError(err, { module: 'ai', action: 'callOpenRouter', extra: { status, attempt, fallback: 'failed' } });
         throw err;
       }
     }
 
-    captureError(err, { module: 'claude', action: 'callClaude', extra: { status: err.status, attempt } });
+    captureError(err, { module: 'ai', action: 'callOpenRouter', extra: { status, attempt } });
     throw err;
   }
 }
 
 /**
- * GPT-4o-mini fallback when Claude is overloaded.
- * Uses the same system prompt and messages format.
+ * Fallback model (Gemini 2.5 Flash Lite) via OpenRouter.
  */
-async function callGptFallback(systemPrompt, messages) {
-  const gptMessages = [
-    { role: 'system', content: systemPrompt },
-    ...messages,
-  ];
+async function callFallback(systemPrompt, messages) {
+  const model = config.openrouter.fallbackModel;
 
-  const response = await openaiClient.chat.completions.create({
-    model: 'gpt-4o-mini',
+  const response = await openrouter.chat.completions.create({
+    model,
     max_tokens: 500,
     temperature: 0.7,
-    messages: gptMessages,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...messages,
+    ],
   });
 
   const text = response.choices[0]?.message?.content || '';
   const metadata = extractMetadata(text);
-  console.log(`[AI] GPT Fallback | Metadata: ${JSON.stringify(metadata.data)}`);
-  console.log(`[AI] Model: gpt-4o-mini (fallback) | Tokens: ${response.usage?.prompt_tokens || 0}in/${response.usage?.completion_tokens || 0}out`);
+  console.log(`[AI] Fallback | Metadata: ${JSON.stringify(metadata.data)}`);
+  console.log(`[AI] Model: ${model} (fallback) | Tokens: ${response.usage?.prompt_tokens || 0}in/${response.usage?.completion_tokens || 0}out`);
 
   trackApiCost({
-    provider: 'openai',
-    model: 'gpt-4o-mini',
+    provider: 'openrouter',
+    model,
     inputTokens: response.usage?.prompt_tokens || 0,
     outputTokens: response.usage?.completion_tokens || 0,
     endpoint: 'chat-fallback',
@@ -193,15 +195,16 @@ async function callGptFallback(systemPrompt, messages) {
 }
 
 /**
- * Analyze an image using GPT-4o Vision (stays on OpenAI).
+ * Analyze an image using Gemini 2.5 Flash via OpenRouter.
  */
 export async function analyzeImage(base64Image, mimeType = 'image/jpeg') {
   const MAX_RETRIES = 2;
+  const model = config.openrouter.visionModel;
 
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     try {
-      const response = await openaiClient.chat.completions.create({
-        model: config.openai.visionModel,
+      const response = await openrouter.chat.completions.create({
+        model,
         max_tokens: 150,
         messages: [
           {
@@ -227,8 +230,8 @@ export async function analyzeImage(base64Image, mimeType = 'image/jpeg') {
       console.log(`[Vision] Image analysis: ${description.substring(0, 200)}`);
 
       trackApiCost({
-        provider: 'openai',
-        model: config.openai.visionModel,
+        provider: 'openrouter',
+        model,
         inputTokens: response.usage?.prompt_tokens || 0,
         outputTokens: response.usage?.completion_tokens || 0,
         endpoint: 'vision',
@@ -275,3 +278,6 @@ function extractMetadata(text) {
     return { cleanText, data: {} };
   }
 }
+
+// Re-export openaiClient for TTS usage in other modules
+export { openaiClient };

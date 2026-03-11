@@ -1,12 +1,17 @@
 import { db } from '../db/client.js';
 import { config } from '../config.js';
 
-// Pricing per 1M tokens (USD) — updated Feb 2025
+// Pricing per 1M tokens (USD) — updated Mar 2026
 const PRICING = {
+  // OpenRouter models (primary)
+  'x-ai/grok-4.1-fast': { input: 0.20, output: 0.50 },
+  'google/gemini-2.5-flash-lite': { input: 0.10, output: 0.40 },
+  'google/gemini-2.5-flash': { input: 0.30, output: 2.50 },
+  // Legacy (kept for reference)
   'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
-  'claude-sonnet-4-5-20250514': { input: 3.00, output: 15.00 },
   'gpt-4o-mini': { input: 0.15, output: 0.60 },
   'gpt-4o': { input: 2.50, output: 10.00 },
+  // TTS / STT (OpenAI direct)
   'tts-1-hd': { perChar: 0.000030 },  // $30 per 1M chars
   'tts-1': { perChar: 0.000015 },
   'whisper-1': { perMinute: 0.006 },

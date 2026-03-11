@@ -3,6 +3,16 @@ import 'dotenv/config';
 export const config = {
   port: parseInt(process.env.PORT || '3001'),
 
+  // OpenRouter — unified AI gateway (chat, fallback, vision)
+  openrouter: {
+    apiKey: process.env.OPENROUTER_API_KEY,
+    model: process.env.OPENROUTER_MODEL || 'x-ai/grok-4.1-fast',
+    fallbackModel: process.env.OPENROUTER_FALLBACK_MODEL || 'google/gemini-2.5-flash-lite',
+    visionModel: process.env.OPENROUTER_VISION_MODEL || 'google/gemini-2.5-flash',
+    baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+  },
+
+  // Legacy — kept for TTS only (OpenRouter doesn't support TTS)
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY,
     model: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
