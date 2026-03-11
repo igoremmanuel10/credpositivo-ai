@@ -109,14 +109,21 @@ export async function getAgent(id) {
 
 /**
  * List all registered agents in registration order.
+ * Self-healing: if the index is empty, automatically reload manifests.
  *
  * @returns {Promise<Object[]>}
  */
 export async function getAllAgents() {
   const r = getRedis();
-  const ids = await r.zrange(AGENTS_INDEX_KEY, 0, -1);
+  let ids = await r.zrange(AGENTS_INDEX_KEY, 0, -1);
 
-  if (!ids.length) return [];
+  // Self-healing: if index was flushed, rebuild from manifests
+  if (!ids.length) {
+    console.warn('[Registry] Index empty — rebuilding from manifests...');
+    await loadManifests();
+    ids = await r.zrange(AGENTS_INDEX_KEY, 0, -1);
+    if (!ids.length) return [];
+  }
 
   const pipeline = r.pipeline();
   ids.forEach((id) => pipeline.hgetall(AGENT_KEY(id)));
