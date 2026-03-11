@@ -107,16 +107,23 @@ function checkBridge() {
     const health = getBridgeHealth();
     const now = Date.now();
 
-    // If no activity in 30 minutes, consider degraded
+    // Determine bridge status based on activity AND errors
     let status = 'ok';
-    if (health.lastQuepasaToChatwoot) {
-      const lastActivity = new Date(health.lastQuepasaToChatwoot).getTime();
-      if (now - lastActivity > 30 * 60 * 1000) {
-        status = 'degraded';
-      }
-    }
-    if (health.errorCount > 10) {
+    const errorCount = health.errorCount || 0;
+
+    if (errorCount > 10) {
+      // High error count always means degraded
       status = 'degraded';
+    } else if (health.lastQuepasaToChatwoot) {
+      const lastActivity = new Date(health.lastQuepasaToChatwoot).getTime();
+      const inactiveMins = (now - lastActivity) / (60 * 1000);
+      if (inactiveMins > 30 && errorCount > 0) {
+        // No recent activity AND there are errors — genuinely degraded
+        status = 'degraded';
+      } else if (inactiveMins > 30) {
+        // No recent activity but zero errors — normal idle (e.g., nighttime)
+        status = 'idle';
+      }
     }
 
     return {

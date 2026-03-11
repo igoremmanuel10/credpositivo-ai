@@ -226,6 +226,16 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
       conversation = await db.getConversation(phone);
     }
 
+    // Validate cached conversation still exists in DB (FK constraint protection)
+    if (conversation) {
+      const dbConv = await db.getConversation(phone);
+      if (!dbConv || dbConv.id !== conversation.id) {
+        console.warn(`[Manager] Cached conversation ${conversation.id} for ${phone} not found in DB. Invalidating cache.`);
+        await cache.deleteConversation(phone);
+        conversation = dbConv || null; // use DB version if it exists under different id, otherwise null
+      }
+    }
+
     if (!conversation) {
       const botPhone = Object.entries(config.sdr.phoneToPersona).find(([, p]) => p === persona)?.[0] || '';
       conversation = await db.createConversation(phone, pushName || null, persona, botPhone);
