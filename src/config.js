@@ -86,6 +86,9 @@ export const config = {
 
   sdr: {
     enabled: process.env.SDR_ENABLED !== 'false',
+    // AUGUSTO_ENABLED=false desativa o fluxo do Augusto sem deletar nada.
+    // Para reativar: remova a variável ou sete AUGUSTO_ENABLED=true.
+    augustoEnabled: process.env.AUGUSTO_ENABLED !== 'false',
     botToken: process.env.SDR_BOT_TOKEN || '',
     botPhone: process.env.SDR_BOT_PHONE || '5521971364221',
     phoneToPersona: Object.fromEntries(

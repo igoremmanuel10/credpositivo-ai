@@ -147,6 +147,13 @@ async function processBufferedMessages(phone, remoteJid, pushName) {
   const botTokenForReply = phoneTokenMap.get(phone) || null;
   const persona = phonePersonaMap.get(phone) || 'augusto';
 
+  // Guard: Augusto flow desativado via AUGUSTO_ENABLED=false
+  if (persona === 'augusto' && !config.sdr.augustoEnabled) {
+    console.log(`[Manager] Augusto flow DISABLED — skipping message from ${phone}`);
+    await cache.flushDebounceBuffer(phone);
+    return;
+  }
+
   // Re-check hourly limit
   const hourlyCount = await cache.getHourlyMessageCount(phone);
   const maxPerHour = config.limits.maxAgentMessagesPerHour || 3;

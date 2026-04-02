@@ -222,6 +222,14 @@ async function processPendingFollowups() {
 
       // Determine follow-up format based on persona, attempt, and phase
       const persona = followup.persona || 'augusto';
+
+      // Guard: Augusto desativado
+      if (persona === 'augusto' && !config.sdr.augustoEnabled) {
+        console.log(`[Followup] Augusto DISABLED — skipping followup for ${followup.phone}`);
+        await db.markFollowupSent(followup.id); // marca como enviado para não reprocessar
+        continue;
+      }
+
       const format = getFollowupFormat(persona, followup.attempt, followup.phase || 0);
 
       console.log(`[Followup] Processing ${followup.event_type} (attempt ${followup.attempt}, format: ${format.type}) for ${followup.phone} [persona: ${persona}]`);

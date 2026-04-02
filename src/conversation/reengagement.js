@@ -112,6 +112,13 @@ async function processReengagementBatch() {
       // Determine event type based on conversation state
       const eventType = getReengagementType(conv);
 
+      // Guard: Augusto desativado
+      const persona = conv.persona || 'augusto';
+      if (persona === 'augusto' && !config.sdr.augustoEnabled) {
+        console.log(`[Reengagement] Augusto DISABLED — skipping reengagement for ${conv.phone}`);
+        continue;
+      }
+
       console.log(`[Reengagement] [${i + 1}/${candidates.length}] Sending ${eventType} to ${conv.phone} (phase ${conv.phase}, last: ${conv.last_message_at})`);
 
       // Send the follow-up (text only for re-engagement)
