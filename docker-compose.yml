@@ -245,32 +245,6 @@ services:
     networks:
       - credpositivo
 
-  # ============================================
-  # MATRIX ENERGIA AI (WhatsApp SDR)
-  # ============================================
-  matrixenergia-ai:
-    restart: unless-stopped
-    build:
-      context: /opt/matrixenergia-ai
-    ports:
-      - "3003:3003"
-    environment:
-      PORT: 3003
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL_MATRIX:-google/gemini-2.5-flash-lite}
-      QUEPASA_API_URL: http://quepasa:31000
-      QUEPASA_TOKEN: ${QUEPASA_BOT_TOKEN}
-      IGOR_WHATSAPP: ${IGOR_WHATSAPP:-5511932145806}
-      REDIS_URL: redis://redis:6379/3
-    depends_on:
-      redis:
-        condition: service_started
-      quepasa:
-        condition: service_started
-    networks:
-      - credpositivo
-
 networks:
   credpositivo:
     driver: bridge
