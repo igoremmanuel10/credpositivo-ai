@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { createHash, randomUUID } from "crypto";
 import { enqueueLeadToFunnel } from "./email-funnel.js";
 import { db } from "../db/client.js";
+import { requireAdmin } from "./auth.js";
 
 const FB_PIXEL_ID    = "3814071692219923";
 const FB_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
@@ -133,14 +134,16 @@ quizLeadRouter.post("/api/quiz-lead", async (req, res) => {
       await db.query(
         `INSERT INTO quiz_leads
            (nome, whatsapp, email, cpf, score, level, nivel, variant, situacao, valor,
-            onde, urgencia, tentativa, source, utm, url, funnel_enqueued)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+            onde, urgencia, tentativa, source, utm, url, funnel_enqueued,
+            tempo_quiz, chegou_resultado, is_final)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
         [
           nome, whatsapp, email, body.cpf || null, score, level, nivel,
           body.variant || null, body.situacao || null, body.valor || null,
           JSON.stringify(body.onde || []), body.urgencia || null, body.tentativa || null,
           body.source || "quiz_credpositivo", JSON.stringify(body.utm || {}),
           body.url || null, funnelResult.success,
+          body.tempo_quiz || null, body.chegou_resultado || false, body.is_final || false,
         ]
       );
       console.log(`[quiz-lead] Lead saved to DB: ${email} (${nivel}, score ${score})`);
@@ -167,6 +170,51 @@ quizLeadRouter.post("/api/quiz-lead", async (req, res) => {
     });
   } catch (err) {
     console.error("[quiz-lead] Error:", err);
+    res.status(500).json({ error: "Internal error", detail: err.message });
+  }
+});
+
+// ── GET /api/quiz-leads (admin dashboard) ───────────────────────────────────
+quizLeadRouter.get("/api/quiz-leads", requireAdmin, async (req, res) => {
+  try {
+    const { period = "today", limit = 200 } = req.query;
+
+    const periodFilter =
+      period === "today"   ? "created_at >= CURRENT_DATE" :
+      period === "week"    ? "created_at >= CURRENT_DATE - INTERVAL '7 days'" :
+      period === "month"   ? "created_at >= CURRENT_DATE - INTERVAL '30 days'" :
+      "TRUE";
+
+    const [leads, stats] = await Promise.all([
+      db.query(
+        `SELECT id, nome, whatsapp, email, score, nivel, situacao, urgencia,
+                funnel_enqueued, is_final, tempo_quiz, chegou_resultado, utm, source, created_at
+         FROM quiz_leads
+         WHERE ${periodFilter}
+         ORDER BY created_at DESC
+         LIMIT $1`,
+        [Number(limit)]
+      ),
+      db.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE)                     AS hoje,
+           COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') AS semana,
+           COUNT(*)                                                                AS total,
+           COUNT(*) FILTER (WHERE nivel = 'critico')                              AS criticos,
+           COUNT(*) FILTER (WHERE nivel = 'atencao')                              AS atencao,
+           COUNT(*) FILTER (WHERE nivel = 'preventivo')                           AS preventivo,
+           COUNT(*) FILTER (WHERE funnel_enqueued = true)                         AS no_funil,
+           COUNT(*) FILTER (WHERE is_final = true)                                AS foi_checkout,
+           COUNT(*) FILTER (WHERE chegou_resultado = true)                        AS chegou_resultado,
+           ROUND(AVG(score)::numeric, 1)                                          AS score_medio,
+           ROUND(AVG(tempo_quiz) FILTER (WHERE tempo_quiz IS NOT NULL)::numeric)  AS tempo_medio
+         FROM quiz_leads`
+      ),
+    ]);
+
+    res.json({ leads: leads.rows, stats: stats.rows[0] });
+  } catch (err) {
+    console.error("[quiz-leads] Error:", err);
     res.status(500).json({ error: "Internal error", detail: err.message });
   }
 });

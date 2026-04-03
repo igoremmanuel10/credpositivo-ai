@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Leads do Quizz | CredPositivo</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f1117;--bg2:#171b26;--bg3:#1e2333;
+      --border:#2a2f45;--border2:#343a54;
+      --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+      --blue:#3b82f6;--blue-dim:#1e3a5f;
+      --red:#ef4444;--red-dim:#3f1f1f;
+      --yellow:#f59e0b;--yellow-dim:#3d2e0a;
+      --green:#22c55e;--green-dim:#0f2e1a;
+      --purple:#a855f7;--purple-dim:#2d1a4a;
+      --radius:10px;--radius-sm:6px;
+    }
+    body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+    /* ── Auth ── */
+    #view-login{display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px}
+    #view-login.active{display:flex}
+    .auth-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:36px;width:100%;max-width:380px}
+    .auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+    .auth-icon{width:40px;height:40px;background:var(--blue);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+    .auth-brand-name{font-weight:700;font-size:15px}
+    .auth-brand-sub{font-size:12px;color:var(--text2)}
+    .auth-title{font-size:20px;font-weight:700;margin-bottom:6px}
+    .auth-sub{font-size:13px;color:var(--text2);margin-bottom:24px}
+    .form-label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+    .form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;color:var(--text);font-size:14px;outline:none;margin-bottom:14px;transition:border-color .15s}
+    .form-input:focus{border-color:var(--blue)}
+    .btn-primary{width:100%;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);padding:11px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
+    .btn-primary:hover{opacity:.88}
+    .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+    .auth-error{margin-top:12px;color:var(--red);font-size:13px;display:none}
+    .auth-error.visible{display:block}
+
+    /* ── Dashboard ── */
+    #view-dashboard{display:none;min-height:100vh;flex-direction:column}
+    #view-dashboard.active{display:flex}
+
+    .header{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    .header-brand{display:flex;align-items:center;gap:10px}
+    .header-icon{width:34px;height:34px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex-shrink:0}
+    .header-title{font-weight:700;font-size:15px}
+    .header-sub{font-size:12px;color:var(--text2)}
+    .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .header-refresh{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3)}
+    .refresh-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .period-btn{padding:5px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:12px;cursor:pointer;transition:all .15s}
+    .period-btn.active{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+    .btn-logout{padding:5px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text3);font-size:12px;cursor:pointer}
+
+    .main{flex:1;padding:24px;max-width:1400px;width:100%;margin:0 auto}
+
+    /* ── Stats ── */
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+    .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+    .stat-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+    .stat-val{font-size:26px;font-weight:800;line-height:1}
+    .stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
+    .stat-card.critico .stat-val{color:var(--red)}
+    .stat-card.atencao .stat-val{color:var(--yellow)}
+    .stat-card.preventivo .stat-val{color:var(--green)}
+    .stat-card.checkout .stat-val{color:var(--blue)}
+    .stat-card.tempo .stat-val{color:var(--purple)}
+
+    /* ── Funil bar ── */
+    .funnel-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px}
+    .funnel-title{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em}
+    .funnel-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+    .funnel-label{font-size:12px;color:var(--text2);width:130px;flex-shrink:0}
+    .funnel-bar-wrap{flex:1;background:var(--bg3);border-radius:100px;height:8px;overflow:hidden}
+    .funnel-bar{height:100%;border-radius:100px;transition:width .6s ease}
+    .funnel-count{font-size:12px;color:var(--text2);width:40px;text-align:right;flex-shrink:0}
+
+    /* ── Table ── */
+    .table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    .table-header{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px}
+    .table-title{font-size:14px;font-weight:600}
+    .table-count{font-size:12px;color:var(--text3)}
+    .search-input{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;color:var(--text);font-size:13px;outline:none;width:220px;transition:border-color .15s}
+    .search-input:focus{border-color:var(--blue)}
+    .table-scroll{overflow-x:auto}
+    table{width:100%;border-collapse:collapse}
+    th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);white-space:nowrap}
+    td{padding:11px 14px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(255,255,255,.02)}
+    .nome-cell{font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .wa-cell{color:var(--text2);font-size:12px;font-family:monospace}
+
+    /* Badges */
+    .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700;white-space:nowrap}
+    .badge-critico{background:var(--red-dim);color:var(--red)}
+    .badge-atencao{background:var(--yellow-dim);color:var(--yellow)}
+    .badge-preventivo{background:var(--green-dim);color:var(--green)}
+
+    .score-cell{font-weight:700;font-family:monospace}
+    .score-neg{color:var(--red)}
+    .score-mid{color:var(--yellow)}
+    .score-ok{color:var(--green)}
+
+    .tempo-cell{color:var(--purple);font-size:12px}
+    .check-yes{color:var(--green)}
+    .check-no{color:var(--text3)}
+    .time-cell{color:var(--text3);font-size:12px;white-space:nowrap}
+
+    /* Engajamento bar */
+    .eng-wrap{display:flex;align-items:center;gap:6px}
+    .eng-bar{width:60px;height:5px;background:var(--bg3);border-radius:100px;overflow:hidden;flex-shrink:0}
+    .eng-fill{height:100%;border-radius:100px}
+    .eng-label{font-size:11px;color:var(--text2)}
+
+    /* Empty / loading */
+    .empty{padding:48px;text-align:center;color:var(--text3)}
+    .loading-row td{padding:48px;text-align:center;color:var(--text3)}
+    .spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="active">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-icon">CP</div>
+      <div>
+        <div class="auth-brand-name">CredPositivo</div>
+        <div class="auth-brand-sub">Leads do Quizz</div>
+      </div>
+    </div>
+    <h1 class="auth-title">Entrar</h1>
+    <p class="auth-sub">Acompanhe os leads em tempo real.</p>
+    <form id="form-login" novalidate>
+      <label class="form-label" for="inp-email">E-mail</label>
+      <input id="inp-email" class="form-input" type="email" placeholder="admin@credpositivo.com.br" autocomplete="username" required/>
+      <label class="form-label" for="inp-senha">Senha</label>
+      <input id="inp-senha" class="form-input" type="password" placeholder="Sua senha" autocomplete="current-password" required/>
+      <button type="submit" class="btn-primary" id="btn-login">Entrar</button>
+      <div class="auth-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="view-dashboard">
+  <header class="header">
+    <div class="header-brand">
+      <div class="header-icon">CP</div>
+      <div>
+        <div class="header-title">Leads do Quizz</div>
+        <div class="header-sub">Diagnóstico de Crédito</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-refresh">
+        <span class="refresh-dot"></span>
+        <span id="last-refresh">—</span>
+      </div>
+      <button class="period-btn active" data-period="today">Hoje</button>
+      <button class="period-btn" data-period="week">7 dias</button>
+      <button class="period-btn" data-period="month">30 dias</button>
+      <button class="period-btn" data-period="all">Todos</button>
+      <button class="btn-logout" id="btn-logout">Sair</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- Stats -->
+    <div class="stats" id="stats-grid">
+      <div class="stat-card"><div class="stat-label">Leads hoje</div><div class="stat-val" id="s-hoje">—</div><div class="stat-sub">entradas</div></div>
+      <div class="stat-card critico"><div class="stat-label">Críticos</div><div class="stat-val" id="s-criticos">—</div><div class="stat-sub">situação grave</div></div>
+      <div class="stat-card atencao"><div class="stat-label">Atenção</div><div class="stat-val" id="s-atencao">—</div><div class="stat-sub">situação moderada</div></div>
+      <div class="stat-card preventivo"><div class="stat-label">Preventivos</div><div class="stat-val" id="s-preventivo">—</div><div class="stat-sub">situação leve</div></div>
+      <div class="stat-card checkout"><div class="stat-label">Foram ao checkout</div><div class="stat-val" id="s-checkout">—</div><div class="stat-sub">clicaram comprar</div></div>
+      <div class="stat-card tempo"><div class="stat-label">Tempo médio</div><div class="stat-val" id="s-tempo">—</div><div class="stat-sub">no quiz</div></div>
+    </div>
+
+    <!-- Funil visual -->
+    <div class="funnel-wrap">
+      <div class="funnel-title">Funil de engajamento</div>
+      <div class="funnel-row">
+        <span class="funnel-label">Leads capturados</span>
+        <div class="funnel-bar-wrap"><div class="funnel-bar" id="fb-total" style="background:var(--blue);width:100%"></div></div>
+        <span class="funnel-count" id="fc-total">—</span>
+      </div>
+      <div class="funnel-row">
+        <span class="funnel-label">Viram o resultado</span>
+        <div class="funnel-bar-wrap"><div class="funnel-bar" id="fb-resultado" style="background:var(--purple)"></div></div>
+        <span class="funnel-count" id="fc-resultado">—</span>
+      </div>
+      <div class="funnel-row">
+        <span class="funnel-label">Foram ao checkout</span>
+        <div class="funnel-bar-wrap"><div class="funnel-bar" id="fb-checkout" style="background:var(--yellow)"></div></div>
+        <span class="funnel-count" id="fc-checkout">—</span>
+      </div>
+      <div class="funnel-row">
+        <span class="funnel-label">Entrou no funil email</span>
+        <div class="funnel-bar-wrap"><div class="funnel-bar" id="fb-funil" style="background:var(--green)"></div></div>
+        <span class="funnel-count" id="fc-funil">—</span>
+      </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="table-wrap">
+      <div class="table-header">
+        <div>
+          <span class="table-title">Leads recentes</span>
+          <span class="table-count" id="tbl-count"></span>
+        </div>
+        <input class="search-input" id="search" placeholder="Buscar nome, WhatsApp ou e-mail…"/>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Lead</th>
+              <th>WhatsApp</th>
+              <th>Nível</th>
+              <th>Score</th>
+              <th>Engajamento</th>
+              <th>Tempo quiz</th>
+              <th>Viu resultado</th>
+              <th>Checkout</th>
+              <th>Email</th>
+              <th>Horário</th>
+            </tr>
+          </thead>
+          <tbody id="leads-body">
+            <tr class="loading-row"><td colspan="10"><span class="spinner"></span>Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let TOKEN = localStorage.getItem('quiz_token') || '';
+let allLeads = [];
+let currentPeriod = 'today';
+let refreshTimer = null;
+
+// ── Auth ──────────────────────────────────────────────────────
+function show(id) {
+  ['view-login','view-dashboard'].forEach(v => {
+    const el = document.getElementById(v);
+    el.classList.toggle('active', v === id);
+  });
+}
+
+document.getElementById('form-login').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('btn-login');
+  const err = document.getElementById('login-error');
+  btn.disabled = true; btn.textContent = 'Entrando…';
+  err.classList.remove('visible');
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: document.getElementById('inp-email').value,
+        password: document.getElementById('inp-senha').value,
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Credenciais inválidas');
+    TOKEN = d.token;
+    localStorage.setItem('quiz_token', TOKEN);
+    show('view-dashboard');
+    startDashboard();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.add('visible');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
+});
+
+document.getElementById('btn-logout').addEventListener('click', () => {
+  TOKEN = '';
+  localStorage.removeItem('quiz_token');
+  clearInterval(refreshTimer);
+  show('view-login');
+});
+
+// ── Period buttons ────────────────────────────────────────────
+document.querySelectorAll('.period-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPeriod = btn.dataset.period;
+    loadData();
+  });
+});
+
+// ── Search ────────────────────────────────────────────────────
+document.getElementById('search').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  renderTable(q ? allLeads.filter(l =>
+    (l.nome||'').toLowerCase().includes(q) ||
+    (l.whatsapp||'').includes(q) ||
+    (l.email||'').toLowerCase().includes(q)
+  ) : allLeads);
+});
+
+// ── Load data ─────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const r = await fetch(`${API}/api/quiz-leads?period=${currentPeriod}&limit=300`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    if (r.status === 401) { TOKEN = ''; localStorage.removeItem('quiz_token'); show('view-login'); return; }
+    const d = await r.json();
+    allLeads = d.leads || [];
+    renderStats(d.stats || {});
+    renderFunnel(d.stats || {});
+    renderTable(allLeads);
+    document.getElementById('last-refresh').textContent =
+      'Atualizado ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch (err) {
+    console.error('Load error:', err);
+  }
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+function renderStats(s) {
+  document.getElementById('s-hoje').textContent     = s.hoje || 0;
+  document.getElementById('s-criticos').textContent = s.criticos || 0;
+  document.getElementById('s-atencao').textContent  = s.atencao || 0;
+  document.getElementById('s-preventivo').textContent = s.preventivo || 0;
+  document.getElementById('s-checkout').textContent = s.foi_checkout || 0;
+  document.getElementById('s-tempo').textContent    = fmtTempo(s.tempo_medio);
+}
+
+// ── Funil ─────────────────────────────────────────────────────
+function renderFunnel(s) {
+  const total = Number(s.total) || 1;
+  const resultado = Number(s.chegou_resultado) || 0;
+  const checkout  = Number(s.foi_checkout) || 0;
+  const funil     = Number(s.no_funil) || 0;
+
+  setFunil('total',    total,     total,     total);
+  setFunil('resultado',resultado, total,     total);
+  setFunil('checkout', checkout,  total,     total);
+  setFunil('funil',    funil,     total,     total);
+}
+
+function setFunil(key, val, total) {
+  const pct = total ? Math.round((val / total) * 100) : 0;
+  document.getElementById('fb-' + key).style.width = pct + '%';
+  document.getElementById('fc-' + key).textContent = val;
+}
+
+// ── Table ─────────────────────────────────────────────────────
+function renderTable(leads) {
+  const tbody = document.getElementById('leads-body');
+  document.getElementById('tbl-count').textContent = ` — ${leads.length} registro${leads.length !== 1 ? 's' : ''}`;
+
+  if (!leads.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">Nenhum lead encontrado.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = leads.map(l => {
+    const nivel = l.nivel || 'preventivo';
+    const nivelLabel = nivel === 'critico' ? 'Crítico' : nivel === 'atencao' ? 'Atenção' : 'Preventivo';
+    const score = Number(l.score) || 0;
+    const scoreClass = score <= -35 ? 'score-neg' : score <= -15 ? 'score-mid' : 'score-ok';
+
+    // Engajamento: baseado no tempo (máx referência = 600s / 10min)
+    const tempo = l.tempo_quiz ? Number(l.tempo_quiz) : null;
+    const engPct = tempo ? Math.min(100, Math.round((tempo / 360) * 100)) : 0;
+    const engColor = engPct >= 66 ? 'var(--green)' : engPct >= 33 ? 'var(--yellow)' : 'var(--red)';
+    const engLabel = engPct >= 66 ? 'Alto' : engPct >= 33 ? 'Médio' : tempo ? 'Baixo' : '—';
+
+    const wa = maskWA(l.whatsapp || '');
+    const hora = fmtHora(l.created_at);
+
+    return `<tr>
+      <td class="nome-cell" title="${esc(l.nome)}">${esc(l.nome)}</td>
+      <td class="wa-cell">${wa}</td>
+      <td><span class="badge badge-${nivel}">${nivelLabel}</span></td>
+      <td class="score-cell ${scoreClass}">${score > 0 ? '+' : ''}${score}</td>
+      <td>
+        <div class="eng-wrap">
+          <div class="eng-bar"><div class="eng-fill" style="width:${engPct}%;background:${engColor}"></div></div>
+          <span class="eng-label">${engLabel}</span>
+        </div>
+      </td>
+      <td class="tempo-cell">${fmtTempo(tempo)}</td>
+      <td>${l.chegou_resultado ? '<span class="check-yes">✓</span>' : '<span class="check-no">—</span>'}</td>
+      <td>${l.is_final ? '<span class="check-yes">✓</span>' : '<span class="check-no">—</span>'}</td>
+      <td>${l.funnel_enqueued ? '<span class="check-yes">✓</span>' : '<span class="check-no">—</span>'}</td>
+      <td class="time-cell">${hora}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function maskWA(wa) {
+  const d = wa.replace(/\D/g, '');
+  if (d.length < 8) return wa;
+  return d.slice(0, 4) + '****' + d.slice(-4);
+}
+
+function fmtTempo(sec) {
+  if (!sec) return '—';
+  const s = Number(sec);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60), r = s % 60;
+  return r ? `${m}m ${r}s` : `${m}m`;
+}
+
+function fmtHora(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+function startDashboard() {
+  loadData();
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(loadData, 30000);
+}
+
+if (TOKEN) {
+  show('view-dashboard');
+  startDashboard();
+} else {
+  show('view-login');
+}
+</script>
+</body>
+</html>

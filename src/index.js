@@ -179,6 +179,9 @@ app.get('/admin/analytics', (req, res) => {
 app.get('/admin/performance', (req, res) => {
   res.sendFile(join(__dirname, 'admin', 'performance.html'));
 });
+app.get('/admin/quiz-leads', (req, res) => {
+  res.sendFile(join(__dirname, 'admin', 'quiz-leads.html'));
+});
 
 // API cost summary (admin only)
 app.get('/api/admin/costs', async (req, res) => {
