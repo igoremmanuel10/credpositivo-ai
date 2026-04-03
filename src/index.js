@@ -54,8 +54,8 @@ import { startInstagramScheduler } from './social/instagram.js';
 import { runCeoCycle } from './ceo/musk.js';
 import { startIgorScheduler, getIgorStatus, runIgorCycleNow } from './orchestrator/igor.js';
 import { initOS } from './os/index.js';
-import { startYoutubePipeline } from './youtube-pipeline/index.js';
-import { startContentOS } from './content-os/index.js';
+// import { startYoutubePipeline } from './youtube-pipeline/index.js'; // TODO: commitar módulo
+// import { startContentOS } from './content-os/index.js'; // TODO: commitar módulo
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -358,19 +358,9 @@ app.use((err, req, res, next) => {
     console.error('[AI-OS] Kernel init failed (non-fatal):', err.message);
   }
 
-  // YouTube Pipeline (dark channels automation)
-  try {
-    startYoutubePipeline();
-  } catch (err) {
-    console.error('[YouTubePipeline] Init failed (non-fatal):', err.message);
-  }
-
-  // Content OS (Instagram Reels, UGC, Carousel)
-  try {
-    startContentOS();
-  } catch (err) {
-    console.error('[ContentOS] Init failed (non-fatal):', err.message);
-  }
+  // TODO: descomentar quando youtube-pipeline e content-os forem commitados ao git
+  // startYoutubePipeline();
+  // startContentOS();
 
   app.listen(config.port, () => {
     console.log(`
