@@ -243,7 +243,16 @@
 
 <script>
 const API = '';
-let TOKEN = localStorage.getItem('quiz_token') || '';
+const TOKEN_KEY = 'adminSession';
+function getSavedToken() {
+  try { return JSON.parse(localStorage.getItem(TOKEN_KEY) || '{}').token || ''; } catch { return ''; }
+}
+function saveToken(t) {
+  const s = {}; try { Object.assign(s, JSON.parse(localStorage.getItem(TOKEN_KEY) || '{}')); } catch {}
+  s.token = t; localStorage.setItem(TOKEN_KEY, JSON.stringify(s));
+}
+function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+let TOKEN = getSavedToken();
 let allLeads = [];
 let currentPeriod = 'today';
 let refreshTimer = null;
@@ -263,18 +272,18 @@ document.getElementById('form-login').addEventListener('submit', async e => {
   btn.disabled = true; btn.textContent = 'Entrando…';
   err.classList.remove('visible');
   try {
-    const r = await fetch('/api/auth/login', {
+    const r = await fetch('/api/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: document.getElementById('inp-email').value,
-        password: document.getElementById('inp-senha').value,
+        senha: document.getElementById('inp-senha').value,
       }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Credenciais inválidas');
     TOKEN = d.token;
-    localStorage.setItem('quiz_token', TOKEN);
+    saveToken(TOKEN);
     show('view-dashboard');
     startDashboard();
   } catch (ex) {
@@ -287,7 +296,7 @@ document.getElementById('form-login').addEventListener('submit', async e => {
 
 document.getElementById('btn-logout').addEventListener('click', () => {
   TOKEN = '';
-  localStorage.removeItem('quiz_token');
+  clearToken();
   clearInterval(refreshTimer);
   show('view-login');
 });
