@@ -2,6 +2,7 @@ import { Router } from "express";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { createHash, randomUUID } from "crypto";
 import { enqueueLeadToFunnel } from "./email-funnel.js";
+import { db } from "../db/client.js";
 
 const FB_PIXEL_ID    = "3814071692219923";
 const FB_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
@@ -127,31 +128,36 @@ quizLeadRouter.post("/api/quiz-lead", async (req, res) => {
       nivel,
     });
 
-    // 5) Log the lead to JSON file
-    const leads = readLeads();
-    leads.push({
-      nome,
-      whatsapp,
-      email,
-      score,
-      level,
-      nivel,
-      variant: body.variant || null,
-      situacao: body.situacao || null,
-      valor: body.valor || null,
-      onde: body.onde || [],
-      urgencia: body.urgencia || null,
-      tentativa: body.tentativa || null,
-      source: body.source || "quiz_form",
-      url: body.url || null,
-      utm: body.utm || {},
-      timestamp: body.timestamp || new Date().toISOString(),
-      funnelEnqueued: funnelResult.success,
-      createdAt: new Date().toISOString(),
-    });
-    writeLeads(leads);
-
-    console.log(`[quiz-lead] Lead saved: ${email} (${nivel}, score ${score})`);
+    // 5) Salvar no PostgreSQL (fonte primária) + JSON como fallback
+    try {
+      await db.query(
+        `INSERT INTO quiz_leads
+           (nome, whatsapp, email, cpf, score, level, nivel, variant, situacao, valor,
+            onde, urgencia, tentativa, source, utm, url, funnel_enqueued)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+        [
+          nome, whatsapp, email, body.cpf || null, score, level, nivel,
+          body.variant || null, body.situacao || null, body.valor || null,
+          JSON.stringify(body.onde || []), body.urgencia || null, body.tentativa || null,
+          body.source || "quiz_credpositivo", JSON.stringify(body.utm || {}),
+          body.url || null, funnelResult.success,
+        ]
+      );
+      console.log(`[quiz-lead] Lead saved to DB: ${email} (${nivel}, score ${score})`);
+    } catch (dbErr) {
+      console.error("[quiz-lead] DB error, falling back to JSON:", dbErr.message);
+      const leads = readLeads();
+      leads.push({
+        nome, whatsapp, email, score, level, nivel,
+        variant: body.variant || null, situacao: body.situacao || null,
+        valor: body.valor || null, onde: body.onde || [],
+        urgencia: body.urgencia || null, tentativa: body.tentativa || null,
+        source: body.source || "quiz_credpositivo", url: body.url || null,
+        utm: body.utm || {}, timestamp: body.timestamp || new Date().toISOString(),
+        funnelEnqueued: funnelResult.success, createdAt: new Date().toISOString(),
+      });
+      writeLeads(leads);
+    }
 
     // 6) Return success
     res.json({

@@ -8,6 +8,7 @@ import { normalizePhone } from '../utils/phone.js';
 import { config } from '../config.js';
 import { syncDealWon } from '../crm/sync.js';
 import { fireEmailForEvent } from '../email/hook.js';
+import { createHash, randomUUID } from 'crypto';
 
 export const webhooksRouter = Router();
 
@@ -468,4 +469,85 @@ webhooksRouter.get('/api/events', (req, res) => {
       model: config.tts.model,
     },
   });
+});
+
+// ── POST /webhook/monetizze — Postback de venda confirmada ──────────────────
+// Monetizze chama esta URL quando uma venda é aprovada.
+// Configura em: Monetizze → Produto → Configurações → Postback URL
+//   https://credpositivo.com/webhook/monetizze
+//
+// Dispara evento Purchase via Meta CAPI para otimização de campanha.
+webhooksRouter.post('/webhook/monetizze', async (req, res) => {
+  res.status(200).json({ received: true });
+
+  try {
+    const body = req.body || {};
+    const status = (body.status_name || body.status || '').toLowerCase();
+
+    // Só processa vendas aprovadas
+    if (!['aprovada', 'approved', 'completo', 'complete'].includes(status)) {
+      console.log(`[monetizze] Ignorando postback com status: ${status}`);
+      return;
+    }
+
+    const email    = body.buyer_email || body.email || '';
+    const nome     = body.buyer_name  || body.nome  || '';
+    const phone    = (body.buyer_phone || body.telefone || '').replace(/\D/g, '');
+    const valor    = parseFloat(body.price || body.valor || 67);
+    const orderId  = body.order_id || body.transaction || randomUUID();
+
+    console.log(`[monetizze] Venda aprovada — ${email} — R$${valor} — order: ${orderId}`);
+
+    // Salva no banco
+    try {
+      await db.query(
+        `INSERT INTO quiz_leads (nome, whatsapp, email, source, valor, funnel_enqueued)
+         VALUES ($1, $2, $3, 'monetizze_purchase', $4, false)
+         ON CONFLICT DO NOTHING`,
+        [nome, phone, email, String(valor)]
+      );
+    } catch (dbErr) {
+      console.warn('[monetizze] DB insert error:', dbErr.message);
+    }
+
+    // Dispara CAPI Purchase
+    const FB_PIXEL_ID     = '3814071692219923';
+    const FB_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
+    if (!FB_ACCESS_TOKEN) return;
+
+    const hash = (v) => v ? createHash('sha256').update(v.trim().toLowerCase()).digest('hex') : undefined;
+
+    const payload = {
+      data: [{
+        event_name: 'Purchase',
+        event_time: Math.floor(Date.now() / 1000),
+        event_id: `monetizze_${orderId}`,
+        event_source_url: 'https://www.credpositivo.com/quizz',
+        action_source: 'website',
+        user_data: {
+          em:  email ? [hash(email)] : undefined,
+          ph:  phone ? [hash(phone)] : undefined,
+          fn:  nome  ? [hash(nome.split(' ')[0])] : undefined,
+          client_ip_address: req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip,
+          client_user_agent: req.headers['user-agent'],
+        },
+        custom_data: {
+          currency: 'BRL',
+          value: valor,
+          order_id: orderId,
+          content_name: 'Diagnóstico CredPositivo',
+          content_type: 'product',
+        },
+      }],
+    };
+
+    const capiRes = await fetch(
+      `https://graph.facebook.com/v19.0/${FB_PIXEL_ID}/events?access_token=${FB_ACCESS_TOKEN}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+    );
+    const capiData = await capiRes.json();
+    console.log(`[monetizze] CAPI Purchase fired: events_received=${capiData.events_received ?? '?'}`);
+  } catch (err) {
+    console.error('[monetizze] Erro no postback:', err.message);
+  }
 });
