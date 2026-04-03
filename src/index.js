@@ -54,6 +54,8 @@ import { startInstagramScheduler } from './social/instagram.js';
 import { runCeoCycle } from './ceo/musk.js';
 import { startIgorScheduler, getIgorStatus, runIgorCycleNow } from './orchestrator/igor.js';
 import { initOS } from './os/index.js';
+import { startYoutubePipeline } from './youtube-pipeline/index.js';
+import { startContentOS } from './content-os/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -61,6 +63,7 @@ const __dirname = dirname(__filename);
 const app = express();
 
 app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true })); // Monetizze postback (x-www-form-urlencoded)
 
 // CORS — whitelist allowed origins
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '*').split(',').map(s => s.trim());
@@ -353,6 +356,20 @@ app.use((err, req, res, next) => {
     console.log('[AI-OS] Kernel initialized successfully');
   } catch (err) {
     console.error('[AI-OS] Kernel init failed (non-fatal):', err.message);
+  }
+
+  // YouTube Pipeline (dark channels automation)
+  try {
+    startYoutubePipeline();
+  } catch (err) {
+    console.error('[YouTubePipeline] Init failed (non-fatal):', err.message);
+  }
+
+  // Content OS (Instagram Reels, UGC, Carousel)
+  try {
+    startContentOS();
+  } catch (err) {
+    console.error('[ContentOS] Init failed (non-fatal):', err.message);
   }
 
   app.listen(config.port, () => {
