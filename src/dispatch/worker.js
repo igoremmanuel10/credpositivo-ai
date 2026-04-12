@@ -23,14 +23,25 @@ function resetCounterIfNewDay() {
 }
 
 async function pickNextLead() {
+  // Dedupe por telefone: pula leads cujo whatsapp já foi tocado em qualquer
+  // outro lead (enviado, respondeu, parado, etc). Evita disparar 2x pro
+  // mesmo numero quando a pessoa fez o quizz multiplas vezes.
   const r = await db.query(
     `SELECT id, nome, whatsapp, nivel
-       FROM quiz_leads
-      WHERE wa_dispatch_status = 'novo'
-        AND whatsapp IS NOT NULL
-        AND length(regexp_replace(whatsapp,'\\D','','g')) >= 10
-        AND created_at >= NOW() - ($1 || ' days')::interval
-      ORDER BY created_at DESC
+       FROM quiz_leads q
+      WHERE q.wa_dispatch_status = 'novo'
+        AND q.whatsapp IS NOT NULL
+        AND length(regexp_replace(q.whatsapp,'\\D','','g')) >= 10
+        AND q.created_at >= NOW() - ($1 || ' days')::interval
+        AND NOT EXISTS (
+          SELECT 1 FROM quiz_leads q2
+          WHERE q2.id <> q.id
+            AND regexp_replace(q2.whatsapp,'\\D','','g')
+              = regexp_replace(q.whatsapp,'\\D','','g')
+            AND q2.wa_dispatch_status IN
+              ('enviado','enviando','respondeu','optout','parado','erro','invalido','duplicado')
+        )
+      ORDER BY q.created_at DESC
       LIMIT 1`,
     [String(dispatchConfig.maxLeadAgeDays)]
   );
@@ -72,6 +83,25 @@ async function dispatchOne() {
     await sendText(jid, text, dispatchConfig.token);
 
     await markStatus(lead.id, 'enviado', { incrementCount: true });
+
+    // Mark any other 'novo' row with the same phone as 'duplicado'
+    try {
+      const dup = await db.query(
+        `UPDATE quiz_leads
+            SET wa_dispatch_status = 'duplicado'
+          WHERE id <> $1
+            AND wa_dispatch_status = 'novo'
+            AND regexp_replace(whatsapp,'\\D','','g')
+              = regexp_replace((SELECT whatsapp FROM quiz_leads WHERE id = $1),'\\D','','g')`,
+        [lead.id]
+      );
+      if (dup.rowCount > 0) {
+        console.log(`[Dispatch] Marked ${dup.rowCount} duplicate lead(s) for phone of ${lead.id}`);
+      }
+    } catch (e) {
+      console.warn('[Dispatch] duplicate mark failed (non-fatal):', e.message);
+    }
+
     sentToday++;
     console.log(`[Dispatch] Sent to lead ${lead.id} (${phone}). Today: ${sentToday}/${dispatchConfig.dailyCap}`);
     return { status: 'sent', leadId: lead.id };
