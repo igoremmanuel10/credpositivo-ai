@@ -48,6 +48,7 @@ import { startUnansweredMonitor, checkAndFixUnanswered } from './monitoring/unan
 import { startFunnelWatcher } from './manager/funnel-watcher.js';
 import { emailFunnelRouter, startEmailFunnelPoller } from './api/email-funnel.js';
 import { quizLeadRouter } from './api/quiz-lead.js';
+import { startDispatchWorker, getDispatchStatus } from './dispatch/worker.js';
 import agentFeedRouter from './api/agent-feed.js';
 import { startAdsScheduler, getAdsSnapshot, sendAdsReport } from './ads/manager.js';
 import { startInstagramScheduler } from './social/instagram.js';
@@ -401,6 +402,7 @@ app.use((err, req, res, next) => {
     startAdsScheduler();
     startInstagramScheduler();
     startIgorScheduler();
+    startDispatchWorker();
 
     // Embedding job: process new conversations every 30 minutes, refresh stale daily
     setInterval(() => {

@@ -17,6 +17,7 @@ import { handleGroupMessage, FINANCEIRO_GROUP_JID } from '../expense/tracker.js'
 import { handleCoachingMessage, COACHING_GROUP_JID } from '../coaching/protocol.js';
 import { handleAdmGroupMessage, ADM_GROUP_JID } from '../agenda/manager.js';
 import { db } from '../db/client.js';
+import { handleIncomingDispatchReply } from '../dispatch/reply-detector.js';
 
 export const webhookRouter = Router();
 // === SMART CIRCUIT BREAKER ===
@@ -242,6 +243,9 @@ webhookRouter.post('/webhook/quepasa', async (req, res) => {
     const botTokenForReply = getTokenForWid(wid);
 
     console.log(`[Quepasa] Message from ${phone} (${pushName}) via wid ${wid ? wid.substring(0, 15) : 'unknown'}: ${text.substring(0, 100)}`);
+
+    // Dispatch reply detector — if this phone is in a dispatched quiz_lead, mark status
+    handleIncomingDispatchReply(phone, text).catch(() => {});
 
     // LAYER 1: System messages (logout, reconnect, etc.) — never process
     if (msg.type === 'system') {

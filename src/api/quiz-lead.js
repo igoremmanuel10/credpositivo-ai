@@ -188,7 +188,8 @@ quizLeadRouter.get("/api/quiz-leads", requireAdmin, async (req, res) => {
     const [leads, stats] = await Promise.all([
       db.query(
         `SELECT id, nome, whatsapp, email, score, nivel, situacao, urgencia,
-                funnel_enqueued, is_final, tempo_quiz, chegou_resultado, utm, source, created_at
+                funnel_enqueued, is_final, tempo_quiz, chegou_resultado, utm, source, created_at,
+                wa_dispatch_status, wa_dispatch_last_at, wa_dispatch_count
          FROM quiz_leads
          WHERE ${periodFilter}
          ORDER BY created_at DESC
@@ -215,6 +216,30 @@ quizLeadRouter.get("/api/quiz-leads", requireAdmin, async (req, res) => {
     res.json({ leads: leads.rows, stats: stats.rows[0] });
   } catch (err) {
     console.error("[quiz-leads] Error:", err);
+    res.status(500).json({ error: "Internal error", detail: err.message });
+  }
+});
+
+// ── PATCH /api/quiz-leads/:id/dispatch-status ───────────────────────────────
+// Admin action: pause/resume/reset dispatch for a given lead.
+// Allowed values: novo | parado | respondeu | optout
+quizLeadRouter.patch("/api/quiz-leads/:id/dispatch-status", requireAdmin, async (req, res) => {
+  const allowed = new Set(["novo", "parado", "respondeu", "optout"]);
+  const { id } = req.params;
+  const { status } = req.body || {};
+  if (!allowed.has(status)) {
+    return res.status(400).json({ error: "invalid status", allowed: [...allowed] });
+  }
+  try {
+    const r = await db.query(
+      `UPDATE quiz_leads SET wa_dispatch_status = $1 WHERE id = $2
+       RETURNING id, wa_dispatch_status`,
+      [status, Number(id)]
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: "not found" });
+    res.json({ ok: true, lead: r.rows[0] });
+  } catch (err) {
+    console.error("[quiz-leads] PATCH dispatch-status error:", err);
     res.status(500).json({ error: "Internal error", detail: err.message });
   }
 });
