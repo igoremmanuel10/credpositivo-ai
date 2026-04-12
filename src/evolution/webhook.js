@@ -121,6 +121,23 @@ webhookRouter.post('/webhook/quepasa-dispatch', async (req, res) => {
     if (!phone) return;
     const text = msg.text || msg.body || msg.message?.text || msg.message?.conversation || '';
     console.log(`[Dispatch Webhook] Reply from ${phone}: ${String(text).substring(0, 100)}`);
+
+    // Undo Quepasa auto-read (READUPDATE=true at server level) by marking
+    // chat back as unread. So the operator sees the unread badge on the phone.
+    const token = process.env.DISPATCH_QUEPASA_TOKEN || '';
+    const qpUrl = process.env.QUEPASA_API_URL || 'http://quepasa:31000';
+    if (token) {
+      fetch(`${qpUrl}/chat/markunread`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-QUEPASA-TOKEN': token,
+        },
+        body: JSON.stringify({ chatid: chatId }),
+      }).catch((err) => console.warn('[Dispatch Webhook] markunread failed:', err.message));
+    }
+
     handleIncomingDispatchReply(phone, text).catch(() => {});
   } catch (err) {
     console.warn('[Dispatch Webhook] error:', err.message);
