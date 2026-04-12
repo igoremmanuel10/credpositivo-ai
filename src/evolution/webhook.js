@@ -104,6 +104,30 @@ function detectMimeType(msg) {
 }
 
 // ============================================
+// QUEPASA DISPATCH WEBHOOK — isolado pro 2º número do disparador (Igor).
+// Só detecta resposta/opt-out pra marcar o lead no banco.
+// NÃO marca como lida, NÃO chama Augusto, NÃO faz nada mais.
+// ============================================
+webhookRouter.post('/webhook/quepasa-dispatch', async (req, res) => {
+  res.status(200).json({ status: 'received' });
+  try {
+    const msg = req.body || {};
+    const isFromMe = msg.fromMe || msg.from_me || msg.fromme;
+    if (isFromMe) return;
+    const chatId = msg.chat?.id || msg.chatId || msg.source || '';
+    if (!chatId || chatId.endsWith('@g.us')) return;
+    const rawPhone = msg.chat?.phone?.replace(/^\+/, '') || chatId.replace(/@.*$/, '');
+    const phone = normalizePhone(rawPhone);
+    if (!phone) return;
+    const text = msg.text || msg.body || msg.message?.text || msg.message?.conversation || '';
+    console.log(`[Dispatch Webhook] Reply from ${phone}: ${String(text).substring(0, 100)}`);
+    handleIncomingDispatchReply(phone, text).catch(() => {});
+  } catch (err) {
+    console.warn('[Dispatch Webhook] error:', err.message);
+  }
+});
+
+// ============================================
 // QUEPASA WEBHOOK - WhatsApp messages arrive here
 // ============================================
 webhookRouter.post('/webhook/quepasa', async (req, res) => {
