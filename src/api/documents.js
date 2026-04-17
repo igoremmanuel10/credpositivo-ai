@@ -133,8 +133,10 @@ router.get('/api/documents/:id/file', async (req, res) => {
     }
 
     const filePath = join(UPLOAD_DIR, doc.rows[0].filename);
+    const disposition = req.query.download ? 'attachment' : 'inline';
+    const safeName = String(doc.rows[0].original_name).replace(/"/g, '');
     res.setHeader('Content-Type', doc.rows[0].mime_type || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${doc.rows[0].original_name}"`);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${safeName}"`);
     res.sendFile(filePath);
   } catch (err) {
     console.error('[Documents] Serve error:', err);
